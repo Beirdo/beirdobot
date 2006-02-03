@@ -1,0 +1,4 @@
+This project is under GPL (see COPYING)
+
+The bot/ dir will contain the source of the IRC bot (C)
+The web/ dir will contain the source of the web frontend (PHP)
