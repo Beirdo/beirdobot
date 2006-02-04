@@ -1,0 +1,214 @@
+/*
+ *  This file is part of the beirdobot package
+ *  Copyright (C) 2006 Gavin Hurlbut
+ *
+ *  nuvtools is free software; you can redistribute it and/or modify
+ *  it under the terms of the GNU General Public License as published by
+ *  the Free Software Foundation; either version 2 of the License, or
+ *  (at your option) any later version.
+ *
+ *  This program is distributed in the hope that it will be useful,
+ *  but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ *  GNU General Public License for more details.
+ *
+ *  You should have received a copy of the GNU General Public License
+ *  along with this program; if not, write to the Free Software
+ *  Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ */
+
+/*HEADER---------------------------------------------------
+* $Id$
+*
+* Copyright 2006 Gavin Hurlbut
+* All rights reserved
+*
+*/
+
+#include "environment.h"
+#include <stdio.h>
+#include <pthread.h>
+#include <string.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <signal.h>
+#include <sys/time.h>
+#include <errno.h>
+#include <getopt.h>
+#include "protos.h"
+#include "release.h"
+
+
+static char ident[] _UNUSED_= 
+    "$Id$";
+
+char   *mysql_host;
+uint16 mysql_port;
+char   *mysql_user;
+char   *mysql_password;
+char   *mysql_db;
+
+void LogBanner( void );
+void MainParseArgs( int argc, char **argv );
+void MainDisplayUsage( char *program, char *errorMsg );
+
+int main ( int argc, char **argv )
+{
+    /* Parse the command line options */
+    MainParseArgs( argc, argv );
+
+    /* Print the startup log messages */
+    LogBanner();
+
+    /* Setup the MySQL connection */
+
+    /* Start the bot */
+    bot_start();
+
+    return(0);
+}
+
+
+void LogBanner( void )
+{
+    printf( "\nbeirdobot  (c) 2006 Gavin Hurlbut\n" );
+    printf( "%s\n", svn_version() );
+}
+
+
+void MainParseArgs( int argc, char **argv )
+{
+    extern char *optarg;
+    extern int optind, opterr, optopt;
+    int opt;
+    int optIndex = 0;
+    static struct option longOpts[] = {
+        {"help", 0, 0, 'h'},
+        {"version", 0, 0, 'V'},
+        {"host", 1, 0, 'H'},
+        {"user", 1, 0, 'u'},
+        {"password", 1, 0, 'p'},
+        {"port", 1, 0, 'P'},
+        {"database", 1, 0, 'd'},
+        {0, 0, 0, 0}
+    };
+
+    mysql_host = NULL;
+    mysql_port = 0;
+    mysql_user = NULL;
+    mysql_password = NULL;
+    mysql_db = NULL;
+
+    while( (opt = getopt_long( argc, argv, "hVH:P:u:p:d:", longOpts, &optIndex ))
+           != -1 )
+    {
+        switch( opt )
+        {
+            case 'h':
+                MainDisplayUsage( argv[0], NULL );
+                exit( 0 );
+                break;
+            case 'H':
+                if( mysql_host != NULL )
+                {
+                    free( mysql_host );
+                }
+                mysql_host = strdup(optarg);
+                break;
+            case 'P':
+                mysql_port = atoi(optarg);
+                break;
+            case 'u':
+                if( mysql_user != NULL )
+                {
+                    free( mysql_user );
+                }
+                mysql_user = strdup(optarg);
+                break;
+            case 'p':
+                if( mysql_password != NULL )
+                {
+                    free( mysql_password );
+                }
+                mysql_password = strdup(optarg);
+                break;
+            case 'd':
+                if( mysql_db != NULL )
+                {
+                    free( mysql_db );
+                }
+                mysql_db = strdup(optarg);
+                break;
+            case 'V':
+                LogBanner();
+                exit( 0 );
+                break;
+            case '?':
+            case ':':
+            default:
+                MainDisplayUsage( argv[0], "Unknown option" );
+                exit( 1 );
+                break;
+        }
+    }
+
+    if( mysql_host == NULL )
+    {
+        mysql_host = strdup("localhost");
+    }
+
+    if( mysql_port == 0 )
+    {
+        mysql_port = 3306;
+    }
+
+    if( mysql_user == NULL )
+    {
+        mysql_user = strdup("beirdonet");
+    }
+
+    if( mysql_password == NULL )
+    {
+        mysql_password = strdup("beirdonet");
+    }
+
+    if( mysql_db == NULL )
+    {
+        mysql_db = strdup("beirdonet");
+    }
+}
+
+void MainDisplayUsage( char *program, char *errorMsg )
+{
+    char *nullString = "<program name>";
+
+    LogBanner();
+
+    if( errorMsg != NULL )
+    {
+        fprintf( stderr, "\n%s\n\n", errorMsg );
+    }
+
+    if( program == NULL )
+    {
+        program = nullString;
+    }
+
+    fprintf( stderr, "\nUsage:\n\t%s [-H host] [-P port] [-u user] "
+                     "[-p password] [-d database]\n\n", program );
+    fprintf( stderr, 
+               "Options:\n"
+               "\t-H or --host\tMySQL host to connect to (default localhost)\n"
+               "\t-P or --port\tMySQL port to connect to (default 3306)\n"
+               "\t-u or --user\tMySQL user to connect as (default beirdonet)\n"
+               "\t-p or --password\tMySQL password to use (default beirdonet)\n"
+               "\t-d or --database\tMySQL database to use (default beirdonet)\n"
+               "\t-V or --version\tshow the version number and quit\n"
+               "\t-h or --help\tshow this help text\n\n" );
+}
+
+
+/*
+ * vim:ts=4:sw=4:ai:et:si:sts=4
+ */
+

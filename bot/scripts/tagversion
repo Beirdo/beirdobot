@@ -1,0 +1,43 @@
+#! /bin/sh
+
+RELEASE=0
+DONE=0
+
+while [ ${DONE} -eq 0 ] ; do
+	getopts "r:" arg
+	if [ $? -ne 0 ] ; then
+		DONE=1
+		continue 1
+	fi
+
+	case ${arg} in
+	r)
+		# Make a release tag
+		RELEASE=1
+		RELEASENUM=${OPTARG}
+		;;
+	?)
+		DONE=1
+		;;
+	esac
+done
+	
+if [ ${RELEASE} -eq 0 ] ; then
+	if [ -f .release ] ; then
+		# This is building from a released version
+		echo "Not tagging a released version"
+		exit 0
+	fi
+
+	# This is an SVN build
+	RELEASENUM=`svnversion -n .`
+	VERSION="SVN Version ${RELEASENUM}"
+else
+	# This is building a release
+	VERSION="Release ${RELEASENUM}"
+	touch .release
+fi
+
+sed -e "s/@VERSION@/${VERSION}/" include/release.h.in > include/release.h
+echo ${VERSION}
+

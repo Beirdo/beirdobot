@@ -1,6 +1,31 @@
-/* Bot Net Example file
-  (c) Christophe CALMEJANE - 1999'01
-  aka Ze KiLleR / SkyTech
+/*
+ *  This file is part of the beirdobot package
+ *  Copyright (C) 2006 Gavin Hurlbut
+ *
+ *  nuvtools is free software; you can redistribute it and/or modify
+ *  it under the terms of the GNU General Public License as published by
+ *  the Free Software Foundation; either version 2 of the License, or
+ *  (at your option) any later version.
+ *
+ *  This program is distributed in the hope that it will be useful,
+ *  but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ *  GNU General Public License for more details.
+ *
+ *  You should have received a copy of the GNU General Public License
+ *  along with this program; if not, write to the Free Software
+ *  Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ */
+
+/*HEADER---------------------------------------------------
+* $Id$
+*
+* Copyright 2006 Gavin Hurlbut
+* All rights reserved
+*
+* Bot Net Example file
+* (c) Christophe CALMEJANE - 1999'01
+* aka Ze KiLleR / SkyTech
 */
 
 
@@ -13,6 +38,8 @@
 #endif
 #include <errno.h>
 #include <string.h>
+#include "environment.h"
+#include "protos.h"
 
 #define BOT_NICKNAME "Mega"
 #define BOT_USERNAME "MegaBot"
@@ -230,7 +257,7 @@ void ProcOnAction(BN_PInfo I,const char Chan[],const char Who[],const char Msg[]
   printf("%s sent an action to %s : %s\n",Who,Chan,Msg);
 }
 
-int main(int argc,char *argv[])
+void bot_start(void)
 {
   BN_TInfo Info;
 #ifdef _WIN32
@@ -239,13 +266,9 @@ int main(int argc,char *argv[])
   pid_t Res;
 #endif
 
-  printf("MEGA BOT\n%s\n",BN_GetCopyright());
+  char *server = NULL;
+  uint16 port = 6667;
 
-  if(argc < 2)
-  {
-    printf("Missing server name\n");
-    return -1;
-  }
   memset(&Info,0,sizeof(Info));
   Info.CB.OnConnected = ProcOnConnected;
   Info.CB.OnPingPong = ProcOnPingPong;
@@ -282,9 +305,9 @@ int main(int argc,char *argv[])
   Val = 0; // Val initialized to 0 here... If new PROCESS, cannot change this variable... otherwise we can
 
 #ifdef DEBUG
-  while(BN_Connect(&Info,argv[1],6667,0) != true)
+  while(BN_Connect(&Info,server,port,0) != true)
 #else
-  while(BN_Connect(&Info,argv[1],6667,PROCESS_NEW_THREAD) == true)
+  while(BN_Connect(&Info,server,port,PROCESS_NEW_THREAD) != true)
 #endif
   {
     printf("Disconnected.\n");
@@ -311,6 +334,5 @@ int main(int argc,char *argv[])
     Sleep(5*1000);
   } while(Res == STILL_ACTIVE);
 #endif
-  return 0;
 }
 

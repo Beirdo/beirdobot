@@ -1,0 +1,62 @@
+#! /bin/bash
+
+ORIGDIR=`pwd`
+TMPDIR=${ORIGDIR}/mkrelease.$$
+
+# Prompt for release number
+RESULT=1
+while [ ${RESULT} -eq 1 ] ; do
+	echo ""
+	echo -n "Release number? "
+	read RELEASENUM crap
+
+	if [ "${RELEASENUM}" != "" ] ; then
+		RESULT=0
+	else
+		echo "Idiot.  Enter the release number!"
+	fi
+done
+
+# Check everything in
+svn commit
+
+# Create the tag
+svn copy https://trac.beirdo.ca:4443/svn/beirdobot/trunk \
+         https://trac.beirdo.ca:4443/svn/beirdobot/tags/release-${RELEASENUM} \
+	 -m "Tagging release ${RELEASENUM}"
+
+# Create a temp dir to export in
+mkdir ${TMPDIR}
+
+# Check out the tagged release
+cd ${TMPDIR}
+svn co https://trac.beirdo.ca:4443/svn/beirdobot/tags/release-${RELEASENUM} \
+	beirdobot-${RELEASENUM}
+cd beirdobot-${RELEASENUM}/bot
+
+# Make the release.h
+scripts/tagversion -r ${RELEASENUM}
+
+# Generate the ChangeLog
+svn log --xml --verbose | \
+	scripts/svn2log.py -F -u scripts/.users -o ChangeLog.tag
+svn log --xml --verbose | \
+	scripts/svn2log.py -F -u scripts/.users -p /trunk -o ChangeLog.trunk
+cat ChangeLog.tag ChangeLog.trunk > ChangeLog
+rm ChangeLog.tag ChangeLog.trunk
+
+# Create an excludes file
+cd ${TMPDIR}
+find beirdobot-${RELEASENUM} -name .svn -type d > excludes
+
+# Create a tarball as nuvtools-${RELEASENUM}
+tar --exclude-from excludes -czvf beirdobot-${RELEASENUM}.tar.gz \
+	beirdobot-${RELEASENUM}
+cp beirdobot-${RELEASENUM}.tar.gz ${ORIGDIR}
+
+# (future) Create an RPM
+# (future) Create a DEB
+
+# Clean up the checked out dir
+cd ${ORIGDIR}
+rm -rf ${TMPDIR}
