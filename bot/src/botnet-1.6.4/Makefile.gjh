@@ -4,5 +4,6 @@ all:
 	${MAKE} install
 
 clean:
+	${MAKE} uninstall
 	${MAKE} distclean
 
