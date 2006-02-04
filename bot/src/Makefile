@@ -1,13 +1,15 @@
 BOTNETCFG	=../bin/botnet-config
+MYSQLCFG	= mysql_config
 
 CC	= gcc
 
 CFLAGS	= -O6 -g -Wall -Werror -DDEBUG
 #-ansi -pedantic 
+CFLAGS	+= $(shell ${MYSQLCFG} --cflags)
 CFLAGS  += $(shell ${BOTNETCFG} --cflags)
 
 LDFLAGS = -g
-LIBS	= -L/usr/lib/mysql -lmysqlclient
+LIBS	= $(shell ${MYSQLCFG} --libs_r)
 LIBS	+= $(shell ${BOTNETCFG} --libs-static)
 
 SRCS	= bot.c
