@@ -97,6 +97,8 @@ typedef unsigned long long int uint64;
 #define ELEMSIZE(elem,StructType)   (sizeof(((StructType *)NULL)->elem))
 #define FORCE_UINT32(x)             (*(uint32 *)&(x))
 
+#define MAX_STRING_LENGTH           1024
+
 #endif
 
 /*

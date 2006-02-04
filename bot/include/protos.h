@@ -34,7 +34,7 @@ static char protos_h_ident[] _UNUSED_ =
 
 /* Externals */
 extern char   *mysql_host;
-extern uint16  mysql_port;
+extern uint16  mysql_portnum;
 extern char   *mysql_user;
 extern char   *mysql_password;
 extern char   *mysql_db;
@@ -42,6 +42,7 @@ extern char   *mysql_db;
 
 /* Prototypes */
 void bot_start(void);
+void db_setup(void);
 
 #endif
 

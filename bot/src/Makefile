@@ -3,7 +3,7 @@ MYSQLCFG	= mysql_config
 
 CC	= gcc
 
-CFLAGS	= -O6 -g -Wall -Werror
+CFLAGS	= -O6 -g -Wall -Werror -I../include
 # -DDEBUG
 #-ansi -pedantic 
 CFLAGS	+= $(shell ${MYSQLCFG} --cflags)
@@ -13,7 +13,7 @@ LDFLAGS = -g
 LIBS	= $(shell ${MYSQLCFG} --libs_r)
 LIBS	+= $(shell ${BOTNETCFG} --libs-static)
 
-SRCS	= main.c bot.c
+SRCS	= main.c bot.c mysql.c
 OBJS	= ${SRCS:.c=.o}
 EXE	= bot
 

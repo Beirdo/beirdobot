@@ -43,7 +43,7 @@ static char ident[] _UNUSED_=
     "$Id$";
 
 char   *mysql_host;
-uint16 mysql_port;
+uint16  mysql_portnum;
 char   *mysql_user;
 char   *mysql_password;
 char   *mysql_db;
@@ -61,6 +61,7 @@ int main ( int argc, char **argv )
     LogBanner();
 
     /* Setup the MySQL connection */
+    db_setup();
 
     /* Start the bot */
     bot_start();
@@ -94,7 +95,7 @@ void MainParseArgs( int argc, char **argv )
     };
 
     mysql_host = NULL;
-    mysql_port = 0;
+    mysql_portnum = 0;
     mysql_user = NULL;
     mysql_password = NULL;
     mysql_db = NULL;
@@ -116,7 +117,7 @@ void MainParseArgs( int argc, char **argv )
                 mysql_host = strdup(optarg);
                 break;
             case 'P':
-                mysql_port = atoi(optarg);
+                mysql_portnum = atoi(optarg);
                 break;
             case 'u':
                 if( mysql_user != NULL )
@@ -157,9 +158,9 @@ void MainParseArgs( int argc, char **argv )
         mysql_host = strdup("localhost");
     }
 
-    if( mysql_port == 0 )
+    if( mysql_portnum == 0 )
     {
-        mysql_port = 3306;
+        mysql_portnum = 3306;
     }
 
     if( mysql_user == NULL )
