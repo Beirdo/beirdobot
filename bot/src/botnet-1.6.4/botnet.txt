@@ -1,0 +1,533 @@
+
+                           The BotNet Documentation
+                             Written by Ze KiLleR
+
+                           Stable Version : 1.6.4
+                           Devel  Version : none
+                       Last Update : November, 26th 2001
+
+       Some changes may appear between versions, as small as possible
+     It is only a small documentation as the package isn't finished yet
+    If someone wants to make a full documentation...well.. just do it :o)
+
+
+ Description
+
+    BotNet is a small shared and statically linked library, intended to assist
+  development of a bot or a full client for the IRC protocol (see RFC 1459).
+  You can connect to an IRC server, send messages, and receive data from the
+  server. Received data are parsed, and returned to the main thread as events
+  as described bellow.
+  BotNet now supports services, and functions for easily make a leaf server
+  compatible with the new RFCs (2810 to 2813).
+
+ Portability issue
+
+    BotNet library is written in C, and uses standard socket functions, so you
+  may easily compile it on many archs.
+
+
+ Reference
+
+    Here is the reference manual for all functions and structures of BotNet package
+    Please consult rfc for more details on the IRC protocol (rfc1459, and newly
+    released rfc2810 to rfc2813)
+
+
+
+
+  typedef struct
+  {
+    int Socket;
+    char Nick[BN_NICKLENGTH];
+    char Buf[BN_BUFFERSIZE];
+    int BufPos;
+    BN_TCallbacks CB;
+    /* Server data */
+    BN_TServerCallbacks SCB;
+    char Serv[BN_SERVLENGTH];
+    bool IsServer;
+    int PingDelay;
+    int MyToken;
+    /* *********** */
+    struct BN_PSlood *Flood;
+    void *User;
+    int Flags;
+    char *Server;
+    int Port;
+    time_t Stamps[BN_STAMPSIZE];
+    int    StampPos,NbStamps,StampLen[BN_STAMPSIZE];
+    time_t Time;
+    Thread;
+  } BN_TInfo,*BN_PInfo;
+
+
+  This is the type of server informations passed to each event callback function and passed to the Connect function :
+    Socket is the connected socket (DON'T USE IT).
+    Nick is your current registered nickname (DON'T CHANGE IT).
+    Buf contains the internal buffer (DON'T USE IT).
+    BufPos is the internal buffer position (DON'T USE IT).
+    CB contains the callback function pointers. You have to set them before calling the Connect function.
+    /* Server data only have a usable value if current connection is a server */
+    SCB contains the server callback function pointers. You have to set them before calling the Connect function.
+    Serv is the name of the connected server (DON'T CHANGE IT).
+    IsServer is a boolean that has a true value if the current connection is a server (DON'T CHANGE IT).
+    PingDelay is the max time to wait for data before sending a PING request to the remote server. You have to set it before calling the Connect function.
+    MyToken is the token of my server for the other servers (DON'T CHANGE IT).
+    /* end of server specific data */
+    Flood is an internal structure used for excess flood detection (if set with BN_EnableFloodProtection) (DON'T USE IT).
+    User is a user defined pointer intended to store personnal datas. You can set it to whatever your want.
+    Flags,Server and Port are the values passed as arguments to the BN_Connect function (DON'T CHANGE IT).
+    Stamps,... are the arrival time of the messages in the current callback (DON'T CHANGE IT).
+    Thread is the thread's handle (if applicable) (DON'T USE IT).
+
+
+  typedef struct
+  {
+    /* Server data */
+    char To[BN_NICKLENGTH];
+    BN_TChatCallbacks CB;
+    /* *********** */
+    char Nick[BN_NICKLENGTH];
+    char UN[BN_UNLENGTH];
+    int  Status;
+    char Addr[BN_ADRSLENGTH];
+    int  Port;
+    int  Socket;
+    int  Flags;
+    char Buf[CHAT_BUFFERSIZE];
+    int  BufPos;
+    struct sockaddr_in SAddr;
+    void *User;
+  } BN_TChat,*BN_PChat;
+
+  This is the type of DCC Chat connection informations passed to each callback function :
+    To is the remote nick, used for servers.
+    CB are the callback used in server mode for this dcc chat connection.
+    Nick contains the nick of remote host at the time of the request (not updated, you can modify).
+    UN contains the Username of remote host.
+    Status represents the current status of the DCC Chat connection (DON'T USE).
+    Addr contains the IP adrs of remote host (in dot format, you can read).
+    Port,Socket,Buf,BufPos and SAddr are internally used.
+    Flags are the flags passed to the Accept or Request functions.
+    User is a user defined pointer intended to store personnal datas.
+
+
+  typedef struct
+  {
+    /* Server data */
+    char To[BN_NICKLENGTH];
+    BN_TSendCallbacks CB;
+    /* *********** */
+    char Nick[BN_NICKLENGTH];
+    char UN[BN_UNLENGTH];
+    int  Status;
+    char Addr[BN_ADRSLENGTH];
+    int  Port;
+    int  Socket;
+    int  Flags;
+    char Buf[CHAT_BUFFERSIZE];
+    int  BufPos;
+    char Filename[PATH_MAX];
+    unsigned int Length;
+    struct sockaddr_in SAddr;
+    void *User;
+  } BN_TSend,*BN_PSend;
+
+  This is the type of DCC Send connection informations passed to each callback function :
+    Variables with the same name as in the BN_PChat structure have the same meaning.
+    Filename is the currently file processed (receiving or sending)
+
+
+  typedef struct
+  {
+    void (*OnConnected)(BN_PInfo,const char []); // Host
+    void (*OnRegistered)(BN_PInfo); // Void
+    void (*OnError)(BN_PInfo,int); // Num
+    void (*OnPingPong)(BN_PInfo); // Void
+    void (*OnStatus)(BN_PInfo,const char [],int); // Msg Code
+    void (*OnJoinChannel)(BN_PInfo,const char []); // Chan
+    void (*OnChannelTalk)(BN_PInfo,const char [],const char [],const char []); // Chan Who Msg
+    void (*OnAction)(BN_PInfo,const char [],const char [],const char []); // Chan Who Msg
+    void (*OnPrivateTalk)(BN_PInfo,const char [],const char [],const char []); // Who Whom Msg
+    char * (*OnCTCP)(BN_PInfo,const char [],const char [],const char []); // Who Whom Type .. returned string is freed after use
+    void (*OnCTCPReply)(BN_PInfo,const char [],const char [],const char []); // Who Whom Msg
+    void (*OnNotice)(BN_PInfo,const char [],const char [],const char []); // Who Whom Msg
+    void (*OnNick)(BN_PInfo,const char [],const char []); // Who Msg
+    void (*OnJoin)(BN_PInfo,const char [],const char []); // Chan Who
+    void (*OnPart)(BN_PInfo,const char [],const char [],const char []); // Chan Who Msg
+    void (*OnQuit)(BN_PInfo,const char [],const char []); // Who Msg
+    void (*OnMode)(BN_PInfo,const char [],const char [],const char []); // Chan Who Msg
+    void (*OnModeIs)(BN_PInfo,const char [],const char []); // Chan Msg
+    void (*OnTopic)(BN_PInfo,const char [],const char [],const char []); // Chan Who Msg
+    void (*OnTopicIs)(BN_PInfo,const char [],const char []); // Chan Msg
+    void (*OnTopicSetBy)(BN_PInfo,const char [],const char [],const char []); // Chan Msg Time
+    void (*OnList)(BN_PInfo,const char *[],const char *[],const char *[],const int); // Channels Usercounts Topics Count
+    void (*OnNames)(BN_PInfo,const char *,const char *[],const int); // Chan List Count
+    void (*OnWhois)(BN_PInfo,const char *[]); // Infos
+    void (*OnWho)(BN_PInfo,const char *,const char *[],const int); // Chan Infos-list Count
+    void (*OnBanList)(BN_PInfo,const char [],const char *[],const int); // Chan BanList Count
+    void (*OnInvite)(BN_PInfo,const char [],const char [],const char []); // Chan Who Whom
+    void (*OnKick)(BN_PInfo,const char [],const char [],const char [],const char []); // Chan Who Whom Msg
+    void (*OnKill)(BN_PInfo,const char [],const char [],const char []); // Who Whom Msg
+    void (*OnDisconnected)(BN_PInfo,const char []); // Msg
+    void (*OnExcessFlood)(BN_PInfo,const char []); // Msg
+    void (*OnUnknown)(BN_PInfo,const char[],const char[],const char []); // Who Command Msg
+
+    BN_TChatCallbacks Chat;
+    BN_TSendCallbacks Send;
+
+    void * (*OnUserCallback1)(BN_PInfo,void *Info); // Info
+    void * (*OnUserCallback2)(BN_PInfo,void *Info); // Info
+    void * (*OnUserCallback3)(BN_PInfo,void *Info); // Info
+    void * (*OnUserCallback4)(BN_PInfo,void *Info); // Info
+  } BN_TCallbacks,*BN_PCallbacks;
+
+  This structure contains all callback function pointers, you must set them (either to NULL or one of your function) before any
+  call to the Connect function (each function has the server's info struct as first parameter).
+  Some of these functions have a Whom parameter that is YOU and is useful only in server mode.
+    void OnConnected(HostName) : When server has accepted your connection
+    void OnRegistered(void) : When you've been registered on the server
+    void OnError(ErrorNum) : When an error occured on the server (just before disconnection)
+    void OnPingPong(void) : When you received a PING message
+    void OnStatus(Message,Code) : When you received a status kind message (see rfc for code number or use defined from botnet.h)
+    void OnJoinChannel(Channel) : When you have just joined a new channel
+    void OnChannelTalk(Channel,Who,Message) : When somebody talked in a channel
+    void OnAction(Channel,Who,Message) : When somebody did an 'action' message in a channel
+    void OnPrivateTalk(Who,Whom,Message) : When you (whom) received a private message from somebody (who)
+    char *OnCTCP(Who,Whom,Type) : When you (whom) received a CTCP command. you must return a string (your answer to the CTCP command) or NULL
+                                  The string will be freed internally
+    void OnCTCPReply(Who,Whom,Answer) : When you (whom) received a CTCP reply for a command you sent
+    void OnNotice(Who,Whom,Message) : When you (whom) received a NOTICE from somebody (Who may be null if from server)
+    void OnNick(Who,NewNick) : When somebody has changed his nickname
+    void OnJoin(Channel,Who) : When somebody has joined a channel
+    void OnPart(Channel,Who,Message) : When somebody has left a channel
+    void OnQuit(Who,Message) : When somebody has quit irc
+    void OnMode(Channel,Who,Mode) : When somebody has changed a channel's mode
+    void OnModeIs(Channel,Mode) : When you received a channel's mode answer
+    void OnTopic(Channel,Who,NewTopic) : When somebody has changed a channel's topic
+    void OnTopicIs(Channel,Topic) : When you join a channel, you receive the current channel's topic
+    void OnTopicSetBy(Channel,Who,Time) : When you join a channel, you may be notified of who set the topic
+    void OnList(Channels,Usercounts,Topics,Count) : When you received answer of your LIST query
+    void OnNames(Channel,NamesList,NamesCount) : When you received answer of your NAMES query
+    void OnWhois(WhoisInfo) : When you received answer of your WHOIS query
+    void OnWho(Channel,WhoInfo,Count) : When you reveived answer of your WHO query.
+    void OnBanList(Channel,BanList,BanCount) : When you received answer of your BANLIST query
+    void OnInvite(Channel,Who,Whom) : When you (whom) have been invited to a channel by somebody (who)
+    void OnKick(Channel,Who,Whom,Message) : When you (whom) have been kicked from a channel by somebody (who)
+    void OnKill(Who,Whom,Message) : When you (whom) have been killed from server by an ircop or server (who)
+    void OnDisconnected(Message) : When you have lost your connection to the server
+    void OnExcessFlood(Message) : When one of your message (to send) is in a waiting state because it would raise an excess flood otherwise.
+    void OnUnknown(Who,Command,Message) : When an unknown event (or not yet handled) occured. Please report this event to the development team.
+
+
+  typedef struct
+  {
+    void (*OnDCCChatRequest)(BN_PInfo,BN_PChat); // Chat
+    void (*OnDCCChatOpened)(BN_PInfo,BN_PChat); // Chat
+    void (*OnDCCChatClosed)(BN_PInfo,BN_PChat); // Chat
+    void (*OnDCCTalk)(BN_PInfo,BN_PChat,const char []); // Chat Msg
+    void (*OnDCCChatIdle)(struct BN_SInfo *,BN_PChat); // Chat
+  } BN_TChatCallbacks,*BN_PChatCallbacks;
+
+  typedef struct
+  {
+    void (*OnDCCSendOpened)(struct BN_SInfo *,BN_PSend); // Send
+    void (*OnDCCSendClosed)(struct BN_SInfo *,BN_PSend); // Send
+    void (*OnDCCSendRequest)(struct BN_SInfo *, BN_PSend); // Send
+    void (*OnDCCGetOpened)(struct BN_SInfo *, BN_PSend); // Send
+    void (*OnDCCGetClosed)(struct BN_SInfo *, BN_PSend); // Send
+  } BN_TSendCallbacks,*BN_PSendCallbacks;
+
+  And here are the DCC CHAT events (not fully tested yet... please report any bug to the development team)
+  Each function has the Chat's info structure as second parameter :
+    void OnDCCChatRequest : When you received a DCC chat request. Accept it with a call to the AcceptDCCChat fonction or Reject it.
+    void OnDCCChatOpened : When a DCC chat has been established
+    void OnDCCChatClosed : When a DCC chat has been closed
+    void OnDCCTalk : When you received a message from the other side of the DCC chat connection
+    void OnDCCChatIdle : When the DCC chat connection has been idle for the default time_out value (30 sec)
+
+  And here are the DCC SEND events (not fully tested yet... please report any bug to the development team)
+  Each function has the Send's info structure as second parameter :
+    void OnDCCSendRequest : When you received a DCC send request. Accept it with a call to the AcceptDCCSend fonction or Reject it.
+    void OnDCCSendOpened : When a DCC send is starting
+    void OnDCCSendClosed : When a DCC send is finished
+    void OnDCCGetOpened : When a DCC get is starting
+    void OnDCCGetClosed : When a DCC get is finished
+
+  There are also 4 user defined callback, taking a BN_PInfo and a void * as parameter, and returning a void *.
+
+
+  /* ************************************ */
+  /*      GLOBAL AND CLIENT FUNCTIONS     */
+  /* ************************************ */
+
+  char * BN_GetVersion(void);
+
+    This function returns the version number of the package.
+
+
+  char *BN_GetCopyright(void);
+
+    This function returns the copyright info of the package.
+
+
+  bool BN_Connect(BN_PInfo Info,const char *Server,const int Port,const int Flags);
+
+    This function connects you to the specified Server and Port.
+    The Info parameter must have been allocated and its CB structure must have been filled before this call.
+    Flags is any of the following flags :
+      PROCESS_KEEP_SIG    : Keep all signal handler (otherwise, they are set to SIG_DFL) (only applicable if PROCESS_NEW_PROCESS or PROCESS_NEW_THREAD)
+      PROCESS_NEW_PROCESS : Creates a new process, in a different address space
+      PROCESS_NEW_THREAD  : Creates a new thread, in the same address space
+    By default, no new process is created and the function returns only on error. The last callback called if error AFTER disconnection is OnDisconnect, so you can reconnect in this CB, before return.
+    True on success.
+
+
+  void BN_EnableFloodProtection(BN_PInfo Info,int BufferSize,int SizeLimit,time_t TimeLimit);
+
+    This function is used to set an internal excess flood detection mechanism.
+      BufferSize is the desired buffer size (OnExcessFlood event is raised if the buffer overflows) (100 seems to be enough)
+      SizeLimit and TimeLimit represent the limit value before excess flood (1000 bytes:60 seconds might be enough)
+
+
+  void BN_DisableFloodProtection(BN_PInfo Info);
+
+    This function is used to disable the excess flood detection mechanism.
+
+
+  void BN_SendQuitMessage(BN_PInfo Info,const char *QuitMessage);
+
+    This function sends a QUIT message to the server, and disconnects you.
+
+
+  char *BN_MakeMessage(const char *Prefix,const char *Command,const char *Params);
+
+    This function creates a new message (returned as a string).
+    When sending message, prefix is only used between servers.
+    Command is the command to send.
+    Params are all parameters in one string.
+    Please refer to RFC for more details of messages structure.
+
+
+  void BN_SendPassword(BN_PInfo I,const char *Password);
+
+    This function is used to send a (optional) password BEFORE registering.
+
+
+  void BN_Register(BN_PInfo Info,const char *Nick,const char *UserName,const char *RealName);
+
+    This function sends a register message to the server it's connected to
+    Nick is the nick name to use (unique for all linked servers)
+    UserName is your user name (UserName@HostName)
+    RealName is what appears in a WHOIS command.
+
+
+  void BN_RegisterService(BN_PInfo I,const char *Nick,const char *Distribution,const char *Type,const char *Info);
+
+    This is used to register you as a SERVICE instead of a client.
+
+
+  void BN_SendNickMessage(BN_PInfo Info,const char *NewNick);
+
+    This function sends a NICK command.
+
+
+  bool BN_SendMessage(BN_PInfo Info,char *Message,int Priority);
+
+    This function sends directly the specified message to the server. LOW LEVEL FUNCTION.
+    Message is freed in the function. Priority gives a priority level to the message, in
+    case of excess flood (must be BN_LOW_PRIORITY or BN_HIGH_PRIORITY).
+    True on success.
+
+
+  void BN_SendChannelMessage(BN_PInfo Info,const char *Channel,const char *Message);
+
+    This function sends a string to the specified channel.
+
+
+  void BN_SendActionMessage(BN_PInfo I,const char *Channel,const char *Message);
+
+    This function sends an action message to the specified channel (/me command).
+
+
+  void BN_SendPrivateMessage(BN_PInfo Info,const char *Nick,const char *Message);
+
+    This function sends a private string to the specified nickname.
+
+
+  void BN_SendSQueryMessage(BN_PInfo I,const char *ServiceName,const char *Message);
+
+    This function sends a query string to the specified service.
+    This is the only way to send a message to a service.
+
+
+  void BN_SendWallopMessage(BN_PInfo I,const char *Message);
+
+    This function sends a Wallop message.
+
+
+  void BN_SendJoinMessage(BN_PInfo Info,const char*Channel,const char *Keys);
+
+    This function sends a JOIN message for joining the specified channel, with ou without access keys.
+
+
+  void BN_ExtractNick(const char *Prefix,char Nick[],int Length);
+
+    This function copies the nick part from a prefix, and with a maximal length of Length.
+    Prefix is the string from the Prefix element of a BN_PMessage.
+    Nick is the destination buffer (must be allocated before).
+    Length is the max length of the Nick buffer.
+
+
+  void BN_ExtractHost(const char *Prefix,char Host[],int Length);
+
+    This function is similar to the BN_ExtractNick, but returns the Host instead.
+
+
+  void BN_ExtractUserName(const char *Prefix,char UserName[],int Length);
+
+    This function is similar to the BN_ExtractNick, but returns the UserName instead.
+
+
+  char  *BN_StripColor(const char *text);
+
+    This function strips mirc color codes from text, and returns a new string without them.
+
+
+  /* ************************************ */
+  /*              DCC Functions           */
+  /* ************************************ */
+
+  void BN_SendDCCChatRequest(BN_PInfo Info,const char *Nick,const int Flags);
+
+    This function sends a DCC CHAT request to the specified Nick.
+    If accepted by remote host, the connection is automatically open.
+    Flags is any of the following flags :
+      PROCESS_KEEP_SOCKET : Keep server's socket opened (otherwise, it's closed. So you can't send message to server from a dcc connection) (only applicable if PROCESS_NEW_PROCESS)
+      PROCESS_KEEP_SIG    : Keep all signal handler (otherwise, they are set to SIG_DFL)
+      PROCESS_KEEP_EVENT  : Keep all Info.CB (otherwise, they are set to NULL, except DCCClosed,DCCOpened,DCCTalk) (only applicable if PROCESS_NEW_PROCESS)
+      PROCESS_NEW_PROCESS : Creates a new process, in a different address space
+      PROCESS_NEW_THREAD  : Creates a new thread, in the same address space
+    By default, no new thread is created.
+
+
+  void BN_AcceptDCCChat(BN_PInfo,Info,BN_PChat Chat,const int Flags);
+
+    This function is used to accept a DCC Chat request from a remote host. (Use BN_RejectDCCChat if not accepting this connection)
+    Flags is any of the following flags :
+      PROCESS_KEEP_SOCKET : Keep server's socket opened (otherwise, it's closed. So you can't send message to server from a dcc connection) (only applicable if PROCESS_NEW_PROCESS)
+      PROCESS_KEEP_SIG    : Keep all signal handler (otherwise, they are set to SIG_DFL)
+      PROCESS_KEEP_EVENT  : Keep all Info.CB (otherwise, they are set to NULL, except DCCClosed,DCCOpened,DCCTalk) (only applicable if PROCESS_NEW_PROCESS)
+      PROCESS_NEW_PROCESS : Creates a new process, in a different address space
+      PROCESS_NEW_THREAD  : Creates a new thread, in the same address space
+    By default, no new thread is created.
+
+
+  void BN_RejectDCCChat(BN_PChat Chat);
+
+    This function is used to refuse a DCC Chat request.
+
+  void BN_SendDCCChatMessage(BN_PInfo Info,BN_PChat Chat,const char *Message);
+
+    This function is used to send a string to a remote host, thru a DCC Chat connection.
+
+
+  void BN_CloseDCCChat(BN_PInfo Info,BN_PChat Chat);
+
+    This function is used to close a DCC Chat connection with the remote host.
+    The Chat structure is freed.
+
+
+  void BN_SendDCCSendRequest(BN_PInfo Info,const char *Nick,const int Flags, char *Filename, const int Timeout);
+
+    This function sends a DCC SEND request to the specified Nick.
+    If accepted by remote host, the connection is automatically open.
+    Flags is any of the following flags :
+      PROCESS_KEEP_SOCKET : Keep server's socket opened (only applicable if PROCESS_NEW_PROCESS)
+      PROCESS_KEEP_SIG    : Keep all signal handler (otherwise, they are set to SIG_DFL)
+      PROCESS_KEEP_EVENT  : Keep all Info.CB (otherwise, they are set to NULL, except DCCClosed,DCCOpened,DCCGet opened an closed) (only applicable if PROCESS_NEW_PROCESS)
+      PROCESS_NEW_PROCESS : Creates a new process, in a different address space
+      PROCESS_NEW_THREAD  : Creates a new thread, in the same address space
+    By default, no new thread is created.
+
+  void BN_AcceptDCCSend(BN_PInfo Info, BN_PSend, const int);
+
+    This function is used to accept a DCC Send request from a remote host. (Use BN_RejectDCCSend if not accepting this connection)
+    Flags is any of the following flags :
+      PROCESS_KEEP_SOCKET : Keep server's socket opened (only applicable if PROCESS_NEW_PROCESS)
+      PROCESS_KEEP_SIG    : Keep all signal handler (otherwise, they are set to SIG_DFL)
+      PROCESS_KEEP_EVENT  : Keep all Info.CB (otherwise, they are set to NULL, except DCCClosed,DCCOpened,DCCGet opened and closed) (only applicable if PROCESS_NEW_PROCESS)
+      PROCESS_NEW_PROCESS : Creates a new process, in a different address space
+      PROCESS_NEW_THREAD  : Creates a new thread, in the same address space
+    By default, no new thread is created.
+
+
+  void BN_RejectDCCSend(BN_PSend);
+
+    This function is used to refuse a DCC Send request.
+
+
+  /* ************************************ */
+  /*           Server Functions           */
+  /* ************************************ */
+
+
+  void BN_ServerSendErrorMessage(BN_PInfo I,const char *Message);
+
+    This function is used to send an error message to remote server, and then close the link.
+
+
+  /* ********* LEAF SERVERS ********** */
+  void BN_ServerSendPassMessage(BN_PInfo I,const char *Password,const char *Version,bool Compressed,bool Secured);
+
+    This function is used when connecting to a server. You send your password, and your irc implementation version.
+    (Version must be from 4 to 14 caracters, and for current implementation, must start with "2010").
+    Compressed is used if you wish the link to be compressed.
+    Secured is used if you wish to use the abuse protection.
+
+
+  void BN_ServerSendServerMessage(BN_PInfo I,const char *ServerName,const char *Info);
+
+    This function is used to send your server's info. Just after a PASS message.
+    You give your server name and Info string.
+
+
+  void BN_ServerSendNickMessage(BN_PInfo I,const char *NickName,const int LocalHopCount,const char *UserName,const char *HostName,const int ServToken,const char *UMode,const char *RealName);
+
+    This function is used to send NICK message, giving remote server infos about your users.
+    A user that is local for me have a LocalHopCount of 0.
+
+
+  void BN_ServerSendNJoinMessage(BN_PInfo I,const char *Channel,const char *Nicks);
+
+    This function is used to send NJOIN message, giving remote server infos about your users's channels.
+
+
+  void BN_ServerSendSQuitMessage(BN_PInfo I,const char *Server,const char *Msg);
+
+    This function is used to break the link between 2 servers.
+
+
+  /* ********* HUB SERVERS ********** */
+
+  Currently, this function is the only one written for hub servers.
+
+  void BN_ServerForwardServerMessage(BN_PInfo I,const char *ConnectedServer,const char *ConnectingServer,const int LocalHopCount,const int Token,const char *Info);
+
+    This function is used by hub servers to forward a SERVER message, and reply to the newly connected server.
+    ConnectedServer and ConnectingServer have different values depending on :
+    1) When a new server connects, hub servers must forward this message (ConnectedServer = I->Prefix)
+    2) But they also must reply to this new server, giving info on every server connected to the network
+       Hub uses ConnectedServer to tell on wich server is connected ConnectingServer
+       And so ConnectedServer MAY be different of I->Prefix, if there is another hub behind the hub
+    LocalHopCount is the HopCount stored on local hub server infos.
+    Token is the unique token (for THIS hub server) that will be used with future NICK or SERVICE messages.
+    Info is the info string of this server.
+
+
+  The other functions for hub servers are missing, since I do not pretend to make a HUB server. If you really wish this functions to be written,
+  please send my an email at zekiller@skytech.org
+
+
+[UNFINISHED DOCUMENTATION - REFER TO botnet.h]

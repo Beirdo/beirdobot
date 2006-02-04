@@ -1,0 +1,9 @@
+THINGS TO DO :
+
+ - Faire un thread pour la reception (avec un lock pour eviter un traitement lors de l ecriture dans le buffer de recep). Mettre donc une nouvelle option dans les flags de BN_Connect
+ - Flood protect
+ - ctcp ping/time
+ - Add CTCP request functions
+
+
+KNOWN BUGS :

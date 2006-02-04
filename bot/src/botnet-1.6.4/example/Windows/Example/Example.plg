@@ -1,0 +1,35 @@
+<html>
+<body>
+<pre>
+<h1>Build Log</h1>
+<h3>
+--------------------Configuration: Example - Win32 Debug--------------------
+</h3>
+<h3>Command Lines</h3>
+Creating temporary file "C:\WIN95\TEMP\RSPC270.TMP" with contents
+[
+/nologo /MLd /W3 /Gm /GX /ZI /Od /D "WIN32" /D "_DEBUG" /D "_CONSOLE" /D "_MBCS" /Fp"Debug/Example.pch" /YX /Fo"Debug/" /Fd"Debug/" /FD /GZ /c 
+"D:\Travail\skytech\botnet\botnet-1.20\example\bot.c"
+]
+Creating command line "cl.exe @C:\WIN95\TEMP\RSPC270.TMP" 
+Creating temporary file "C:\WIN95\TEMP\RSPC271.TMP" with contents
+[
+kernel32.lib user32.lib gdi32.lib winspool.lib comdlg32.lib advapi32.lib shell32.lib ole32.lib oleaut32.lib uuid.lib odbc32.lib odbccp32.lib kernel32.lib user32.lib gdi32.lib winspool.lib comdlg32.lib advapi32.lib shell32.lib ole32.lib oleaut32.lib uuid.lib odbc32.lib odbccp32.lib /nologo /subsystem:console /incremental:yes /pdb:"Debug/Example.pdb" /debug /machine:I386 /out:"Debug/Example.exe" /pdbtype:sept 
+".\Debug\bot.obj"
+"..\..\..\makelib\Windows\Botnet\Debug\Botnet.lib"
+]
+Creating command line "link.exe @C:\WIN95\TEMP\RSPC271.TMP"
+<h3>Output Window</h3>
+Compiling...
+bot.c
+d:\travail\skytech\botnet\botnet-1.20\example\bot.c(178) : warning C4090: 'function' : different 'const' qualifiers
+d:\travail\skytech\botnet\botnet-1.20\example\bot.c(178) : warning C4028: formal parameter 4 different from declaration
+Linking...
+
+
+
+<h3>Results</h3>
+Example.exe - 0 error(s), 2 warning(s)
+</pre>
+</body>
+</html>

@@ -1,0 +1,8 @@
+all:
+	./configure --prefix=`cd ../.. ; pwd`
+	${MAKE}
+	${MAKE} install
+
+clean:
+	${MAKE} distclean
+

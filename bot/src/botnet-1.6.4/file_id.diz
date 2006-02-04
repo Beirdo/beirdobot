@@ -1,0 +1,16 @@
+             BotNet V1.6.4
+     http://zekiller.skytech.org
+
+BotNet is  a small  library  written in  C
+and  distributed  under  GNU General Pulic
+License, intended to assist in development
+of an IRC bot (or  even  an IRC client).
+It   provides  an  easy-to-use   model  of
+communication  with  the  IRC  server   by
+giving  you  string-sending  functions and
+by  returning messages from the IRC server
+into events to your appliction's main().
+Also contains functions  for easy DCC CHAT
+and SEND connections  and an excess flood
+protection mechanism.
+                             By Ze KiLleR
