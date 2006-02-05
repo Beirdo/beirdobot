@@ -26,12 +26,14 @@
  * Handles MySQL database connections
  */
 
-#include "environment.h"
 #include <stdio.h>
 #include <string.h>
 #include <mysql.h>
 #include <stdlib.h>
 #include "protos.h"
+#include "botnet.h"
+#include "environment.h"
+#include "structs.h"
 
 static char ident[] _UNUSED_ =
     "$Id$";
@@ -94,87 +96,102 @@ char *db_quote(char *string)
 }
 
 
-#if 0
-struct index_data *db_generate_object_index(int *top, int *sort_top,
-                                            int *alloc_top)
+void db_load_servers(void)
 {
-    struct index_data *index = NULL;
-    int             i,
-                    vnum,
-                    j,
-                    len;
-    int             count,
-                    keyCount;
-
-    MYSQL_RES      *res,
-                   *resKeywords;
+    IRCServer_t    *server;
+    int             count;
+    int             i;
+    MYSQL_RES      *res;
     MYSQL_ROW       row;
 
-    strcpy(sqlbuf, "SELECT `vnum` FROM `objects` WHERE `ownerId` = -1 AND "
-                   "ownedItemId = -1 ORDER BY `vnum`" );
+    strcpy(sqlbuf, "SELECT `serverid`, `server`, `port`, `nick`, `username`, "
+                   "`realname`, `nickserv`, `nickservpass` FROM `servers` "
+                   "ORDER BY `serverid`" );
     mysql_query(sql, sqlbuf);
 
     res = mysql_store_result(sql);
     if( !res || !(count = mysql_num_rows(res)) ) {
         mysql_free_result(res);
-        return( NULL );
-    }
-
-    index = (struct index_data *)malloc(count * sizeof(struct index_data));
-    if( !index ) {
-        mysql_free_result(res);
-        return( NULL );
+        return;
     }
 
     for( i = 0; i < count; i++ ) {
         row = mysql_fetch_row(res);
 
-        vnum = atoi(row[0]);
-        index[i].virtual = vnum;
-        index[i].pos = -1;
-        index[i].number = 0;
-        index[i].data = NULL;
-        index[i].func = NULL;
-
-        sprintf( sqlbuf, "SELECT `keyword` FROM `objectKeywords` "
-                         "WHERE `vnum` = %d AND `ownerId` = -1 AND "
-                         "`ownedItemId` = -1 ORDER BY `seqNum`", vnum );
-        mysql_query(sql, sqlbuf);
-
-        index[i].name = NULL;
-        len = 0;
-
-        resKeywords = mysql_store_result(sql);
-        if( !resKeywords || !(keyCount = mysql_num_rows(resKeywords)) ) {
-            mysql_free_result(resKeywords);
+        server = (IRCServer_t *)malloc(sizeof(IRCServer_t));
+        if( !server ) {
             continue;
         }
 
-        for( j = 0; j < keyCount; j++ ) {
-            row = mysql_fetch_row(resKeywords);
+        memset( server, 0, sizeof(IRCServer_t) );
 
-            index[i].name = (char *)realloc(index[i].name, 
-                                            len + strlen(row[0]) + 2);
-            if( !len ) {
-                strcpy( index[i].name, row[0] );
-            } else {
-                strcat( index[i].name, " " );
-                strcat( index[i].name, row[0] );
-            }
-            len = strlen(index[i].name);
+        server->serverId        = atoi(row[0]);
+        server->server          = strdup(row[1]);
+        server->port            = (uint16)atoi(row[2]);
+        server->nick            = strdup(row[3]);
+        server->username        = strdup(row[4]);
+        server->realname        = strdup(row[5]);
+        server->nickserv        = strdup(row[6]);
+        server->nickservpass    = strdup(row[7]);
+
+        LinkedListAdd( ServerList, (LinkedListItem_t *)server, UNLOCKED,
+                       AT_TAIL );
+    }
+
+    mysql_free_result(res);
+}
+
+void db_load_channels(void)
+{
+    LinkedListItem_t   *item;
+    IRCServer_t        *server;
+    IRCChannel_t       *channel;
+    int                 count;
+    int                 i;
+    MYSQL_RES          *res;
+    MYSQL_ROW           row;
+
+    LinkedListLock( ServerList );
+    
+    for( item = ServerList->head; item; item = item->next ) {
+        server = (IRCServer_t *)item;
+
+        sprintf(sqlbuf, "SELECT `chanid`, `channel` FROM `channels` "
+                        "WHERE `serverid` = %d ORDER BY `chanid`",
+                        server->serverId );
+        mysql_query(sql, sqlbuf);
+
+        res = mysql_store_result(sql);
+        if( !res || !(count = mysql_num_rows(res)) ) {
+            mysql_free_result(res);
+            continue;
         }
 
-        mysql_free_result(resKeywords);
+        server->channels = LinkedListCreate();
+
+        for( i = 0; i < count; i++ ) {
+            row = mysql_fetch_row(res);
+
+            channel = (IRCChannel_t *)malloc(sizeof(IRCChannel_t));
+            if( !channel ) {
+                continue;
+            }
+
+            memset( channel, 0, sizeof(IRCServer_t) );
+
+            channel->channelId      = atoi(row[0]);
+            channel->channel        = strdup(row[1]);
+            channel->server         = server;
+            channel->joined         = false;
+
+            LinkedListAdd( server->channels, (LinkedListItem_t *)channel, 
+                           UNLOCKED, AT_TAIL );
+        }
+
+        mysql_free_result(res);
     }
-    mysql_free_result(res);
-
-    *sort_top = count - 1;
-    *alloc_top = count;
-    *top = count;
-
-    return (index);
+    LinkedListUnlock( ServerList );
 }
-#endif
 
 
 /*

@@ -1,5 +1,5 @@
 /*
- *  This file is part of the beirdonet package
+ *  This file is part of the beirdobot package
  *  Copyright (C) 2006 Gavin Hurlbut
  *
  *  havokmud is free software; you can redistribute it and/or modify
@@ -22,32 +22,41 @@
 *
 * Copyright 2006 Gavin Hurlbut
 * All rights reserved
-*
 */
 
-#ifndef protos_h_
-#define protos_h_
+#ifndef structs_h_
+#define structs_h_
 
+#include <pthread.h>
+#include "botnet.h"
+#include "environment.h"
 #include "linked_list.h"
 
-/* CVS generated ID string (optional for h files) */
-static char protos_h_ident[] _UNUSED_ = 
+static char interthread_h_ident[] _UNUSED_ = 
     "$Id$";
 
-/* Externals */
-extern char   *mysql_host;
-extern uint16  mysql_portnum;
-extern char   *mysql_user;
-extern char   *mysql_password;
-extern char   *mysql_db;
-extern LinkedList_t   *ServerList;
+typedef struct {
+    LinkedListItem_t    item;
+    LinkedList_t       *channels;
+    int                 serverId;
+    char               *server;
+    uint16              port;
+    char               *nick;
+    char               *username;
+    char               *realname;
+    char               *nickserv;
+    char               *nickservpass;
+    BN_TInfo            ircInfo;
+    pthread_t           threadId;
+} IRCServer_t;
 
-
-/* Prototypes */
-void bot_start(void);
-void db_setup(void);
-void db_load_servers(void);
-void db_load_channels(void);
+typedef struct {
+    LinkedListItem_t    item;
+    int                 channelId;
+    IRCServer_t        *server;
+    char               *channel;
+    bool                joined;
+} IRCChannel_t;
 
 #endif
 

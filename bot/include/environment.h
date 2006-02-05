@@ -65,7 +65,7 @@ static char environment_h_ident[] _UNUSED_ =
  * -Wall -Werror (which you should be)
  */
 #ifndef __cplusplus
-#ifndef __BOTNET_H__
+#ifdef ___ARGH
 typedef int                    bool;
 #endif
 #endif

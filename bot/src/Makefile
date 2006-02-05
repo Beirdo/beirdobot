@@ -13,7 +13,7 @@ LDFLAGS = -g
 LIBS	= $(shell ${MYSQLCFG} --libs_r)
 LIBS	+= $(shell ${BOTNETCFG} --libs-static)
 
-SRCS	= main.c bot.c mysql.c
+SRCS	= main.c bot.c mysql.c linked_list.c
 OBJS	= ${SRCS:.c=.o}
 EXE	= bot
 
