@@ -9,6 +9,9 @@ clean:
 	${RM} include/release.h
 	${MAKE} -C src clean
 
+release:
+	scripts/mkrelease
+
 include/release.h:	FORCE
 	scripts/tagversion
 
