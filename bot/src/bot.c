@@ -42,10 +42,6 @@
 #include "protos.h"
 #include "structs.h"
 
-#define BOT_NICKNAME "Mega"
-#define BOT_USERNAME "MegaBot"
-#define BOT_REALNAME "Talk to me"
-
 #define MY_PASS "botnet"
 
 #define DCC_WAITING_FOR_PASS 1
@@ -101,9 +97,12 @@ void ProcOnDCCTalk(BN_PInfo I, BN_PChat Chat, const char Msg[])
 
 void ProcOnConnected(BN_PInfo I, const char HostName[])
 {
+    IRCServer_t *server;
+
+    server = (IRCServer_t *)I->User;
     printf("Event Connected : (%s)\n", HostName);
     BN_EnableFloodProtection(I, 100, 1000, 60);
-    BN_Register(I, BOT_NICKNAME, BOT_USERNAME, BOT_REALNAME);
+    BN_Register(I, server->nick, server->username, server->realname);
 }
 
 void ProcOnPingPong(BN_PInfo I)
@@ -122,8 +121,6 @@ void ProcOnRegistered(BN_PInfo I)
     // BN_SendJoinMessage(I,"#toto",NULL);
     // BN_SendMessage(I,BN_MakeMessage(NULL,"MODE","#toto"),BN_LOW_PRIORITY);
     // BN_SendMessage(I,BN_MakeMessage(NULL,"LIST",""),BN_LOW_PRIORITY);
-    Val = 666;                  // Modify the variable, main's Val will
-                                // only be modified if same thread
 }
 
 void ProcOnUnknown(BN_PInfo I, const char Who[], const char Command[],

@@ -177,7 +177,7 @@ void db_load_channels(void)
                 continue;
             }
 
-            memset( channel, 0, sizeof(IRCServer_t) );
+            memset( channel, 0, sizeof(IRCChannel_t) );
 
             channel->channelId      = atoi(row[0]);
             channel->channel        = strdup(row[1]);

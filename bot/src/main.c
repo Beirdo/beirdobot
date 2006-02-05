@@ -165,17 +165,17 @@ void MainParseArgs( int argc, char **argv )
 
     if( mysql_user == NULL )
     {
-        mysql_user = strdup("beirdonet");
+        mysql_user = strdup("beirdobot");
     }
 
     if( mysql_password == NULL )
     {
-        mysql_password = strdup("beirdonet");
+        mysql_password = strdup("beirdobot");
     }
 
     if( mysql_db == NULL )
     {
-        mysql_db = strdup("beirdonet");
+        mysql_db = strdup("beirdobot");
     }
 }
 
@@ -201,9 +201,9 @@ void MainDisplayUsage( char *program, char *errorMsg )
                "Options:\n"
                "\t-H or --host\tMySQL host to connect to (default localhost)\n"
                "\t-P or --port\tMySQL port to connect to (default 3306)\n"
-               "\t-u or --user\tMySQL user to connect as (default beirdonet)\n"
-               "\t-p or --password\tMySQL password to use (default beirdonet)\n"
-               "\t-d or --database\tMySQL database to use (default beirdonet)\n"
+               "\t-u or --user\tMySQL user to connect as (default beirdobot)\n"
+               "\t-p or --password\tMySQL password to use (default beirdobot)\n"
+               "\t-d or --database\tMySQL database to use (default beirdobot)\n"
                "\t-V or --version\tshow the version number and quit\n"
                "\t-h or --help\tshow this help text\n\n" );
 }
