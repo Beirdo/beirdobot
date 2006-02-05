@@ -194,6 +194,40 @@ void db_load_channels(void)
 }
 
 
+void db_add_logentry( IRCChannel_t *channel, char *nick, IRCMsgType_t msgType, 
+                      char *text )
+{
+    char           *nickOnly;
+    char           *nickQuoted;
+    char           *textQuoted;
+
+    if( !channel || !nick || !text ) {
+        return;
+    }
+
+    nickOnly = (char *)malloc(strlen(nick));
+    if( !nickOnly ) {
+        nickOnly = nick;
+    } else {
+        BN_ExtractNick(nick, nickOnly, strlen(nick));
+    }
+
+    nickQuoted = db_quote(nickOnly);
+    textQuoted = db_quote(text);
+
+    if( nickQuoted && textQuoted ) {
+        sprintf( sqlbuf, "INSERT INTO `irclog` (`chanid`, `timestamp`, "
+                         "`nick`, `msgtype`, `message`) "
+                         "VALUES ( %d, NULL, '%s', %d, '%s' )",
+                         channel->channelId, nickQuoted, msgType, textQuoted );
+        free(nickQuoted);
+        free(textQuoted);
+
+        mysql_query(sql, sqlbuf);
+    }
+}
+
+
 /*
  * vim:ts=4:sw=4:ai:et:si:sts=4
  */

@@ -58,6 +58,18 @@ typedef struct {
     bool                joined;
 } IRCChannel_t;
 
+typedef enum {
+    TYPE_MESSAGE,
+    TYPE_ACTION,
+    TYPE_TOPIC,
+    TYPE_KICK,
+    TYPE_MODE,
+    TYPE_NICK,
+    TYPE_JOIN,
+    TYPE_PART,
+    TYPE_QUIT
+} IRCMsgType_t;
+
 #endif
 
 /*

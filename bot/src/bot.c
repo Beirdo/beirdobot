@@ -42,58 +42,12 @@
 #include "protos.h"
 #include "structs.h"
 
-#define MY_PASS "botnet"
 
-#define DCC_WAITING_FOR_PASS 1
-#define DCC_PASS_ACCEPTED    2
-
-int             Val;
 LinkedList_t   *ServerList;
 
 void *bot_server_thread(void *arg);
+IRCChannel_t *FindChannel(IRCServer_t *server, const char *channame);
 
-void ProcOnDCCSendRequest(BN_PInfo I, BN_PSend Send)
-{
-    BN_AcceptDCCSend(I, Send, PROCESS_KEEP_SOCKET | PROCESS_NEW_THREAD);
-}
-
-void ProcOnDCCChatRequest(BN_PInfo I, BN_PChat Chat)
-{
-    printf("Event Chat Request : %s @ %s\n", Chat->Nick, Chat->Addr);
-    BN_AcceptDCCChat(I, Chat, PROCESS_NEW_THREAD);
-}
-
-void ProcOnDCCChatOpened(BN_PInfo I, BN_PChat Chat)
-{
-    printf("Event Chat Opened : %s @ %s\n", Chat->Nick, Chat->Addr);
-    Chat->User = (void *) DCC_WAITING_FOR_PASS;
-    BN_SendDCCChatMessage(I, Chat, "Enter your password.\n");
-}
-
-void ProcOnDCCChatClosed(BN_PInfo I, BN_PChat Chat)
-{
-    printf("Event Chat Closed : %s @ %s\n", Chat->Nick, Chat->Addr);
-}
-
-void ProcOnDCCTalk(BN_PInfo I, BN_PChat Chat, const char Msg[])
-{
-    printf("Event Chat Talk : %s @ %s : %s\n", Chat->Nick, Chat->Addr,
-           Msg);
-    if (Chat->User == (void *) DCC_WAITING_FOR_PASS) {
-        if (strcmp(Msg, MY_PASS) != 0) {
-            BN_SendDCCChatMessage(I, Chat,
-                                  "Negative on that, Houston. Bye\n");
-            BN_CloseDCCChat(I, Chat);
-        } else
-            Chat->User = (void *) DCC_PASS_ACCEPTED;
-    } else if (Chat->User == (void *) DCC_PASS_ACCEPTED) {
-        printf("DCC CHAT MESSAGE RECEIVED FROM VALID USER : %s\n", Msg);
-        Val = atoi(Msg);
-        BN_SendPrivateMessage(I, "ze_killer",
-                              "Hi there, how do you feel right now ?");
-    } else
-        printf("Bad value in OnDCCTalk : %p\n", Chat->User);
-}
 
 void ProcOnConnected(BN_PInfo I, const char HostName[])
 {
@@ -140,10 +94,6 @@ void ProcOnRegistered(BN_PInfo I)
             }
 
             BN_SendJoinMessage(I, channel->channel, NULL);
-            // BN_SendMessage(I,BN_MakeMessage(NULL,"MODE",channel->channel),
-            //                BN_LOW_PRIORITY);
-            // BN_SendMessage(I,BN_MakeMessage(NULL,"LIST",""),BN_LOW_PRIORITY);
-            
             found = true;
         }
         LinkedListUnlock( server->channels );
@@ -208,7 +158,13 @@ void ProcOnWhois(BN_PInfo I, const char *Chans[])
 void ProcOnMode(BN_PInfo I, const char Channel[], const char Who[],
                 const char Msg[])
 {
-    printf("Mode for %s by %s : %s\n", Channel, Who, Msg);
+    char           *string;
+
+    string = (char *)malloc(MAX_STRING_LENGTH);
+    sprintf(string, "Mode for %s by %s : %s\n", Channel, Who, Msg);
+    db_add_logentry( FindChannel((IRCServer_t *)I->User, Channel), (char *)Who, 
+                     TYPE_MODE, string );
+    free( string );
 }
 
 void ProcOnModeIs(BN_PInfo I, const char Channel[], const char Msg[])
@@ -228,15 +184,6 @@ void ProcOnNames(BN_PInfo I, const char Channel[], const char *Names[],
                    BN_LOW_PRIORITY);
 }
 
-void ProcOnLinks(BN_PInfo I, const char Server[], const char *Links[],
-                 int Count)
-{
-    int             i;
-    printf("Links for %s :\n", Server);
-    for (i = 0; i < Count; i++)
-        printf("\t%s\n", Links[i]);
-    printf("End of names for (%s)\n", Server);
-}
 
 void ProcOnWho(BN_PInfo I, const char Channel[], const char *Info[],
                const int Count)
@@ -285,13 +232,27 @@ void ProcOnInvite(BN_PInfo I, const char Chan[], const char Who[],
 void ProcOnTopic(BN_PInfo I, const char Chan[], const char Who[],
                  const char Msg[])
 {
-    printf("Topic for %s has been changed by %s (%s)\n", Chan, Who, Msg);
+    char           *string;
+
+    string = (char *)malloc(MAX_STRING_LENGTH);
+    sprintf(string, "Topic for %s has been changed by %s (%s)\n", Chan, Who, 
+                    Msg);
+    db_add_logentry( FindChannel((IRCServer_t *)I->User, Chan), (char *)Who, 
+                     TYPE_TOPIC, string );
+    free( string );
 }
 
 void ProcOnKick(BN_PInfo I, const char Chan[], const char Who[],
                 const char Whom[], const char Msg[])
 {
-    printf("%s has been kicked from %s by %s (%s)\n", Whom, Chan, Who, Msg);
+    char           *string;
+
+    string = (char *)malloc(MAX_STRING_LENGTH);
+    sprintf(string, "%s has been kicked from %s by %s (%s)\n", Whom, Chan, Who,
+                    Msg);
+    db_add_logentry( FindChannel((IRCServer_t *)I->User, Chan), (char *)Who, 
+                     TYPE_KICK, string );
+    free( string );
 }
 
 void ProcOnPrivateTalk(BN_PInfo I, const char Who[], const char Whom[],
@@ -303,8 +264,67 @@ void ProcOnPrivateTalk(BN_PInfo I, const char Who[], const char Whom[],
 void ProcOnAction(BN_PInfo I, const char Chan[], const char Who[],
                   const char Msg[])
 {
-    printf("%s sent an action to %s : %s\n", Who, Chan, Msg);
+    db_add_logentry( FindChannel((IRCServer_t *)I->User, Chan), (char *)Who, 
+                     TYPE_ACTION, (char *)Msg );
 }
+
+void ProcOnChannelTalk(BN_PInfo I, const char Chan[], const char Who[],
+                       const char Msg[])
+{
+    db_add_logentry( FindChannel((IRCServer_t *)I->User, Chan), (char *)Who, 
+                     TYPE_MESSAGE, (char *)Msg );
+}
+
+#if 0
+void ProcOnNick(BN_PInfo I, const char Who[], const char Msg[])
+{
+    /* Need to find what channel they were in?! */
+    db_add_logentry( FindChannel((IRCServer_t *)I->User, Chan), (char *)Who, 
+                     TYPE_NICK, (char *)Msg );
+}
+#endif
+
+void ProcOnJoin(BN_PInfo I, const char Chan[], const char Who[])
+{
+    char           *string;
+    char            nick[256];
+
+    string = (char *)malloc(MAX_STRING_LENGTH);
+    BN_ExtractNick(Who, nick, 256);
+    sprintf(string, "%s (%s) has joined %s\n", nick, Who, Chan);
+    db_add_logentry( FindChannel((IRCServer_t *)I->User, Chan), (char *)Who, 
+                     TYPE_JOIN, string );
+    free( string );
+}
+
+void ProcOnPart(BN_PInfo I, const char Chan[], const char Who[], 
+                const char Msg[])
+{
+    char           *string;
+    char            nick[256];
+
+    string = (char *)malloc(MAX_STRING_LENGTH);
+    BN_ExtractNick(Who, nick, 256);
+    sprintf(string, "%s (%s) has left %s (%s)\n", nick, Who, Chan, Msg);
+    db_add_logentry( FindChannel((IRCServer_t *)I->User, Chan), (char *)Who, 
+                     TYPE_PART, string );
+    free( string );
+}
+
+#if 0
+void ProcOnQuit(BN_PInfo I, const char Who[], const char Msg[])
+{
+    char           *string;
+
+    /* Need to find all channels they are on?! */
+
+    string = (char *)malloc(MAX_STRING_LENGTH);
+    sprintf(string, "%s (%s) has quit (%s)\n", BN_ExtractNick(Who), Who, Msg);
+    db_add_logentry( FindChannel((IRCServer_t *)I->User, Chan), (char *)Who, 
+                     TYPE_QUIT, string );
+    free( string );
+}
+#endif
 
 void ProcOnJoinChannel(BN_PInfo I, const char Chan[])
 {
@@ -397,7 +417,6 @@ void *bot_server_thread(void *arg)
     Info->CB.OnMode = ProcOnMode;
     Info->CB.OnModeIs = ProcOnModeIs;
     Info->CB.OnNames = ProcOnNames;
-    Info->CB.OnLinks = ProcOnLinks;
     Info->CB.OnWho = ProcOnWho;
     Info->CB.OnBanList = ProcOnBanList;
     Info->CB.OnList = ProcOnList;
@@ -407,13 +426,15 @@ void *bot_server_thread(void *arg)
     Info->CB.OnKick = ProcOnKick;
     Info->CB.OnPrivateTalk = ProcOnPrivateTalk;
     Info->CB.OnAction = ProcOnAction;
-
-    Info->CB.Chat.OnDCCChatRequest = ProcOnDCCChatRequest;
-    Info->CB.Chat.OnDCCChatOpened = ProcOnDCCChatOpened;
-    Info->CB.Chat.OnDCCChatClosed = ProcOnDCCChatClosed;
-    Info->CB.Chat.OnDCCTalk = ProcOnDCCTalk;
-
-    Info->CB.Send.OnDCCSendRequest = ProcOnDCCSendRequest;
+    Info->CB.OnChannelTalk = ProcOnChannelTalk;
+#if 0
+    Info->CB.OnNick = ProcOnNick;
+#endif
+    Info->CB.OnJoin = ProcOnJoin;
+    Info->CB.OnPart = ProcOnPart;
+#if 0
+    Info->CB.OnQuit = ProcOnQuit;
+#endif
 
     printf("Connecting to %s:%d...\n", server->server, server->port);
 
@@ -426,6 +447,32 @@ void *bot_server_thread(void *arg)
 
     return(NULL);
 }
+
+IRCChannel_t *FindChannel(IRCServer_t *server, const char *channame)
+{
+    LinkedListItem_t       *item;
+    IRCChannel_t           *channel;
+    IRCChannel_t           *chanitem;
+    bool                    found;
+
+    channel = NULL;
+    if( server->channels ) {
+        LinkedListLock( server->channels );
+        for( found = false, item = server->channels->head; item && !found; 
+             item = item->next ) {
+            chanitem = (IRCChannel_t *)item;
+
+            if( !strcasecmp(channame, chanitem->channel) ) {
+                found = true;
+                channel = chanitem;
+            }
+        }
+        LinkedListUnlock( server->channels );
+    }
+
+    return( channel );
+}
+
 
 /*
  * vim:ts=4:sw=4:ai:et:si:sts=4

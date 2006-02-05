@@ -29,6 +29,7 @@
 #define protos_h_
 
 #include "linked_list.h"
+#include "structs.h"
 
 /* CVS generated ID string (optional for h files) */
 static char protos_h_ident[] _UNUSED_ = 
@@ -49,6 +50,8 @@ void bot_start(void);
 void db_setup(void);
 void db_load_servers(void);
 void db_load_channels(void);
+void db_add_logentry( IRCChannel_t *channel, char *nick, IRCMsgType_t msgType, 
+                      char *text );
 
 #endif
 
