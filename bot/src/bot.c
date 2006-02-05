@@ -117,10 +117,37 @@ void ProcOnStatus(BN_PInfo I, const char Msg[], int Code)
 
 void ProcOnRegistered(BN_PInfo I)
 {
+    bool                found;
+    LinkedListItem_t   *item;
+    IRCServer_t        *server;
+    IRCChannel_t       *channel;
+
+    server = (IRCServer_t *)I->User;
     printf("Event Registered\n");
-    // BN_SendJoinMessage(I,"#toto",NULL);
-    // BN_SendMessage(I,BN_MakeMessage(NULL,"MODE","#toto"),BN_LOW_PRIORITY);
-    // BN_SendMessage(I,BN_MakeMessage(NULL,"LIST",""),BN_LOW_PRIORITY);
+
+    if( strcmp(server->nickserv, "") ) {
+        /* We need to register with nickserv */
+        BN_SendPrivateMessage(I, server->nickserv, server->nickservmsg);
+    }
+
+    if( server->channels ) {
+        LinkedListLock( server->channels );
+        for( found = false, item = server->channels->head; 
+             item && !found; item = item->next ) {
+            channel = (IRCChannel_t *)item;
+            if( channel->joined ) {
+                continue;
+            }
+
+            BN_SendJoinMessage(I, channel->channel, NULL);
+            // BN_SendMessage(I,BN_MakeMessage(NULL,"MODE",channel->channel),
+            //                BN_LOW_PRIORITY);
+            // BN_SendMessage(I,BN_MakeMessage(NULL,"LIST",""),BN_LOW_PRIORITY);
+            
+            found = true;
+        }
+        LinkedListUnlock( server->channels );
+    }
 }
 
 void ProcOnUnknown(BN_PInfo I, const char Who[], const char Command[],
@@ -193,7 +220,7 @@ void ProcOnNames(BN_PInfo I, const char Channel[], const char *Names[],
     for (i = 0; i < Count; i++)
         printf("\t(%s)\n", Names[i]);
     printf("End of names for (%s)\n", Channel);
-    BN_SendMessage(I, BN_MakeMessage(NULL, "WHO", "#toto"),
+    BN_SendMessage(I, BN_MakeMessage(NULL, "WHO", Channel),
                    BN_LOW_PRIORITY);
 }
 
@@ -275,6 +302,38 @@ void ProcOnAction(BN_PInfo I, const char Chan[], const char Who[],
     printf("%s sent an action to %s : %s\n", Who, Chan, Msg);
 }
 
+void ProcOnJoinChannel(BN_PInfo I, const char Chan[])
+{
+    bool                found;
+    LinkedListItem_t   *item;
+    IRCServer_t        *server;
+    IRCChannel_t       *channel;
+
+    server = (IRCServer_t *)I->User;
+    printf("Joined channel %s on server %s\n", Chan, server->server);
+
+    if( server->channels ) {
+        LinkedListLock( server->channels );
+        for( found = false, item = server->channels->head; 
+             item && !found; item = item->next ) {
+            channel = (IRCChannel_t *)item;
+            if( channel->joined ) {
+                continue;
+            }
+
+            if( !strcasecmp(Chan, channel->channel) ) {
+                channel->joined = true;
+                continue;
+            }
+
+            BN_SendJoinMessage(I, channel->channel, NULL);
+            found = true;
+        }
+        LinkedListUnlock( server->channels );
+    }
+}
+
+
 void bot_start(void)
 {
     LinkedListItem_t *item;
@@ -320,6 +379,7 @@ void *bot_server_thread(void *arg)
     memset(Info, 0, sizeof(BN_TInfo));
     Info->User = (void *)server;
     Info->CB.OnConnected = ProcOnConnected;
+    Info->CB.OnJoinChannel = ProcOnJoinChannel;
     Info->CB.OnPingPong = ProcOnPingPong;
     Info->CB.OnRegistered = ProcOnRegistered;
     Info->CB.OnUnknown = ProcOnUnknown;

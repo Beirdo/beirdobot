@@ -45,7 +45,7 @@ typedef struct {
     char               *username;
     char               *realname;
     char               *nickserv;
-    char               *nickservpass;
+    char               *nickservmsg;
     BN_TInfo            ircInfo;
     pthread_t           threadId;
 } IRCServer_t;

@@ -105,7 +105,7 @@ void db_load_servers(void)
     MYSQL_ROW       row;
 
     strcpy(sqlbuf, "SELECT `serverid`, `server`, `port`, `nick`, `username`, "
-                   "`realname`, `nickserv`, `nickservpass` FROM `servers` "
+                   "`realname`, `nickserv`, `nickservmsg` FROM `servers` "
                    "ORDER BY `serverid`" );
     mysql_query(sql, sqlbuf);
 
@@ -132,7 +132,7 @@ void db_load_servers(void)
         server->username        = strdup(row[4]);
         server->realname        = strdup(row[5]);
         server->nickserv        = strdup(row[6]);
-        server->nickservpass    = strdup(row[7]);
+        server->nickservmsg     = strdup(row[7]);
 
         LinkedListAdd( ServerList, (LinkedListItem_t *)server, UNLOCKED,
                        AT_TAIL );
