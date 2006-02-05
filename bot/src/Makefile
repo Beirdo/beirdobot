@@ -20,10 +20,12 @@ EXE	= bot
 all:	${EXE}
 
 %.o:	%.c
-	${CC} ${CFLAGS} -c -o $@ $+
+	${CC} ${CFLAGS} -c -o $@ $<
 
 ${EXE}:	${OBJS}
 	${CC} ${LDFLAGS} -o $@ $+ ${LIBS}
 
 clean:
 	${RM} ${OBJS} ${EXE}
+
+main.o:	main.c ../include/release.h
