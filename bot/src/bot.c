@@ -179,8 +179,12 @@ char *ProcOnCTCP(BN_PInfo I, const char Who[], const char Whom[],
 
     printf("You (%s) have received a CTCP request from %s (%s)\n", Whom,
            Who, Type);
-    S = malloc(sizeof("Forget about it") + 1);
-    strcpy(S, "Forget about it");
+    if( !strcasecmp(Type, "version") ) {
+        S = (char *)malloc(MAX_STRING_LENGTH);
+        sprintf( S, "beirdobot - %s", svn_version() );
+    } else {
+        S = strdup("Forget about it");
+    }
     return S;
 }
 

@@ -44,6 +44,7 @@ extern LinkedList_t   *ServerList;
 
 
 /* Prototypes */
+const char *svn_version(void);
 void bot_start(void);
 void db_setup(void);
 void db_load_servers(void);
