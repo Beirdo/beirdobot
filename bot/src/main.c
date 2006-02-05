@@ -47,6 +47,8 @@ uint16  mysql_portnum;
 char   *mysql_user;
 char   *mysql_password;
 char   *mysql_db;
+bool    verbose;
+bool    Daemon;
 
 void LogBanner( void );
 void MainParseArgs( int argc, char **argv );
@@ -91,6 +93,8 @@ void MainParseArgs( int argc, char **argv )
         {"password", 1, 0, 'p'},
         {"port", 1, 0, 'P'},
         {"database", 1, 0, 'd'},
+        {"daemon", 0, 0, 'D'},
+        {"verbose", 0, 0, 'v'},
         {0, 0, 0, 0}
     };
 
@@ -99,15 +103,23 @@ void MainParseArgs( int argc, char **argv )
     mysql_user = NULL;
     mysql_password = NULL;
     mysql_db = NULL;
+    verbose = false;
+    Daemon = false;
 
-    while( (opt = getopt_long( argc, argv, "hVH:P:u:p:d:", longOpts, &optIndex ))
-           != -1 )
+    while( (opt = getopt_long( argc, argv, "hVH:P:u:p:d:Dv", longOpts, 
+                               &optIndex )) != -1 )
     {
         switch( opt )
         {
             case 'h':
                 MainDisplayUsage( argv[0], NULL );
                 exit( 0 );
+                break;
+            case 'D':
+                Daemon = true;
+                break;
+            case 'v':
+                verbose = true;
                 break;
             case 'H':
                 if( mysql_host != NULL )
@@ -177,6 +189,10 @@ void MainParseArgs( int argc, char **argv )
     {
         mysql_db = strdup("beirdobot");
     }
+
+    if( Daemon ) {
+        verbose = false;
+    }
 }
 
 void MainDisplayUsage( char *program, char *errorMsg )
@@ -196,7 +212,7 @@ void MainDisplayUsage( char *program, char *errorMsg )
     }
 
     fprintf( stderr, "\nUsage:\n\t%s [-H host] [-P port] [-u user] "
-                     "[-p password] [-d database]\n\n", program );
+                     "[-p password] [-d database] [-D] [-v]\n\n", program );
     fprintf( stderr, 
                "Options:\n"
                "\t-H or --host\tMySQL host to connect to (default localhost)\n"
@@ -204,6 +220,8 @@ void MainDisplayUsage( char *program, char *errorMsg )
                "\t-u or --user\tMySQL user to connect as (default beirdobot)\n"
                "\t-p or --password\tMySQL password to use (default beirdobot)\n"
                "\t-d or --database\tMySQL database to use (default beirdobot)\n"
+               "\t-D or --daemon\tRun solely in daemon mode, detached\n"
+               "\t-v or --verbose\tShow verbose information while running\n"
                "\t-V or --version\tshow the version number and quit\n"
                "\t-h or --help\tshow this help text\n\n" );
 }

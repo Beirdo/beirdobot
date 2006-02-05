@@ -15,7 +15,7 @@ LIBS	+= $(shell ${BOTNETCFG} --libs-static)
 
 SRCS	= main.c bot.c mysql.c linked_list.c
 OBJS	= ${SRCS:.c=.o}
-EXE	= bot
+EXE	= beirdobot
 
 all:	${EXE}
 

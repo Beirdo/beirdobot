@@ -42,6 +42,8 @@ extern char   *mysql_user;
 extern char   *mysql_password;
 extern char   *mysql_db;
 extern LinkedList_t   *ServerList;
+extern bool verbose;
+extern bool Daemon;
 
 
 /* Prototypes */
@@ -52,6 +54,12 @@ void db_load_servers(void);
 void db_load_channels(void);
 void db_add_logentry( IRCChannel_t *channel, char *nick, IRCMsgType_t msgType, 
                       char *text );
+void db_update_nick( IRCChannel_t *channel, char *nick, bool present, 
+                     bool extract );
+void db_flush_nicks( IRCChannel_t *channel );
+void db_flush_nick( IRCServer_t *server, char *nick, IRCMsgType_t type, 
+                    char *text, char *newNick );
+IRCChannel_t *FindChannelNum(LinkedList_t *list, int channum);
 
 #endif
 

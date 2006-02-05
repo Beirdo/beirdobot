@@ -54,19 +54,18 @@ void ProcOnConnected(BN_PInfo I, const char HostName[])
     IRCServer_t *server;
 
     server = (IRCServer_t *)I->User;
-    printf("Event Connected : (%s)\n", HostName);
+    if( verbose ) {
+        printf("Event Connected : (%s)\n", HostName);
+    }
     BN_EnableFloodProtection(I, 100, 1000, 60);
     BN_Register(I, server->nick, server->username, server->realname);
 }
 
-void ProcOnPingPong(BN_PInfo I)
-{
-    printf("Event PingPong\n");
-}
-
 void ProcOnStatus(BN_PInfo I, const char Msg[], int Code)
 {
-    printf("Event Status : (%s)\n", Msg);
+    if( verbose ) {
+        printf("Event Status : (%s)\n", Msg);
+    }
 }
 
 void ProcOnRegistered(BN_PInfo I)
@@ -77,7 +76,10 @@ void ProcOnRegistered(BN_PInfo I)
     IRCChannel_t       *channel;
 
     server = (IRCServer_t *)I->User;
-    printf("Event Registered\n");
+
+    if( verbose ) {
+        printf("Event Registered\n");
+    }
 
     if( strcmp(server->nickserv, "") ) {
         /* We need to register with nickserv */
@@ -103,23 +105,31 @@ void ProcOnRegistered(BN_PInfo I)
 void ProcOnUnknown(BN_PInfo I, const char Who[], const char Command[],
                    const char Msg[])
 {
-    printf("Unknown event from %s : %s %s\n", Who, Command, Msg);
+    if( verbose ) {
+        printf("Unknown event from %s : %s %s\n", Who, Command, Msg);
+    }
 }
 
 void ProcOnError(BN_PInfo I, int err)
 {
-    printf("Event Error : (%d)\n", err);
+    if( verbose ) {
+        printf("Event Error : (%d)\n", err);
+    }
 }
 
 void ProcOnDisconnected(BN_PInfo I, const char Msg[])
 {
-    printf("Event Disconnected : (%s)\n", Msg);
+    if( verbose ) {
+        printf("Event Disconnected : (%s)\n", Msg);
+    }
 }
 
 void ProcOnNotice(BN_PInfo I, const char Who[], const char Whom[],
                   const char Msg[])
 {
-    printf("You (%s) have have notice by %s (%s)\n", Whom, Who, Msg);
+    if( verbose ) {
+        printf("You (%s) have notice by %s (%s)\n", Whom, Who, Msg);
+    }
 }
 
 char *ProcOnCTCP(BN_PInfo I, const char Who[], const char Whom[],
@@ -127,8 +137,11 @@ char *ProcOnCTCP(BN_PInfo I, const char Who[], const char Whom[],
 {
     char           *S;
 
-    printf("You (%s) have received a CTCP request from %s (%s)\n", Whom,
-           Who, Type);
+    if( verbose ) {
+        printf("You (%s) have received a CTCP request from %s (%s)\n", Whom,
+               Who, Type);
+    }
+
     if( !strcasecmp(Type, "version") ) {
         S = (char *)malloc(MAX_STRING_LENGTH);
         sprintf( S, "beirdobot - %s", svn_version() );
@@ -141,47 +154,61 @@ char *ProcOnCTCP(BN_PInfo I, const char Who[], const char Whom[],
 void ProcOnCTCPReply(BN_PInfo I, const char Who[], const char Whom[],
                      const char Msg[])
 {
-    printf("%s has replied to your (%s) CTCP request (%s)\n", Who, Whom,
-           Msg);
+    if( verbose ) {
+        printf("%s has replied to your (%s) CTCP request (%s)\n", Who, Whom,
+               Msg);
+    }
 }
 
 void ProcOnWhois(BN_PInfo I, const char *Chans[])
 {
     int             i;
 
-    printf("Whois Infos:\n");
-    for (i = 0; i < WHOIS_INFO_COUNT; i++)
-        printf("\t(%s)\n", Chans[i]);
-    printf("End of list\n");
+    if( verbose ) {
+        printf("Whois Infos:\n");
+        for (i = 0; i < WHOIS_INFO_COUNT; i++) {
+            printf("\t(%s)\n", Chans[i]);
+        }
+        printf("End of list\n");
+    }
 }
 
 void ProcOnMode(BN_PInfo I, const char Channel[], const char Who[],
                 const char Msg[])
 {
     char           *string;
+    IRCChannel_t   *channel;
 
     string = (char *)malloc(MAX_STRING_LENGTH);
     sprintf(string, "Mode for %s by %s : %s\n", Channel, Who, Msg);
-    db_add_logentry( FindChannel((IRCServer_t *)I->User, Channel), (char *)Who, 
-                     TYPE_MODE, string );
+
+    channel = FindChannel((IRCServer_t *)I->User, Channel);
+    db_add_logentry( channel, (char *)Who, TYPE_MODE, string );
+    db_update_nick( channel, (char *)Who, true, true );
     free( string );
 }
 
 void ProcOnModeIs(BN_PInfo I, const char Channel[], const char Msg[])
 {
-    printf("Mode for %s : %s\n", Channel, Msg);
+    if( verbose ) {
+        printf("Mode for %s : %s\n", Channel, Msg);
+    }
 }
 
 void ProcOnNames(BN_PInfo I, const char Channel[], const char *Names[],
                  int Count)
 {
     int             i;
-    printf("Names for channel (%s) :\n", Channel);
-    for (i = 0; i < Count; i++)
-        printf("\t(%s)\n", Names[i]);
-    printf("End of names for (%s)\n", Channel);
-    BN_SendMessage(I, BN_MakeMessage(NULL, "WHO", Channel),
-                   BN_LOW_PRIORITY);
+
+    if( verbose ) {
+        printf("Names for channel (%s) :\n", Channel);
+        for (i = 0; i < Count; i++) {
+            printf("\t(%s)\n", Names[i]);
+        }
+        printf("End of names for (%s)\n", Channel);
+    }
+
+    BN_SendMessage(I, BN_MakeMessage(NULL, "WHO", Channel), BN_LOW_PRIORITY);
 }
 
 
@@ -189,12 +216,26 @@ void ProcOnWho(BN_PInfo I, const char Channel[], const char *Info[],
                const int Count)
 {
     int             i;
+    IRCChannel_t   *channel;
 
-    printf("Who infos for channel (%s)\n", Channel);
-    for (i = 0; i < (Count * WHO_INFO_COUNT); i += WHO_INFO_COUNT)
-        printf("\t%s,%s,%s,%s,%s,%s\n", Info[i + 0], Info[i + 1],
-               Info[i + 2], Info[i + 3], Info[i + 4], Info[i + 5]);
-    printf("End of Who for (%s)\n", Channel);
+    channel = FindChannel((IRCServer_t *)I->User, Channel);
+
+    if( verbose ) {
+        printf("Who infos for channel (%s)\n", Channel);
+    }
+
+    for (i = 0; i < (Count * WHO_INFO_COUNT); i += WHO_INFO_COUNT) {
+        if( verbose ) {
+            printf("\t%s,%s,%s,%s,%s,%s\n", Info[i + 0], Info[i + 1],
+                   Info[i + 2], Info[i + 3], Info[i + 4], Info[i + 5]);
+        }
+
+        db_update_nick( channel, (char *)Info[i + 0], true, false );
+    }
+
+    if( verbose ) {
+        printf("End of Who for (%s)\n", Channel);
+    }
 }
 
 void ProcOnBanList(BN_PInfo I, const char Channel[], const char *BanList[],
@@ -202,10 +243,13 @@ void ProcOnBanList(BN_PInfo I, const char Channel[], const char *BanList[],
 {
     int             i;
 
-    printf("Ban list for channel %s\n", Channel);
-    for (i = 0; i < Count; i++)
-        printf("\t%s\n", BanList[i]);
-    printf("End of ban list for %s\n", Channel);
+    if( verbose ) {
+        printf("Ban list for channel %s\n", Channel);
+        for (i = 0; i < Count; i++) {
+            printf("\t%s\n", BanList[i]);
+        }
+        printf("End of ban list for %s\n", Channel);
+    }
 }
 
 void ProcOnList(BN_PInfo I, const char *Channels[], const char *Counts[],
@@ -213,32 +257,42 @@ void ProcOnList(BN_PInfo I, const char *Channels[], const char *Counts[],
 {
     int             i;
 
-    for (i = 0; i < Count; i++)
-        printf("%s (%s) : %s\n", Channels[i], Counts[i], Topics[i]);
+    if( verbose ) {
+        for (i = 0; i < Count; i++) {
+            printf("%s (%s) : %s\n", Channels[i], Counts[i], Topics[i]);
+        }
+    }
 }
 
 void ProcOnKill(BN_PInfo I, const char Who[], const char Whom[],
                 const char Msg[])
 {
-    printf("%s has been killed by %s (%s)\n", Whom, Who, Msg);
+    if( verbose ) {
+        printf("%s has been killed by %s (%s)\n", Whom, Who, Msg);
+    }
 }
 
 void ProcOnInvite(BN_PInfo I, const char Chan[], const char Who[],
                   const char Whom[])
 {
-    printf("You (%s) have been invited to %s by %s\n", Whom, Chan, Who);
+    if( verbose ) {
+        printf("You (%s) have been invited to %s by %s\n", Whom, Chan, Who);
+    }
 }
 
 void ProcOnTopic(BN_PInfo I, const char Chan[], const char Who[],
                  const char Msg[])
 {
     char           *string;
+    IRCChannel_t   *channel;
 
     string = (char *)malloc(MAX_STRING_LENGTH);
     sprintf(string, "Topic for %s has been changed by %s (%s)\n", Chan, Who, 
                     Msg);
-    db_add_logentry( FindChannel((IRCServer_t *)I->User, Chan), (char *)Who, 
-                     TYPE_TOPIC, string );
+
+    channel = FindChannel((IRCServer_t *)I->User, Chan);
+    db_add_logentry( channel, (char *)Who, TYPE_TOPIC, string );
+    db_update_nick( channel, (char *)Who, true, true );
     free( string );
 }
 
@@ -246,54 +300,65 @@ void ProcOnKick(BN_PInfo I, const char Chan[], const char Who[],
                 const char Whom[], const char Msg[])
 {
     char           *string;
+    IRCChannel_t   *channel;
 
     string = (char *)malloc(MAX_STRING_LENGTH);
     sprintf(string, "%s has been kicked from %s by %s (%s)\n", Whom, Chan, Who,
                     Msg);
-    db_add_logentry( FindChannel((IRCServer_t *)I->User, Chan), (char *)Who, 
-                     TYPE_KICK, string );
+
+    channel = FindChannel((IRCServer_t *)I->User, Chan);
+    db_add_logentry( channel, (char *)Who, TYPE_KICK, string );
+    db_update_nick( channel, (char *)Who, false, true );
     free( string );
 }
 
 void ProcOnPrivateTalk(BN_PInfo I, const char Who[], const char Whom[],
                        const char Msg[])
 {
-    printf("%s sent you (%s) a private message (%s)\n", Who, Whom, Msg);
+    if( verbose ) {
+        printf("%s sent you (%s) a private message (%s)\n", Who, Whom, Msg);
+    }
 }
 
 void ProcOnAction(BN_PInfo I, const char Chan[], const char Who[],
                   const char Msg[])
 {
-    db_add_logentry( FindChannel((IRCServer_t *)I->User, Chan), (char *)Who, 
-                     TYPE_ACTION, (char *)Msg );
+    IRCChannel_t   *channel;
+
+    channel = FindChannel((IRCServer_t *)I->User, Chan);
+    db_add_logentry( channel, (char *)Who, TYPE_ACTION, (char *)Msg );
+    db_update_nick( channel, (char *)Who, true, true );
 }
 
 void ProcOnChannelTalk(BN_PInfo I, const char Chan[], const char Who[],
                        const char Msg[])
 {
-    db_add_logentry( FindChannel((IRCServer_t *)I->User, Chan), (char *)Who, 
-                     TYPE_MESSAGE, (char *)Msg );
+    IRCChannel_t   *channel;
+
+    channel = FindChannel((IRCServer_t *)I->User, Chan);
+    db_add_logentry( channel, (char *)Who, TYPE_MESSAGE, (char *)Msg );
+    db_update_nick( channel, (char *)Who, true, true );
 }
 
-#if 0
 void ProcOnNick(BN_PInfo I, const char Who[], const char Msg[])
 {
-    /* Need to find what channel they were in?! */
-    db_add_logentry( FindChannel((IRCServer_t *)I->User, Chan), (char *)Who, 
-                     TYPE_NICK, (char *)Msg );
+    db_flush_nick( (IRCServer_t *)I->User, (char *)Who, TYPE_NICK, (char *)Msg,
+                   (char *)Msg );
 }
-#endif
 
 void ProcOnJoin(BN_PInfo I, const char Chan[], const char Who[])
 {
     char           *string;
+    IRCChannel_t   *channel;
     char            nick[256];
 
     string = (char *)malloc(MAX_STRING_LENGTH);
     BN_ExtractNick(Who, nick, 256);
     sprintf(string, "%s (%s) has joined %s\n", nick, Who, Chan);
-    db_add_logentry( FindChannel((IRCServer_t *)I->User, Chan), (char *)Who, 
-                     TYPE_JOIN, string );
+
+    channel = FindChannel((IRCServer_t *)I->User, Chan);
+    db_add_logentry( channel, (char *)Who, TYPE_JOIN, string );
+    db_update_nick( channel, (char *)Who, true, true );
     free( string );
 }
 
@@ -301,30 +366,31 @@ void ProcOnPart(BN_PInfo I, const char Chan[], const char Who[],
                 const char Msg[])
 {
     char           *string;
+    IRCChannel_t   *channel;
     char            nick[256];
 
     string = (char *)malloc(MAX_STRING_LENGTH);
     BN_ExtractNick(Who, nick, 256);
     sprintf(string, "%s (%s) has left %s (%s)\n", nick, Who, Chan, Msg);
-    db_add_logentry( FindChannel((IRCServer_t *)I->User, Chan), (char *)Who, 
-                     TYPE_PART, string );
+
+    channel = FindChannel((IRCServer_t *)I->User, Chan);
+    db_add_logentry( channel, (char *)Who, TYPE_PART, string );
+    db_update_nick( channel, (char *)Who, false, true );
     free( string );
 }
 
-#if 0
 void ProcOnQuit(BN_PInfo I, const char Who[], const char Msg[])
 {
     char           *string;
-
-    /* Need to find all channels they are on?! */
+    char            nick[256];
 
     string = (char *)malloc(MAX_STRING_LENGTH);
-    sprintf(string, "%s (%s) has quit (%s)\n", BN_ExtractNick(Who), Who, Msg);
-    db_add_logentry( FindChannel((IRCServer_t *)I->User, Chan), (char *)Who, 
-                     TYPE_QUIT, string );
+    BN_ExtractNick(Who, nick, 256);
+    sprintf(string, "%s (%s) has quit (%s)\n", nick, Who, Msg);
+    db_flush_nick( (IRCServer_t *)I->User, (char *)Who, TYPE_QUIT, string, 
+                   NULL );
     free( string );
 }
-#endif
 
 void ProcOnJoinChannel(BN_PInfo I, const char Chan[])
 {
@@ -347,6 +413,7 @@ void ProcOnJoinChannel(BN_PInfo I, const char Chan[])
 
             if( !strcasecmp(Chan, channel->channel) ) {
                 channel->joined = true;
+                db_flush_nicks( channel );
                 continue;
             }
 
@@ -404,7 +471,6 @@ void *bot_server_thread(void *arg)
     Info->User = (void *)server;
     Info->CB.OnConnected = ProcOnConnected;
     Info->CB.OnJoinChannel = ProcOnJoinChannel;
-    Info->CB.OnPingPong = ProcOnPingPong;
     Info->CB.OnRegistered = ProcOnRegistered;
     Info->CB.OnUnknown = ProcOnUnknown;
     Info->CB.OnDisconnected = ProcOnDisconnected;
@@ -427,14 +493,10 @@ void *bot_server_thread(void *arg)
     Info->CB.OnPrivateTalk = ProcOnPrivateTalk;
     Info->CB.OnAction = ProcOnAction;
     Info->CB.OnChannelTalk = ProcOnChannelTalk;
-#if 0
     Info->CB.OnNick = ProcOnNick;
-#endif
     Info->CB.OnJoin = ProcOnJoin;
     Info->CB.OnPart = ProcOnPart;
-#if 0
     Info->CB.OnQuit = ProcOnQuit;
-#endif
 
     printf("Connecting to %s:%d...\n", server->server, server->port);
 
@@ -468,6 +530,31 @@ IRCChannel_t *FindChannel(IRCServer_t *server, const char *channame)
             }
         }
         LinkedListUnlock( server->channels );
+    }
+
+    return( channel );
+}
+
+IRCChannel_t *FindChannelNum(LinkedList_t *list, int channum)
+{
+    LinkedListItem_t       *item;
+    IRCChannel_t           *channel;
+    IRCChannel_t           *chanitem;
+    bool                    found;
+
+    channel = NULL;
+    if( list ) {
+        LinkedListLock( list );
+        for( found = false, item = list->head; item && !found; 
+             item = item->next ) {
+            chanitem = (IRCChannel_t *)item;
+
+            if( chanitem->channelId == channum ) {
+                found = true;
+                channel = chanitem;
+            }
+        }
+        LinkedListUnlock( list );
     }
 
     return( channel );

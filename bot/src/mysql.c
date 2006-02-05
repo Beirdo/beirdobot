@@ -228,6 +228,93 @@ void db_add_logentry( IRCChannel_t *channel, char *nick, IRCMsgType_t msgType,
 }
 
 
+void db_update_nick( IRCChannel_t *channel, char *nick, bool present, 
+                     bool extract )
+{
+    char           *nickOnly;
+    char           *nickQuoted;
+
+    if( !channel || !nick ) {
+        return;
+    }
+
+    if( extract ) {
+        nickOnly = (char *)malloc(strlen(nick));
+        if( !nickOnly ) {
+            nickOnly = nick;
+        } else {
+            BN_ExtractNick(nick, nickOnly, strlen(nick));
+        }
+    } else {
+        nickOnly = nick;
+    }
+
+    nickQuoted = db_quote(nickOnly);
+
+    if( nickQuoted ) {
+        sprintf( sqlbuf, "REPLACE INTO `nicks` (`chanid`, `nick`, `lastseen`, "
+                         "`present`) VALUES ( %d, '%s', NULL, %d )",
+                         channel->channelId, nickQuoted, present );
+        free(nickQuoted);
+
+        mysql_query(sql, sqlbuf);
+    }
+}
+
+void db_flush_nicks( IRCChannel_t *channel )
+{
+    sprintf( sqlbuf, "UPDATE `nicks` SET `present` = 0 WHERE `chanid` = %d",
+                     channel->channelId );
+    mysql_query(sql, sqlbuf);
+}
+
+void db_flush_nick( IRCServer_t *server, char *nick, IRCMsgType_t type, 
+                    char *text, char *newNick )
+{
+    IRCChannel_t       *channel;
+    char               *nickOnly;
+    char               *nickQuoted;
+    int                 count;
+    int                 i;
+    MYSQL_RES          *res;
+    MYSQL_ROW           row;
+
+    nickOnly = (char *)malloc(strlen(nick));
+    if( !nickOnly ) {
+        nickOnly = nick;
+    } else {
+        BN_ExtractNick(nick, nickOnly, strlen(nick));
+    }
+
+    nickQuoted = db_quote(nickOnly);
+
+    sprintf(sqlbuf, "SELECT DISTINCT `nicks`.`chanid` FROM `nicks`, `channels` "
+                    "WHERE `nicks`.`chanid` = `channels`.`chanid` AND "
+                    "`channels`.`serverid` = %d AND `nicks`.`nick` = '%s'",
+                    server->serverId, nickQuoted );
+    free( nickQuoted );
+    mysql_query(sql, sqlbuf);
+
+    res = mysql_store_result(sql);
+    if( !res || !(count = mysql_num_rows(res)) ) {
+        mysql_free_result(res);
+        return;
+    }
+
+    for( i = 0; i < count; i++ ) {
+        row = mysql_fetch_row(res);
+
+        channel = FindChannelNum( server->channels, atoi(row[0]) );
+        db_update_nick( channel, nickOnly, false, false );
+        if( newNick ) {
+            db_update_nick( channel, newNick, true, false );
+        }
+        db_add_logentry( channel, nick, type, text );
+    }
+
+    mysql_free_result(res);
+}
+
 /*
  * vim:ts=4:sw=4:ai:et:si:sts=4
  */
