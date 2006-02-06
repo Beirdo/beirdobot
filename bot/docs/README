@@ -1,0 +1,13 @@
+To use the database.sql to create your database structure:
+
+mysql -u root -p     (assuming you put a password!)
+
+mysql> create database beirdobot;
+mysql> grant usage on *.* to beirdobot@localhost identified by 'beirdobot';
+mysql> grant select, insert, update, create, drop, index, alter on
+       beirdobot.* beirdobot@local;
+mysql> flush privileges;
+mysql> quit;
+
+
+mysql -u beirdobot -p < database.sql
