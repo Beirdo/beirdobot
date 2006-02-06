@@ -639,6 +639,19 @@ void BN_CTCPFonction(BN_PInfo I,BN_PMessage Msg)
     return;
   }
 
+  if(strcmp(Ctcp,CTCP_PING) == 0)
+  {
+    BN_ExtractNick(Msg->Prefix,Nick,sizeof(Nick));
+    snprintf(S,sizeof(S),"%s :%s",Nick,Msg->Params[1]);
+#ifdef SERVER
+    if(I->IsServer)
+      BN_SendMessage(I,BN_MakeMessage(I->Serv,"NOTICE",S),BN_LOW_PRIORITY);
+    else
+#endif
+    BN_SendMessage(I,BN_MakeMessage(NULL,"NOTICE",S),BN_LOW_PRIORITY);
+    return;
+  }
+
   Reply = NULL;
   if(I->CB.OnCTCP != NULL)
     Reply = I->CB.OnCTCP(I,Msg->Prefix,Msg->Params[0],Ctcp);
