@@ -55,6 +55,8 @@ typedef struct {
     int                 channelId;
     IRCServer_t        *server;
     char               *channel;
+    char               *url;
+    int                 notifywindow;
     bool                joined;
 } IRCChannel_t;
 

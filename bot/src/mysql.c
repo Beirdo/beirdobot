@@ -156,9 +156,9 @@ void db_load_channels(void)
     for( item = ServerList->head; item; item = item->next ) {
         server = (IRCServer_t *)item;
 
-        sprintf(sqlbuf, "SELECT `chanid`, `channel` FROM `channels` "
-                        "WHERE `serverid` = %d ORDER BY `chanid`",
-                        server->serverId );
+        sprintf(sqlbuf, "SELECT `chanid`, `channel`, `url`, `notifywindow` "
+                        "FROM `channels` WHERE `serverid` = %d "
+                        "ORDER BY `chanid`", server->serverId );
         mysql_query(sql, sqlbuf);
 
         res = mysql_store_result(sql);
@@ -181,6 +181,8 @@ void db_load_channels(void)
 
             channel->channelId      = atoi(row[0]);
             channel->channel        = strdup(row[1]);
+            channel->url            = strdup(row[2]);
+            channel->notifywindow   = atoi(row[3]);
             channel->server         = server;
             channel->joined         = false;
 
@@ -214,6 +216,9 @@ void db_add_logentry( IRCChannel_t *channel, char *nick, IRCMsgType_t msgType,
 
     nickQuoted = db_quote(nickOnly);
     textQuoted = db_quote(text);
+    if( nickOnly != nick ) {
+        free( nickOnly );
+    }
 
     if( nickQuoted && textQuoted ) {
         sprintf( sqlbuf, "INSERT INTO `irclog` (`chanid`, `timestamp`, "
@@ -233,6 +238,8 @@ void db_update_nick( IRCChannel_t *channel, char *nick, bool present,
 {
     char           *nickOnly;
     char           *nickQuoted;
+    int             count;
+    MYSQL_RES      *res;
 
     if( !channel || !nick ) {
         return;
@@ -250,15 +257,38 @@ void db_update_nick( IRCChannel_t *channel, char *nick, bool present,
     }
 
     nickQuoted = db_quote(nickOnly);
-
-    if( nickQuoted ) {
-        sprintf( sqlbuf, "REPLACE INTO `nicks` (`chanid`, `nick`, `lastseen`, "
-                         "`present`) VALUES ( %d, '%s', NULL, %d )",
-                         channel->channelId, nickQuoted, present );
-        free(nickQuoted);
-
-        mysql_query(sql, sqlbuf);
+    if( nickOnly != nick ) {
+        free( nickOnly );
     }
+
+    if( !nickQuoted ) {
+        return;
+    }
+
+    sprintf( sqlbuf, "SELECT * FROM `nicks` WHERE `chanid` = %d AND "
+                     "`nick` = '%s'", channel->channelId, nickQuoted );
+    mysql_query(sql, sqlbuf);
+
+    res = mysql_store_result(sql);
+    if( !res || !(count = mysql_num_rows(res)) ) {
+        count = 0;
+    }
+    mysql_free_result(res);
+
+    if( count ) {
+        sprintf( sqlbuf, "UPDATE `nicks` SET `lastseen` = NULL, "
+                         "`present` = %d WHERE `chanid` = %d AND "
+                         "`nick` = '%s'",
+                         present, channel->channelId, nickQuoted );
+    } else {
+        sprintf( sqlbuf, "INSERT INTO `nicks` (`chanid`, `nick`, `lastseen`, "
+                         "`lastnotice`, `present`) "
+                         "VALUES ( %d, '%s', NULL, '00000000000000', %d )",
+                         channel->channelId, nickQuoted, present );
+    }
+    free(nickQuoted);
+
+    mysql_query(sql, sqlbuf);
 }
 
 void db_flush_nicks( IRCChannel_t *channel )
@@ -313,7 +343,66 @@ void db_flush_nick( IRCServer_t *server, char *nick, IRCMsgType_t type,
     }
 
     mysql_free_result(res);
+
+    if( nickOnly != nick ) {
+        free( nickOnly );
+    }
 }
+
+bool db_check_nick_notify( IRCChannel_t *channel, char *nick, int hours )
+{
+    char           *nickQuoted;
+    int             count;
+    MYSQL_RES      *res;
+
+    if( !channel || !nick ) {
+        return( false );
+    }
+
+    nickQuoted = db_quote(nick);
+
+    if( !nickQuoted ) {
+        return( false );
+    }
+
+    sprintf( sqlbuf, "SELECT `lastnotice` FROM `nicks` WHERE "
+                     "`chanid` = %d AND `nick` = '%s' AND "
+                     "SUBDATE(NOW(), INTERVAL %d HOUR) >= `lastnotice`",
+                     channel->channelId, nickQuoted, hours );
+    free(nickQuoted);
+    mysql_query(sql, sqlbuf);
+
+    res = mysql_store_result(sql);
+    if( !res || !(count = mysql_num_rows(res)) ) {
+        mysql_free_result(res);
+        return( false );
+    }
+
+    mysql_free_result(res);
+
+    if( count ) {
+        return( true );
+    } else {
+        return( false );
+    }
+}
+
+void db_notify_nick( IRCChannel_t *channel, char *nick )
+{
+    char           *nickQuoted;
+
+    nickQuoted = db_quote(nick);
+
+    if( !nickQuoted ) {
+        return;
+    }
+
+    sprintf( sqlbuf, "UPDATE `nicks` SET `lastnotice` = NOW() "
+                     "WHERE `chanid` = %d AND `nick` = '%s'",
+                     channel->channelId, nickQuoted );
+    mysql_query(sql, sqlbuf);
+}
+
 
 /*
  * vim:ts=4:sw=4:ai:et:si:sts=4

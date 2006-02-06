@@ -142,11 +142,11 @@ char *ProcOnCTCP(BN_PInfo I, const char Who[], const char Whom[],
                Who, Type);
     }
 
+    S = NULL;
+
     if( !strcasecmp(Type, "version") ) {
         S = (char *)malloc(MAX_STRING_LENGTH);
-        sprintf( S, "beirdobot - %s", svn_version() );
-    } else {
-        S = strdup("Forget about it");
+        sprintf( S, "beirdobot -- %s", svn_version() );
     }
     return S;
 }
@@ -217,6 +217,8 @@ void ProcOnWho(BN_PInfo I, const char Channel[], const char *Info[],
 {
     int             i;
     IRCChannel_t   *channel;
+    char            string[MAX_STRING_LENGTH];
+    char           *nick;
 
     channel = FindChannel((IRCServer_t *)I->User, Channel);
 
@@ -230,7 +232,17 @@ void ProcOnWho(BN_PInfo I, const char Channel[], const char *Info[],
                    Info[i + 2], Info[i + 3], Info[i + 4], Info[i + 5]);
         }
 
-        db_update_nick( channel, (char *)Info[i + 0], true, false );
+        nick = (char *)Info[i + 0];
+        db_update_nick( channel, nick, true, false );
+        if( strcmp( channel->url, "" ) && 
+            db_check_nick_notify( channel, nick, channel->notifywindow ) ) {
+            snprintf( string, MAX_STRING_LENGTH, 
+                      "%s :This channel (%s) is logged -- %s", nick, 
+                      channel->channel, channel->url );
+            BN_SendMessage(I, BN_MakeMessage(NULL, "NOTICE", string),
+                           BN_LOW_PRIORITY);
+            db_notify_nick( channel, nick );
+        }
     }
 
     if( verbose ) {
@@ -359,6 +371,16 @@ void ProcOnJoin(BN_PInfo I, const char Chan[], const char Who[])
     channel = FindChannel((IRCServer_t *)I->User, Chan);
     db_add_logentry( channel, (char *)Who, TYPE_JOIN, string );
     db_update_nick( channel, (char *)Who, true, true );
+
+    if( strcmp( channel->url, "" ) && 
+        db_check_nick_notify( channel, nick, channel->notifywindow ) ) {
+        snprintf( string, MAX_STRING_LENGTH, 
+                  "%s :This channel (%s) is logged -- %s", nick, 
+                  channel->channel, channel->url );
+        BN_SendMessage(I, BN_MakeMessage(NULL, "NOTICE", string),
+                       BN_LOW_PRIORITY);
+        db_notify_nick( channel, nick );
+    }
     free( string );
 }
 
