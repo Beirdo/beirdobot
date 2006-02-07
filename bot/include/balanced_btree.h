@@ -64,12 +64,6 @@ typedef struct _BalancedBTree_t
     pthread_mutex_t              mutex;
 } BalancedBTree_t;
 
-typedef enum
-{
-    UNLOCKED,
-    LOCKED
-} BalancedBTreeLocked_t;
-
 
 #ifdef __cplusplus
 extern "C" {
@@ -81,11 +75,11 @@ void BalancedBTreeDestroy( BalancedBTree_t *btree );
 void BalancedBTreeLock( BalancedBTree_t *btree );
 void BalancedBTreeUnlock( BalancedBTree_t *btree );
 void BalancedBTreeAdd( BalancedBTree_t *btree, BalancedBTreeItem_t *item, 
-                       BalancedBTreeLocked_t locked, bool rebalance );
+                       Locked_t locked, bool rebalance );
 void BalancedBTreeRemove( BalancedBTree_t *btree, BalancedBTreeItem_t *item, 
-                       BalancedBTreeLocked_t locked, bool rebalance );
+                       Locked_t locked, bool rebalance );
 void *BalancedBTreeFind( BalancedBTree_t *btree, void *key,
-                         BalancedBTreeLocked_t locked );
+                         Locked_t locked );
 
 #ifdef __cplusplus
 }

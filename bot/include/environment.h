@@ -99,6 +99,13 @@ typedef unsigned long long int uint64;
 
 #define MAX_STRING_LENGTH           1024
 
+typedef enum
+{
+    UNLOCKED,
+    LOCKED
+} Locked_t;
+
+
 #endif
 
 /*

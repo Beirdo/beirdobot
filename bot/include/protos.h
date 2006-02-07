@@ -61,7 +61,7 @@ void db_flush_nick( IRCServer_t *server, char *nick, IRCMsgType_t type,
                     char *text, char *newNick );
 bool db_check_nick_notify( IRCChannel_t *channel, char *nick, int hours );
 void db_notify_nick( IRCChannel_t *channel, char *nick );
-IRCChannel_t *FindChannelNum(LinkedList_t *list, int channum);
+IRCChannel_t *FindChannelNum( IRCServer_t *server, int channum );
 
 #endif
 

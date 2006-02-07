@@ -168,6 +168,11 @@ void db_load_channels(void)
         }
 
         server->channels = LinkedListCreate();
+        server->channelName = BalancedBTreeCreate( BTREE_KEY_STRING );
+        server->channelNum  = BalancedBTreeCreate( BTREE_KEY_INT );
+        LinkedListLock( server->channels );
+        BalancedBTreeLock( server->channelName );
+        BalancedBTreeLock( server->channelNum );
 
         for( i = 0; i < count; i++ ) {
             row = mysql_fetch_row(res);
@@ -186,11 +191,27 @@ void db_load_channels(void)
             channel->server         = server;
             channel->joined         = false;
 
-            LinkedListAdd( server->channels, (LinkedListItem_t *)channel, 
-                           UNLOCKED, AT_TAIL );
-        }
+            channel->itemName.item  = (void *)channel;
+            channel->itemName.key   = (void *)&channel->channel;
+            channel->itemNum.item   = (void *)channel;
+            channel->itemNum.key    = (void *)&channel->channelId;
 
+            BalancedBTreeAdd( server->channelName, &channel->itemName, LOCKED,
+                              false );
+            BalancedBTreeAdd( server->channelNum, &channel->itemNum, LOCKED,
+                              false );
+            LinkedListAdd( server->channels, (LinkedListItem_t *)channel,
+                           LOCKED, AT_TAIL );
+        }
         mysql_free_result(res);
+
+        /* Rebalance the trees */
+        BalancedBTreeAdd( server->channelName, NULL, LOCKED, true );
+        BalancedBTreeAdd( server->channelNum, NULL, LOCKED, true );
+
+        LinkedListUnlock( server->channels );
+        BalancedBTreeUnlock( server->channelName );
+        BalancedBTreeUnlock( server->channelNum );
     }
     LinkedListUnlock( ServerList );
 }
@@ -334,7 +355,7 @@ void db_flush_nick( IRCServer_t *server, char *nick, IRCMsgType_t type,
     for( i = 0; i < count; i++ ) {
         row = mysql_fetch_row(res);
 
-        channel = FindChannelNum( server->channels, atoi(row[0]) );
+        channel = FindChannelNum( server, atoi(row[0]) );
         db_update_nick( channel, nickOnly, false, false );
         if( newNick ) {
             db_update_nick( channel, newNick, true, false );

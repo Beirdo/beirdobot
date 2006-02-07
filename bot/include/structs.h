@@ -31,13 +31,17 @@
 #include "botnet.h"
 #include "environment.h"
 #include "linked_list.h"
+#include "balanced_btree.h"
 
 static char interthread_h_ident[] _UNUSED_ = 
     "$Id$";
 
+
 typedef struct {
     LinkedListItem_t    item;
     LinkedList_t       *channels;
+    BalancedBTree_t    *channelName;
+    BalancedBTree_t    *channelNum;
     int                 serverId;
     char               *server;
     uint16              port;
@@ -52,6 +56,8 @@ typedef struct {
 
 typedef struct {
     LinkedListItem_t    item;
+    BalancedBTreeItem_t itemName;
+    BalancedBTreeItem_t itemNum;
     int                 channelId;
     IRCServer_t        *server;
     char               *channel;

@@ -57,12 +57,6 @@ typedef struct _LinkedList_t
 
 typedef enum
 {
-    UNLOCKED,
-    LOCKED
-} LinkedListLocked_t;
-
-typedef enum
-{
     AT_HEAD,
     AT_TAIL
 } LinkedListLoc_t;
@@ -78,9 +72,9 @@ void LinkedListDestroy( LinkedList_t *list );
 void LinkedListLock( LinkedList_t *list );
 void LinkedListUnlock( LinkedList_t *list );
 void LinkedListAdd( LinkedList_t *list, LinkedListItem_t *item, 
-                    LinkedListLocked_t locked, LinkedListLoc_t location );
+                    Locked_t locked, LinkedListLoc_t location );
 void LinkedListRemove( LinkedList_t *list, LinkedListItem_t *item, 
-                       LinkedListLocked_t locked );
+                       Locked_t locked );
 
 #ifdef __cplusplus
 }

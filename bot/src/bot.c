@@ -534,51 +534,21 @@ void *bot_server_thread(void *arg)
 
 IRCChannel_t *FindChannel(IRCServer_t *server, const char *channame)
 {
-    LinkedListItem_t       *item;
     IRCChannel_t           *channel;
-    IRCChannel_t           *chanitem;
-    bool                    found;
 
-    channel = NULL;
-    if( server->channels ) {
-        LinkedListLock( server->channels );
-        for( found = false, item = server->channels->head; item && !found; 
-             item = item->next ) {
-            chanitem = (IRCChannel_t *)item;
-
-            if( !strcasecmp(channame, chanitem->channel) ) {
-                found = true;
-                channel = chanitem;
-            }
-        }
-        LinkedListUnlock( server->channels );
-    }
-
+    channel = (IRCChannel_t *)BalancedBTreeFind( server->channelName,
+                                                 (char **)&channame, 
+                                                 UNLOCKED );
     return( channel );
 }
 
-IRCChannel_t *FindChannelNum(LinkedList_t *list, int channum)
+IRCChannel_t *FindChannelNum( IRCServer_t *server, int channum )
 {
-    LinkedListItem_t       *item;
     IRCChannel_t           *channel;
-    IRCChannel_t           *chanitem;
-    bool                    found;
 
-    channel = NULL;
-    if( list ) {
-        LinkedListLock( list );
-        for( found = false, item = list->head; item && !found; 
-             item = item->next ) {
-            chanitem = (IRCChannel_t *)item;
-
-            if( chanitem->channelId == channum ) {
-                found = true;
-                channel = chanitem;
-            }
-        }
-        LinkedListUnlock( list );
-    }
-
+    channel = (IRCChannel_t *)BalancedBTreeFind( server->channelNum,
+                                                 (int *)&channum, 
+                                                 UNLOCKED );
     return( channel );
 }
 

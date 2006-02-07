@@ -119,7 +119,7 @@ void BalancedBTreeDestroy( BalancedBTree_t *btree )
 
 
 void BalancedBTreeAdd( BalancedBTree_t *btree, BalancedBTreeItem_t *item, 
-                       BalancedBTreeLocked_t locked, bool rebalance )
+                       Locked_t locked, bool rebalance )
 {
     int         res;
 
@@ -177,7 +177,7 @@ void BalancedBTreeAdd( BalancedBTree_t *btree, BalancedBTreeItem_t *item,
 
 
 void BalancedBTreeRemove( BalancedBTree_t *btree, BalancedBTreeItem_t *item, 
-                       BalancedBTreeLocked_t locked, bool rebalance )
+                          Locked_t locked, bool rebalance )
 {
     BalancedBTreeItem_t    *replace;
 
@@ -239,7 +239,7 @@ void BalancedBTreeRemove( BalancedBTree_t *btree, BalancedBTreeItem_t *item,
 
 
 void *BalancedBTreeFind( BalancedBTree_t *btree, void *key,
-                         BalancedBTreeLocked_t locked )
+                         Locked_t locked )
 {
     BalancedBTreeItem_t    *item;
     bool                    found;
