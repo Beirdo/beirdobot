@@ -1,0 +1,483 @@
+/*
+ *  This file is part of the beirdobot package
+ *  Copyright (C) 2006 Gavin Hurlbut
+ *
+ *  beirdobot is free software; you can redistribute it and/or modify
+ *  it under the terms of the GNU General Public License as published by
+ *  the Free Software Foundation; either version 2 of the License, or
+ *  (at your option) any later version.
+ *
+ *  This program is distributed in the hope that it will be useful,
+ *  but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ *  GNU General Public License for more details.
+ *
+ *  You should have received a copy of the GNU General Public License
+ *  along with this program; if not, write to the Free Software
+ *  Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ */
+
+/*HEADER---------------------------------------------------
+* $Id$
+*
+* Copyright 2006 Gavin Hurlbut
+* All rights reserved
+*/
+
+/* INCLUDE FILES */
+#define ___ARGH
+#include "environment.h"
+#include <pthread.h>
+#include <stdio.h>
+#include "balanced_btree.h"
+#include <stdlib.h>
+#include <string.h>
+
+/* INTERNAL CONSTANT DEFINITIONS */
+
+/* INTERNAL TYPE DEFINITIONS */
+
+/* INTERNAL MACRO DEFINITIONS */
+
+/* INTERNAL FUNCTION PROTOTYPES */
+int KeyCompareInt( void *left, void *right );
+int KeyCompareString( void *left, void *right );
+BalancedBTreeItem_t *BalancedBTreeFindParent( BalancedBTree_t *btree,
+                                              BalancedBTreeItem_t *item );
+int BalancedBTreeWeight( BalancedBTreeItem_t *root );
+BalancedBTreeItem_t *BalancedBTreeFindGreatest( BalancedBTreeItem_t *root );
+BalancedBTreeItem_t *BalancedBTreeFindLeast( BalancedBTreeItem_t *root );
+void BalancedBTreeReplace( BalancedBTree_t *btree, BalancedBTreeItem_t *item, 
+                           BalancedBTreeItem_t *replace );
+void BalancedBTreeRebalance( BalancedBTree_t *btree, 
+                             BalancedBTreeItem_t *root );
+
+/* CVS generated ID string */
+static char ident[] _UNUSED_ = 
+    "$Id$";
+
+void BalancedBTreeLock( BalancedBTree_t *btree )
+{
+    if( btree == NULL )
+    {
+        return;
+    }
+
+    pthread_mutex_lock( &btree->mutex );
+}
+
+
+void BalancedBTreeUnlock( BalancedBTree_t *btree )
+{
+    if( btree == NULL )
+    {
+        return;
+    }
+
+    pthread_mutex_unlock( &btree->mutex );
+}
+
+
+BalancedBTree_t *BalancedBTreeCreate( BalancedBTreeKeyType_t type )
+{
+    BalancedBTree_t *btree;
+
+    btree = (BalancedBTree_t *)malloc(sizeof(BalancedBTree_t));
+    if( btree == NULL )
+    {
+        fprintf( stderr, "Couldn't create btree\n" );
+        return( NULL );
+    }
+
+    btree->root = NULL;
+    btree->keyType = type;
+    switch( type ) {
+    case BTREE_KEY_INT:
+        btree->keyCompare = KeyCompareInt;
+        break;
+    case BTREE_KEY_STRING:
+        btree->keyCompare = KeyCompareString;
+        break;
+    default:
+        btree->keyCompare = NULL;
+        break;
+    }
+
+    pthread_mutex_init( &btree->mutex, NULL );
+
+    return( btree );
+}
+
+void BalancedBTreeDestroy( BalancedBTree_t *btree )
+{
+    /* Assumes the btree is locked by the caller */
+    pthread_mutex_unlock( &btree->mutex );
+    pthread_mutex_destroy( &btree->mutex );
+
+    free( btree );
+}
+
+
+void BalancedBTreeAdd( BalancedBTree_t *btree, BalancedBTreeItem_t *item, 
+                       BalancedBTreeLocked_t locked, bool rebalance )
+{
+    int         res;
+
+    if( btree == NULL )
+    {
+        return;
+    }
+
+    if( locked == UNLOCKED )
+    {
+        BalancedBTreeLock( btree );
+    }
+
+    if( item == NULL ) {
+        if( rebalance ) {
+            BalancedBTreeRebalance( btree, btree->root );
+        }
+
+        if( locked == UNLOCKED ) {
+            BalancedBTreeLock( btree );
+        }
+        return;
+    }
+
+    item->btree = btree;
+
+    item->left  = NULL;
+    item->right = NULL;
+
+    item->parent = BalancedBTreeFindParent( btree, item );
+    if( item->parent == NULL) {
+        btree->root = item;
+    } else {
+        res = btree->keyCompare( item->key, item->parent->key );
+        if( res > 0 ) {
+            /* item greater than parent */
+            item->parent->right = item;
+        } else if( res < 0 ) {
+            /* item less than parent */
+            item->parent->left  = item;
+        } else {
+            printf( "Duplicate key\n" );
+        }
+    }
+
+    if( rebalance ) {
+        BalancedBTreeRebalance( btree, btree->root );
+    }
+
+    if( locked == UNLOCKED )
+    {
+        BalancedBTreeUnlock( btree );
+    }
+}
+
+
+void BalancedBTreeRemove( BalancedBTree_t *btree, BalancedBTreeItem_t *item, 
+                       BalancedBTreeLocked_t locked, bool rebalance )
+{
+    BalancedBTreeItem_t    *replace;
+
+    if( btree == NULL )
+    {
+        return;
+    }
+
+    if( item != NULL && item->btree != btree )
+    {
+        fprintf( stderr, "Item %p not on btree %p! (on %p)\n", item, btree,
+                 item->btree );
+        return;
+    }
+
+    if( locked == UNLOCKED )
+    {
+        BalancedBTreeLock( btree );
+    }
+
+    if( item == NULL ) {
+        if( rebalance ) {
+            BalancedBTreeRebalance( btree, btree->root );
+        }
+
+        if( locked == UNLOCKED ) {
+            BalancedBTreeLock( btree );
+        }
+        return;
+    }
+
+
+    /* OK, it's on the btree, and we have it locked */
+    if( BalancedBTreeWeight( item->left ) > 
+        BalancedBTreeWeight( item->right ) ) {
+        /* There's more stuff on the left subtree, relink taking
+         * the greatest entry on the left subtree, moving it here
+         */
+        replace = BalancedBTreeFindGreatest( item->left );
+    } else {
+        /* Either more on the right subtree or they are balanced, relink
+         * taking the least entry on the right subtree, moving it here
+         */
+        replace = BalancedBTreeFindLeast( item->right );
+    }
+    BalancedBTreeReplace( btree, item, replace );
+
+    item->btree = NULL;
+
+    if( rebalance ) {
+        BalancedBTreeRebalance( btree, btree->root );
+    }
+
+    if( locked == UNLOCKED )
+    {
+        BalancedBTreeUnlock( btree );
+    }
+}
+
+
+void *BalancedBTreeFind( BalancedBTree_t *btree, void *key,
+                         BalancedBTreeLocked_t locked )
+{
+    BalancedBTreeItem_t    *item;
+    bool                    found;
+    int                     res;
+
+    if( btree == NULL || key == NULL ) {
+        return( NULL );
+    }
+
+    if( locked == UNLOCKED )
+    {
+        BalancedBTreeLock( btree );
+    }
+
+    for( found = FALSE, item = btree->root; item && !found; ) {
+        res = btree->keyCompare( key, item->key );
+        if( res == 0 ) {
+            /* Found it */
+            found = TRUE;
+            continue;
+        } else if ( res < 0 ) {
+            item = item->left;
+        } else {
+            item = item->right;
+        }
+    }
+
+    if( locked == UNLOCKED )
+    {
+        BalancedBTreeUnlock( btree );
+    }
+
+    return( item );
+}
+
+int KeyCompareInt( void *left, void *right )
+{
+    int     res;
+    int     l, r;
+
+    if( !left || !right ) {
+        return( 0 );
+    }
+
+    l = *(int *)left;
+    r = *(int *)right;
+
+    res = l - r;
+    
+    if( res > 1 ) {
+        res = 1;
+    } else if( res < -1 ) {
+        res = -1;
+    }
+
+    return( res );
+}
+
+int KeyCompareString( void *left, void *right )
+{
+    int     res;
+    char   *l, *r;
+
+    if( !left || !right ) {
+        return( 0 );
+    }
+
+    l = *(char **)left;
+    r = *(char **)right;
+
+    res = strcmp( l, r );
+    
+    if( res > 1 ) {
+        res = 1;
+    } else if( res < -1 ) {
+        res = -1;
+    }
+
+    return( res );
+}
+
+BalancedBTreeItem_t *BalancedBTreeFindParent( BalancedBTree_t *btree,
+                                              BalancedBTreeItem_t *item )
+{
+    BalancedBTreeItem_t    *item2;
+    BalancedBTreeItem_t    *parent;
+    int                     res;
+
+    if( btree == NULL || item == NULL ) {
+        return( NULL );
+    }
+
+    parent = NULL;
+    for( item2 = btree->root; item2;  ) {
+        parent = item2;
+        res = btree->keyCompare( item->key, item2->key );
+        if ( res < 0 ) {
+            item = item2->left;
+        } else {
+            item = item2->right;
+        }
+    }
+
+    return( parent );
+}
+
+int BalancedBTreeWeight( BalancedBTreeItem_t *root )
+{
+    int     res;
+
+    res = 0;
+    
+    if( root->left != NULL ) {
+        res += BalancedBTreeWeight( root->left );
+    }
+
+    if( root->right != NULL ) {
+        res += BalancedBTreeWeight( root->right );
+    }
+
+    return( res );
+}
+
+BalancedBTreeItem_t *BalancedBTreeFindGreatest( BalancedBTreeItem_t *root )
+{
+    BalancedBTreeItem_t *prev;
+
+    prev = NULL;
+    while( root ) {
+        prev = root;
+        root = root->right;
+    }
+    return( prev );
+}
+ 
+BalancedBTreeItem_t *BalancedBTreeFindLeast( BalancedBTreeItem_t *root )
+{
+    BalancedBTreeItem_t *prev;
+
+    prev = NULL;
+    while( root ) {
+        prev = root;
+        root = root->left;
+    }
+    return( prev );
+}
+
+void BalancedBTreeReplace( BalancedBTree_t *btree, BalancedBTreeItem_t *item, 
+                           BalancedBTreeItem_t *replace )
+{
+    /* This expects that the replace is a node with a maximum of one subtree.
+     * As we searched for greatest or least, this is a valid assumption.  The
+     * greatest may have a left subtree, the least a right subtree.
+     */
+
+    if( replace == item ) {
+        return;
+    }
+
+    /* Relink the replacement's parent to any subtree */
+    if( replace->parent->left == replace ) {
+        /* We must be the least */
+        replace->parent->left = replace->right;
+    } else if( replace->parent->right == replace ) {
+        /* We must be the greatest */
+        replace->parent->right = replace->left;
+    }
+
+    /* Relink the replacement to take the place of the original */
+    replace->left = item->left;
+    if( replace->left != NULL ) {
+        replace->left->parent = replace;
+    }
+
+    replace->right = item->right;
+    if( replace->right != NULL ) {
+        replace->right->parent = replace;
+    }
+
+    replace->parent = item->parent;
+    if( replace->parent != NULL ) {
+        if( replace->parent->left == item ) {
+            replace->parent->left = replace;
+        } else if( replace->parent->right == item ) {
+            replace->parent->right = replace;
+        }
+    } else {
+        btree->root = replace;
+    }
+
+    /* Now the original is not linked to by anything, NULL its links */
+    item->left   = NULL;
+    item->right  = NULL;
+    item->parent = NULL;
+}
+ 
+void BalancedBTreeRebalance( BalancedBTree_t *btree, 
+                             BalancedBTreeItem_t *root )
+{
+    BalancedBTreeItem_t    *item;
+    int                     res;
+
+    if( root == NULL ) {
+        return;
+    }
+
+    for( res = BalancedBTreeWeight( root->left ) - 
+               BalancedBTreeWeight( root->right ); res < -1 || res > 1; ) {
+        /* Too much stuff on either left or right subtree */
+        if( res < -1 ) {
+            /* Too much on left, need to shift to the right */
+            item = BalancedBTreeFindGreatest( root->left );
+            item->parent->right = item->left;
+            item->parent = root->parent;
+            root->parent = item;
+            item->right = root;
+            item->left = root->left;
+            root->left = NULL;
+        } else {
+            /* Too much on right, need to shift to the left */
+            item = BalancedBTreeFindLeast( root->right );
+            item->parent->left = item->right;
+            item->parent = root->parent;
+            root->parent = item;
+            item->left = root;
+            item->right = root->right;
+            root->right = NULL;
+        }
+
+        if( item->parent == NULL ) {
+            btree->root = item;
+        }
+    }
+
+    BalancedBTreeRebalance( btree, root->left );
+    BalancedBTreeRebalance( btree, root->right );
+}
+
+/*
+ * vim:ts=4:sw=4:ai:et:si:sts=4
+ */
