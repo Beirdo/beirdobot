@@ -337,9 +337,9 @@ BalancedBTreeItem_t *BalancedBTreeFindParent( BalancedBTree_t *btree,
         parent = item2;
         res = btree->keyCompare( item->key, item2->key );
         if ( res < 0 ) {
-            item = item2->left;
+            item2 = item2->left;
         } else {
-            item = item2->right;
+            item2 = item2->right;
         }
     }
 
@@ -351,6 +351,9 @@ int BalancedBTreeWeight( BalancedBTreeItem_t *root )
     int     res;
 
     res = 0;
+    if ( root == NULL ) {
+        return( 0 );
+    }
     
     if( root->left != NULL ) {
         res += BalancedBTreeWeight( root->left );
