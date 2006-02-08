@@ -3,7 +3,7 @@
 -- http://www.phpmyadmin.net
 -- 
 -- Host: localhost
--- Generation Time: Feb 05, 2006 at 08:43 PM
+-- Generation Time: Feb 07, 2006 at 09:06 PM
 -- Server version: 4.0.24
 -- PHP Version: 4.4.0-3ubuntu1
 -- 
@@ -35,7 +35,7 @@ CREATE TABLE channels (
 CREATE TABLE irclog (
   msgid int(11) NOT NULL auto_increment,
   chanid int(11) NOT NULL default '0',
-  timestamp timestamp(14) NOT NULL,
+  timestamp int(14) NOT NULL default '0',
   nick varchar(64) NOT NULL default '',
   msgtype int(11) NOT NULL default '0',
   message text NOT NULL,

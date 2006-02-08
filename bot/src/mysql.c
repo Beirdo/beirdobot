@@ -244,7 +244,7 @@ void db_add_logentry( IRCChannel_t *channel, char *nick, IRCMsgType_t msgType,
     if( nickQuoted && textQuoted ) {
         sprintf( sqlbuf, "INSERT INTO `irclog` (`chanid`, `timestamp`, "
                          "`nick`, `msgtype`, `message`) "
-                         "VALUES ( %d, NULL, '%s', %d, '%s' )",
+                         "VALUES ( %d, UNIX_TIMESTAMP(NOW()), '%s', %d, '%s' )",
                          channel->channelId, nickQuoted, msgType, textQuoted );
         free(nickQuoted);
         free(textQuoted);
