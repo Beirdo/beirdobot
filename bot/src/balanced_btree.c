@@ -350,10 +350,11 @@ int BalancedBTreeWeight( BalancedBTreeItem_t *root )
 {
     int     res;
 
-    res = 0;
     if ( root == NULL ) {
         return( 0 );
     }
+
+    res = 1;
     
     if( root->left != NULL ) {
         res += BalancedBTreeWeight( root->left );
@@ -443,6 +444,9 @@ void BalancedBTreeRebalance( BalancedBTree_t *btree,
                              BalancedBTreeItem_t *root )
 {
     BalancedBTreeItem_t    *item;
+    BalancedBTreeItem_t    *left;
+    BalancedBTreeItem_t    *right;
+    BalancedBTreeItem_t    *parent;
     int                     res;
 
     if( root == NULL ) {
@@ -450,31 +454,75 @@ void BalancedBTreeRebalance( BalancedBTree_t *btree,
     }
 
     for( res = BalancedBTreeWeight( root->left ) - 
-               BalancedBTreeWeight( root->right ); res < -1 || res > 1; ) {
+               BalancedBTreeWeight( root->right ); res < -1 || res > 1;
+         res = BalancedBTreeWeight( root->left ) - 
+               BalancedBTreeWeight( root->right ) ) {
+
         /* Too much stuff on either left or right subtree */
-        if( res < -1 ) {
+        if( res > 1 ) {
             /* Too much on left, need to shift to the right */
             item = BalancedBTreeFindGreatest( root->left );
-            item->parent->right = item->left;
+
+            left   = item->left;
+            right  = item->right;   /* This is NULL! */
+            parent = item->parent;
+
             item->parent = root->parent;
+            item->right  = root;
+            if( root->left != item ) {
+                item->left = root->left;
+                if( item->left != NULL ) {
+                    item->left->parent = item;
+                }
+            }
+
             root->parent = item;
-            item->right = root;
-            item->left = root->left;
-            root->left = NULL;
+            root->left   = NULL;
+
+            if( parent != root ) {
+                parent->right = left;
+                if( left != NULL ) {
+                    left->parent = parent;
+                }
+            }
         } else {
             /* Too much on right, need to shift to the left */
             item = BalancedBTreeFindLeast( root->right );
-            item->parent->left = item->right;
+
+            left   = item->left;    /* This is NULL! */
+            right  = item->right;
+            parent = item->parent;
+
             item->parent = root->parent;
+            item->left   = root;
+            if( root->right != item ) {
+                item->right  = root->right;
+                if( item->right != NULL ) {
+                    item->right->parent = item;
+                }
+            }
+
             root->parent = item;
-            item->left = root;
-            item->right = root->right;
-            root->right = NULL;
+            root->right  = NULL;
+
+            if( parent != root ) {
+                parent->left = right;
+                if( right != NULL ) {
+                    right->parent = parent;
+                }
+            }
         }
 
-        if( item->parent == NULL ) {
+        if( item->parent != NULL ) {
+            if( item->parent->left == root ) {
+                item->parent->left = item;
+            } else {
+                item->parent->right = item;
+            }
+        } else {
             btree->root = item;
         }
+        root = item;
     }
 
     BalancedBTreeRebalance( btree, root->left );
