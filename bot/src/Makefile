@@ -13,7 +13,7 @@ LDFLAGS = -g
 LIBS	= $(shell ${MYSQLCFG} --libs_r)
 LIBS	+= $(shell ${BOTNETCFG} --libs-static)
 
-SRCS	= main.c bot.c mysql.c linked_list.c balanced_btree.c
+SRCS	= main.c bot.c bot_cmds.c mysql.c linked_list.c balanced_btree.c
 OBJS	= ${SRCS:.c=.o}
 EXE	= beirdobot
 
