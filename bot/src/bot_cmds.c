@@ -29,14 +29,19 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include "botnet.h"
 #include "environment.h"
 #include "structs.h"
 
 /* INTERNAL FUNCTION PROTOTYPES */
-void botCmdHelp( IRCChannel_t *channel, char *who, char *msg );
-void botCmdSearch( IRCChannel_t *channel, char *who, char *msg );
-void botCmdSeen( IRCChannel_t *channel, char *who, char *msg );
-void botCmdTrout( IRCChannel_t *channel, char *who, char *msg );
+void botCmdHelp( IRCServer_t *server, IRCChannel_t *channel, char *who, 
+                 char *msg );
+void botCmdSearch( IRCServer_t *server, IRCChannel_t *channel, char *who,
+                   char *msg );
+void botCmdSeen( IRCServer_t *server, IRCChannel_t *channel, char *who, 
+                 char *msg );
+void botCmdTrout( IRCServer_t *server, IRCChannel_t *channel, char *who, 
+                  char *msg );
 
 /* CVS generated ID string */
 static char ident[] _UNUSED_ = 
@@ -88,7 +93,8 @@ void botCmd_add( char *command, BotCmdFunc_t func )
     BalancedBTreeAdd( botCmdTree, item, UNLOCKED, TRUE );
 }
 
-void botCmd_parse( IRCChannel_t *channel, char *who, char *msg )
+void botCmd_parse( IRCServer_t *server, IRCChannel_t *channel, char *who, 
+                   char *msg )
 {
     char           *line;
     char           *cmd;
@@ -113,12 +119,13 @@ void botCmd_parse( IRCChannel_t *channel, char *who, char *msg )
     func = BalancedBTreeFind( botCmdTree, (void *)cmd, UNLOCKED );
     if( func ) {
         cmdFunc = (BotCmdFunc_t)func;
-        cmdFunc( channel, who, line );
+        cmdFunc( server, channel, who, line );
     }
 }
 
 
-void botCmdHelp( IRCChannel_t *channel, char *who, char *msg )
+void botCmdHelp( IRCServer_t *server, IRCChannel_t *channel, char *who, 
+                 char *msg )
 {
     if( !msg ) {
         printf( "Bot CMD: Help NULL by %s\n", who );
@@ -127,7 +134,8 @@ void botCmdHelp( IRCChannel_t *channel, char *who, char *msg )
     }
 }
 
-void botCmdSearch( IRCChannel_t *channel, char *who, char *msg )
+void botCmdSearch( IRCServer_t *server, IRCChannel_t *channel, char *who, 
+                   char *msg )
 {
     if( !msg ) {
         printf( "Bot CMD: Search NULL by %s\n", who );
@@ -136,7 +144,8 @@ void botCmdSearch( IRCChannel_t *channel, char *who, char *msg )
     }
 }
 
-void botCmdSeen( IRCChannel_t *channel, char *who, char *msg )
+void botCmdSeen( IRCServer_t *server, IRCChannel_t *channel, char *who, 
+                 char *msg )
 {
     if( !msg ) {
         printf( "Bot CMD: Seen NULL by %s\n", who );
@@ -145,13 +154,31 @@ void botCmdSeen( IRCChannel_t *channel, char *who, char *msg )
     }
 }
 
-void botCmdTrout( IRCChannel_t *channel, char *who, char *msg )
+void botCmdTrout( IRCServer_t *server, IRCChannel_t *channel, char *who, 
+                  char *msg )
 {
+    static char message[MAX_STRING_LENGTH];
+
     if( !msg ) {
         printf( "Bot CMD: Trout NULL by %s\n", who );
     } else {
         printf( "Bot CMD: Trout %s by %s\n", msg, who );
     }
+
+    if( !channel ) {
+        BN_SendPrivateMessage(&server->ircInfo, (const char *)who,
+                              "You need to do this in a public channel!");
+        return;
+    }
+
+    if( !msg ) {
+        sprintf( message, "dumps a bucket of trout onto %s", who );
+    } else {
+        sprintf( message, "slaps %s with a trout on behalf of %s...", msg, 
+                 who );
+    }
+    BN_SendActionMessage( &server->ircInfo, (const char *)channel->channel,
+                          (const char *)message );
 }
 
 /*

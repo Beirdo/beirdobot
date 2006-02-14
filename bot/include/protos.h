@@ -64,7 +64,8 @@ void db_notify_nick( IRCChannel_t *channel, char *nick );
 IRCChannel_t *FindChannelNum( IRCServer_t *server, int channum );
 void botCmd_initialize( void );
 void botCmd_add( char *command, BotCmdFunc_t func );
-void botCmd_parse( IRCChannel_t *channel, char *who, char *msg );
+void botCmd_parse( IRCServer_t *server, IRCChannel_t *channel, char *who, 
+                   char *msg );
 
 #endif
 
