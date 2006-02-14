@@ -63,6 +63,7 @@ typedef struct {
     char               *channel;
     char               *url;
     int                 notifywindow;
+    char                cmdChar;
     bool                joined;
 } IRCChannel_t;
 
@@ -77,6 +78,12 @@ typedef enum {
     TYPE_PART,
     TYPE_QUIT
 } IRCMsgType_t;
+
+typedef void (*BotCmdFunc_t)( IRCChannel_t *channel, char *who, char *msg );
+typedef struct {
+    char           *command;
+    BotCmdFunc_t    func;
+} BotCmd_t;
 
 #endif
 

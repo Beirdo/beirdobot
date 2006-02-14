@@ -25,19 +25,134 @@
 */
 
 /* INCLUDE FILES */
-#define ___ARGH
-#include "environment.h"
 #include <pthread.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include "environment.h"
+#include "structs.h"
 
 /* INTERNAL FUNCTION PROTOTYPES */
+void botCmdHelp( IRCChannel_t *channel, char *who, char *msg );
+void botCmdSearch( IRCChannel_t *channel, char *who, char *msg );
+void botCmdSeen( IRCChannel_t *channel, char *who, char *msg );
+void botCmdTrout( IRCChannel_t *channel, char *who, char *msg );
 
 /* CVS generated ID string */
 static char ident[] _UNUSED_ = 
     "$Id$";
 
+static BotCmd_t botCmd[] _UNUSED_ = {
+    { "help",       botCmdHelp },
+    { "search",     botCmdSearch },
+    { "seen",       botCmdSeen },
+    { "trout",      botCmdTrout }
+};
+static int botCmdCount _UNUSED_ = NELEMENTS(botCmd);
+
+BalancedBTree_t    *botCmdTree;
+
+
+void botCmd_initialize( void )
+{
+    int                     i;
+    BalancedBTreeItem_t    *item;
+
+    botCmdTree = BalancedBTreeCreate( BTREE_KEY_STRING );
+    BalancedBTreeLock( botCmdTree );
+
+    for( i = 0; i < botCmdCount; i++ ) {
+        item = (BalancedBTreeItem_t *)malloc(sizeof(BalancedBTreeItem_t));
+        if( item ) {
+            item->item = (void *)botCmd[i].func;
+            item->key  = (void *)botCmd[i].command;
+            BalancedBTreeAdd( botCmdTree, item, LOCKED, FALSE );
+        }
+    }
+
+    BalancedBTreeAdd( botCmdTree, NULL, LOCKED, TRUE );
+    BalancedBTreeUnlock( botCmdTree );
+}
+
+void botCmd_add( char *command, BotCmdFunc_t func )
+{
+    BalancedBTreeItem_t    *item;
+
+    item = (BalancedBTreeItem_t *)malloc(sizeof(BalancedBTreeItem_t));
+    if( !item ) {
+        return;
+    }
+
+    item->item = (void *)func;
+    item->key  = (void *)command;
+    BalancedBTreeAdd( botCmdTree, item, UNLOCKED, TRUE );
+}
+
+void botCmd_parse( IRCChannel_t *channel, char *who, char *msg )
+{
+    char           *line;
+    char           *cmd;
+    int             len;
+    void           *func;
+    BotCmdFunc_t    cmdFunc;
+
+    line = strstr( msg, " " );
+    if( line ) {
+        /* Command has trailing text, skip the space */
+        len = line - msg;
+        line++;
+
+        cmd = (char *)malloc( len + 2 );
+        strncpy( cmd, msg, len );
+        cmd[len] = '\0';
+    } else {
+        /* Command is the whole line */
+        cmd = strdup( msg );
+    }
+
+    func = BalancedBTreeFind( botCmdTree, (void *)cmd, UNLOCKED );
+    if( func ) {
+        cmdFunc = (BotCmdFunc_t)func;
+        cmdFunc( channel, who, line );
+    }
+}
+
+
+void botCmdHelp( IRCChannel_t *channel, char *who, char *msg )
+{
+    if( !msg ) {
+        printf( "Bot CMD: Help NULL by %s\n", who );
+    } else {
+        printf( "Bot CMD: Help %s by %s\n", msg, who );
+    }
+}
+
+void botCmdSearch( IRCChannel_t *channel, char *who, char *msg )
+{
+    if( !msg ) {
+        printf( "Bot CMD: Search NULL by %s\n", who );
+    } else {
+        printf( "Bot CMD: Search %s by %s\n", msg, who );
+    }
+}
+
+void botCmdSeen( IRCChannel_t *channel, char *who, char *msg )
+{
+    if( !msg ) {
+        printf( "Bot CMD: Seen NULL by %s\n", who );
+    } else {
+        printf( "Bot CMD: Seen %s by %s\n", msg, who );
+    }
+}
+
+void botCmdTrout( IRCChannel_t *channel, char *who, char *msg )
+{
+    if( !msg ) {
+        printf( "Bot CMD: Trout NULL by %s\n", who );
+    } else {
+        printf( "Bot CMD: Trout %s by %s\n", msg, who );
+    }
+}
 
 /*
  * vim:ts=4:sw=4:ai:et:si:sts=4

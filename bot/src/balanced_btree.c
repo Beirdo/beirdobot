@@ -310,7 +310,7 @@ int KeyCompareString( void *left, void *right )
     l = *(char **)left;
     r = *(char **)right;
 
-    res = strcmp( l, r );
+    res = strcasecmp( l, r );
     
     if( res > 1 ) {
         res = 1;

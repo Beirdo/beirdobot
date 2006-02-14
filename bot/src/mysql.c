@@ -156,7 +156,8 @@ void db_load_channels(void)
     for( item = ServerList->head; item; item = item->next ) {
         server = (IRCServer_t *)item;
 
-        sprintf(sqlbuf, "SELECT `chanid`, `channel`, `url`, `notifywindow` "
+        sprintf(sqlbuf, "SELECT `chanid`, `channel`, `url`, `notifywindow`, "
+                        "`cmdChar` "
                         "FROM `channels` WHERE `serverid` = %d "
                         "ORDER BY `chanid`", server->serverId );
         mysql_query(sql, sqlbuf);
@@ -188,6 +189,7 @@ void db_load_channels(void)
             channel->channel        = strdup(row[1]);
             channel->url            = strdup(row[2]);
             channel->notifywindow   = atoi(row[3]);
+            channel->cmdChar        = row[4][0];
             channel->server         = server;
             channel->joined         = false;
 

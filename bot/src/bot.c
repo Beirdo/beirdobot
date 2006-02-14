@@ -330,6 +330,7 @@ void ProcOnPrivateTalk(BN_PInfo I, const char Who[], const char Whom[],
     if( verbose ) {
         printf("%s sent you (%s) a private message (%s)\n", Who, Whom, Msg);
     }
+    botCmd_parse( NULL, (char *)Who, (char *)Msg );
 }
 
 void ProcOnAction(BN_PInfo I, const char Chan[], const char Who[],
@@ -350,6 +351,11 @@ void ProcOnChannelTalk(BN_PInfo I, const char Chan[], const char Who[],
     channel = FindChannel((IRCServer_t *)I->User, Chan);
     db_add_logentry( channel, (char *)Who, TYPE_MESSAGE, (char *)Msg );
     db_update_nick( channel, (char *)Who, true, true );
+    if( channel->cmdChar ) {
+        if( Msg[0] == channel->cmdChar ) {
+            botCmd_parse( channel, (char *)Who, (char *)&Msg[1] );
+        }
+    }
 }
 
 void ProcOnNick(BN_PInfo I, const char Who[], const char Msg[])
