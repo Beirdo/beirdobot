@@ -3,7 +3,7 @@
 -- http://www.phpmyadmin.net
 -- 
 -- Host: localhost
--- Generation Time: Feb 07, 2006 at 09:06 PM
+-- Generation Time: Feb 13, 2006 at 10:54 PM
 -- Server version: 4.0.24
 -- PHP Version: 4.4.0-3ubuntu1
 -- 
@@ -22,6 +22,7 @@ CREATE TABLE channels (
   channel varchar(64) NOT NULL default '',
   url text NOT NULL,
   notifywindow int(11) NOT NULL default '24',
+  cmdChar char(1) NOT NULL default '',
   PRIMARY KEY  (chanid),
   KEY serverChan (serverid,channel)
 ) TYPE=MyISAM;
