@@ -67,7 +67,7 @@ int main ( int argc, char **argv )
 
     /* Setup the bot commands */
     botCmd_initialize();
-     
+
     /* Start the bot */
     bot_start();
 
