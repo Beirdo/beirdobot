@@ -44,6 +44,7 @@ void botCmdSeen( IRCServer_t *server, IRCChannel_t *channel, char *who,
                  char *msg );
 void botCmdTrout( IRCServer_t *server, IRCChannel_t *channel, char *who, 
                   char *msg );
+char *botCmdDepthFirst( BalancedBTreeItem_t *item );
 
 /* CVS generated ID string */
 static char ident[] _UNUSED_ = 
@@ -172,7 +173,6 @@ char *botCmdDepthFirst( BalancedBTreeItem_t *item )
     free( submsg );
 
     submsg = botCmdDepthFirst( item->right );
-
     if( submsg ) {
         len = strlen( message );
 
