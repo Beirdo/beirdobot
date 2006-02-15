@@ -86,6 +86,16 @@ typedef struct {
     BotCmdFunc_t    func;
 } BotCmd_t;
 
+typedef struct {
+    char           *name;
+    char           *libName;
+    int             preload;
+    char           *args;
+    void           *handle;
+    void          (*init)(char *args);
+    void          (*shutdown)(void);
+} Plugin_t;
+
 #endif
 
 /*

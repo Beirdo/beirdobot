@@ -25,7 +25,6 @@
 *
 */
 
-#include "environment.h"
 #include <stdio.h>
 #include <pthread.h>
 #include <string.h>
@@ -35,6 +34,8 @@
 #include <sys/time.h>
 #include <errno.h>
 #include <getopt.h>
+#include "botnet.h"
+#include "environment.h"
 #include "protos.h"
 #include "release.h"
 
@@ -67,6 +68,15 @@ int main ( int argc, char **argv )
 
     /* Setup the bot commands */
     botCmd_initialize();
+
+    /* List the commands */
+    botCmd_parse( NULL, NULL, "test", "list" );
+
+    /* Setup the plugins */
+    plugins_initialize();
+
+    /* List the commands (should now include loaded plugins) */
+    botCmd_parse( NULL, NULL, "test", "list" );
 
     /* Start the bot */
     bot_start();

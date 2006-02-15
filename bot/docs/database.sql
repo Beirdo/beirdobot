@@ -3,7 +3,7 @@
 -- http://www.phpmyadmin.net
 -- 
 -- Host: localhost
--- Generation Time: Feb 13, 2006 at 10:54 PM
+-- Generation Time: Feb 14, 2006 at 11:49 PM
 -- Server version: 4.0.24
 -- PHP Version: 4.4.0-3ubuntu1
 -- 
@@ -25,7 +25,7 @@ CREATE TABLE channels (
   cmdChar char(1) NOT NULL default '',
   PRIMARY KEY  (chanid),
   KEY serverChan (serverid,channel)
-) TYPE=MyISAM;
+) TYPE=MyISAM PACK_KEYS=1;
 
 -- --------------------------------------------------------
 
@@ -58,6 +58,20 @@ CREATE TABLE nicks (
   lastnotice timestamp(14) NOT NULL default '00000000000000',
   present int(11) NOT NULL default '0',
   PRIMARY KEY  (chanid,nick)
+) TYPE=MyISAM;
+
+-- --------------------------------------------------------
+
+-- 
+-- Table structure for table `plugins`
+-- 
+
+CREATE TABLE plugins (
+  pluginName varchar(64) NOT NULL default '',
+  libName varchar(64) NOT NULL default '',
+  preload int(11) NOT NULL default '0',
+  arguments varchar(255) NOT NULL default '',
+  PRIMARY KEY  (pluginName)
 ) TYPE=MyISAM;
 
 -- --------------------------------------------------------

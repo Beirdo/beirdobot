@@ -47,7 +47,8 @@ void plugin_initialize( char *args )
 {
     static char    *command = "trout";
 
-    botCmd_add( command, botCmdTrout );
+    printf( "Initializing trout...\n" );
+    botCmd_add( (const char **)&command, botCmdTrout );
 }
 
 void plugin_shutdown( void )

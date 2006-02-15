@@ -82,7 +82,7 @@ void botCmd_initialize( void )
     BalancedBTreeUnlock( botCmdTree );
 }
 
-void botCmd_add( char *command, BotCmdFunc_t func )
+void botCmd_add( const char **command, BotCmdFunc_t func )
 {
     BalancedBTreeItem_t    *item;
 
@@ -92,7 +92,7 @@ void botCmd_add( char *command, BotCmdFunc_t func )
     }
 
     item->item = (void *)func;
-    item->key  = (void *)&command;
+    item->key  = (void *)command;
     BalancedBTreeAdd( botCmdTree, item, UNLOCKED, TRUE );
 }
 
@@ -212,13 +212,18 @@ void botCmdList( IRCServer_t *server, IRCChannel_t *channel, char *who,
     message = botCmdDepthFirst( botCmdTree->root );
     BalancedBTreeUnlock( botCmdTree );
 
-    if( !channel ) {
-        /* Private message */
-        BN_SendPrivateMessage(&server->ircInfo, (const char *)who, message);
+    if( server ) {
+        if( !channel ) {
+            /* Private message */
+            BN_SendPrivateMessage(&server->ircInfo, (const char *)who, message);
+        } else {
+            /* in channel */
+            BN_SendChannelMessage(&server->ircInfo, 
+                                  (const char *)channel->channel, message);
+        }
     } else {
-        /* in channel */
-        BN_SendChannelMessage(&server->ircInfo, (const char *)channel->channel,
-                              message);
+        /* Used for debugging purposes */
+        printf( "command list: %s\n", message );
     }
 
     free( message );

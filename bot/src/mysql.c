@@ -30,10 +30,10 @@
 #include <string.h>
 #include <mysql.h>
 #include <stdlib.h>
-#include "protos.h"
 #include "botnet.h"
 #include "environment.h"
 #include "structs.h"
+#include "protos.h"
 
 static char ident[] _UNUSED_ =
     "$Id$";
@@ -424,6 +424,70 @@ void db_notify_nick( IRCChannel_t *channel, char *nick )
                      "WHERE `chanid` = %d AND `nick` = '%s'",
                      channel->channelId, nickQuoted );
     mysql_query(sql, sqlbuf);
+}
+
+
+BalancedBTree_t *db_get_plugins( void )
+{
+    Plugin_t               *plugin;
+    int                     count;
+    int                     i;
+    MYSQL_RES              *res;
+    MYSQL_ROW               row;
+    BalancedBTree_t        *tree;
+    BalancedBTreeItem_t    *item;
+
+    tree = BalancedBTreeCreate( BTREE_KEY_STRING );
+    if( !tree ) {
+        return( tree );
+    }
+    
+    sprintf(sqlbuf, "SELECT `pluginName`, `libName`, `preload`, `arguments` "
+                    "FROM `plugins`" );
+    mysql_query(sql, sqlbuf);
+
+    res = mysql_store_result(sql);
+    if( !res || !(count = mysql_num_rows(res)) ) {
+        mysql_free_result(res);
+        return( tree );
+    }
+
+    BalancedBTreeLock( tree );
+
+    for( i = 0; i < count; i++ ) {
+        row = mysql_fetch_row(res);
+
+        plugin = (Plugin_t *)malloc(sizeof(Plugin_t));
+        item   = (BalancedBTreeItem_t *)malloc(sizeof(BalancedBTreeItem_t));
+        if( !plugin ) {
+            continue;
+        }
+
+        if( !item ) {
+            free( plugin );
+            continue;
+        }
+
+        memset( plugin, 0, sizeof(Plugin_t) );
+
+        plugin->name    = strdup(row[0]);
+        plugin->libName = strdup(row[1]);
+        plugin->preload = atoi(row[2]);
+        plugin->args    = strdup(row[3]);
+
+        item->item = plugin;
+        item->key  = (void *)&plugin->name;
+
+        BalancedBTreeAdd( tree, item, LOCKED, FALSE );
+    }
+    mysql_free_result(res);
+
+    /* Rebalance the tree */
+    BalancedBTreeAdd( tree, NULL, LOCKED, TRUE );
+
+    BalancedBTreeUnlock( tree );
+
+    return( tree );
 }
 
 
