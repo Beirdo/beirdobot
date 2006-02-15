@@ -54,8 +54,7 @@ static BotCmd_t botCmd[] _UNUSED_ = {
     { "help",       botCmdHelp },
     { "list",       botCmdList },
     { "search",     botCmdSearch },
-    { "seen",       botCmdSeen },
-    { "trout",      botCmdTrout }
+    { "seen",       botCmdSeen }
 };
 static int botCmdCount _UNUSED_ = NELEMENTS(botCmd);
 
@@ -95,6 +94,19 @@ void botCmd_add( char *command, BotCmdFunc_t func )
     item->item = (void *)func;
     item->key  = (void *)&command;
     BalancedBTreeAdd( botCmdTree, item, UNLOCKED, TRUE );
+}
+
+void botCmd_remove( char *command )
+{
+    BalancedBTreeItem_t    *item;
+
+    BalancedBTreeLock( botCmdTree );
+    item = BalancedBTreeFind( botCmdTree, (void *)&command, LOCKED );
+
+    if( item ) {
+        BalancedBTreeRemove( botCmdTree, item, LOCKED, TRUE );
+    }
+    BalancedBTreeUnlock( botCmdTree );
 }
 
 void botCmd_parse( IRCServer_t *server, IRCChannel_t *channel, char *who, 
@@ -230,36 +242,6 @@ void botCmdSeen( IRCServer_t *server, IRCChannel_t *channel, char *who,
     } else {
         printf( "Bot CMD: Seen %s by %s\n", msg, who );
     }
-}
-
-void botCmdTrout( IRCServer_t *server, IRCChannel_t *channel, char *who, 
-                  char *msg )
-{
-    char       *message;
-
-    if( !msg ) {
-        printf( "Bot CMD: Trout NULL by %s\n", who );
-    } else {
-        printf( "Bot CMD: Trout %s by %s\n", msg, who );
-    }
-
-    if( !channel ) {
-        BN_SendPrivateMessage(&server->ircInfo, (const char *)who,
-                              "You need to do this in a public channel!");
-        return;
-    }
-
-    if( !msg ) {
-        message = (char *)malloc(29+strlen(who)+2);
-        sprintf( message, "dumps a bucket of trout onto %s", who );
-    } else {
-        message = (char *)malloc(36+strlen(who)+strlen(msg)+2);
-        sprintf( message, "slaps %s with a trout on behalf of %s...", msg, 
-                 who );
-    }
-    BN_SendActionMessage( &server->ircInfo, (const char *)channel->channel,
-                          (const char *)message );
-    free(message);
 }
 
 /*

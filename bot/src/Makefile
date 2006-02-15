@@ -17,7 +17,12 @@ SRCS	= main.c bot.c bot_cmds.c mysql.c linked_list.c balanced_btree.c
 OBJS	= ${SRCS:.c=.o}
 EXE	= beirdobot
 
-all:	${EXE}
+.PHONY:	plugins
+
+all:	${EXE} plugins
+
+plugins:
+	${MAKE} -C plugins all
 
 %.o:	%.c
 	${CC} ${CFLAGS} -c -o $@ $<
@@ -27,5 +32,6 @@ ${EXE}:	${OBJS}
 
 clean:
 	${RM} ${OBJS} ${EXE}
+	${MAKE} -C plugins clean
 
 main.o:	main.c ../include/release.h

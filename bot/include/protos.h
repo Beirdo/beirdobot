@@ -66,6 +66,7 @@ void botCmd_initialize( void );
 void botCmd_add( char *command, BotCmdFunc_t func );
 void botCmd_parse( IRCServer_t *server, IRCChannel_t *channel, char *who, 
                    char *msg );
+void botCmd_remove( char *command );
 
 #endif
 
