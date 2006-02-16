@@ -541,21 +541,30 @@ void *bot_server_thread(void *arg)
 
 IRCChannel_t *FindChannel(IRCServer_t *server, const char *channame)
 {
+    BalancedBTreeItem_t    *item;
     IRCChannel_t           *channel;
 
-    channel = (IRCChannel_t *)BalancedBTreeFind( server->channelName,
-                                                 (char **)&channame, 
-                                                 UNLOCKED );
+    item = BalancedBTreeFind( server->channelName, (char **)&channame, 
+                              UNLOCKED );
+    if( !item ) {
+        return( NULL );
+    }
+
+    channel = (IRCChannel_t *)item->item;
     return( channel );
 }
 
 IRCChannel_t *FindChannelNum( IRCServer_t *server, int channum )
 {
+    BalancedBTreeItem_t    *item;
     IRCChannel_t           *channel;
 
-    channel = (IRCChannel_t *)BalancedBTreeFind( server->channelNum,
-                                                 (int *)&channum, 
-                                                 UNLOCKED );
+    item = BalancedBTreeFind( server->channelNum, (int *)&channum, UNLOCKED );
+    if( !item ) {
+        return( NULL );
+    }
+
+    channel = (IRCChannel_t *)item->item;
     return( channel );
 }
 
