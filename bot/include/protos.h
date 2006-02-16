@@ -70,6 +70,8 @@ void botCmd_parse( IRCServer_t *server, IRCChannel_t *channel, char *who,
 void botCmd_remove( char *command );
 BalancedBTree_t *db_get_plugins( void );
 void plugins_initialize( void );
+void pluginLoad( char *name );
+void pluginUnload( char *name );
 
 #endif
 

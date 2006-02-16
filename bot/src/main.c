@@ -78,6 +78,12 @@ int main ( int argc, char **argv )
     /* List the commands (should now include loaded plugins) */
     botCmd_parse( NULL, NULL, "test", "list" );
 
+    /* Remove trout plugin */
+    pluginUnload( "trout" );
+
+    /* List the commands (should now NOT include trout) */
+    botCmd_parse( NULL, NULL, "test", "list" );
+
     /* Start the bot */
     bot_start();
 

@@ -403,35 +403,49 @@ void BalancedBTreeReplace( BalancedBTree_t *btree, BalancedBTreeItem_t *item,
         return;
     }
 
-    /* Relink the replacement's parent to any subtree */
-    if( replace->parent->left == replace ) {
-        /* We must be the least */
-        replace->parent->left = replace->right;
-    } else if( replace->parent->right == replace ) {
-        /* We must be the greatest */
-        replace->parent->right = replace->left;
-    }
+    if( replace ) {
+        /* Relink the replacement's parent to any subtree */
+        if( replace->parent->left == replace ) {
+            /* We must be the least */
+            replace->parent->left = replace->right;
+        } else if( replace->parent->right == replace ) {
+            /* We must be the greatest */
+            replace->parent->right = replace->left;
+        }
 
-    /* Relink the replacement to take the place of the original */
-    replace->left = item->left;
-    if( replace->left != NULL ) {
-        replace->left->parent = replace;
-    }
+        /* Relink the replacement to take the place of the original */
+        replace->left = item->left;
+        if( replace->left != NULL ) {
+            replace->left->parent = replace;
+        }
 
-    replace->right = item->right;
-    if( replace->right != NULL ) {
-        replace->right->parent = replace;
-    }
+        replace->right = item->right;
+        if( replace->right != NULL ) {
+            replace->right->parent = replace;
+        }
 
-    replace->parent = item->parent;
-    if( replace->parent != NULL ) {
-        if( replace->parent->left == item ) {
-            replace->parent->left = replace;
-        } else if( replace->parent->right == item ) {
-            replace->parent->right = replace;
+        replace->parent = item->parent;
+        if( replace->parent != NULL ) {
+            if( replace->parent->left == item ) {
+                replace->parent->left = replace;
+            } else if( replace->parent->right == item ) {
+                replace->parent->right = replace;
+            }
+        } else {
+            btree->root = replace;
         }
     } else {
-        btree->root = replace;
+        /* No children, relink our parent to NULL where we were */
+        if( !item->parent ) {
+            /* Last item on the tree */
+            btree->root = NULL;
+        } else {
+            if( item->parent->left == item ) {
+                item->parent->left = NULL;
+            } else {
+                item->parent->right = NULL;
+            }
+        }
     }
 
     /* Now the original is not linked to by anything, NULL its links */

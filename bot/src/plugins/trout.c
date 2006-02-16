@@ -53,6 +53,7 @@ void plugin_initialize( char *args )
 
 void plugin_shutdown( void )
 {
+    printf( "Removing trout...\n" );
     botCmd_remove( "trout" );
 }
 

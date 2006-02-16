@@ -40,7 +40,8 @@
 
 /* INTERNAL FUNCTION PROTOTYPES */
 void pluginInitializeTree( BalancedBTreeItem_t *item );
-void pluginLoad( Plugin_t *plugin );
+void pluginLoadItem( Plugin_t *plugin );
+void pluginUnloadItem( Plugin_t *plugin );
 
 BalancedBTree_t *pluginTree;
 
@@ -72,13 +73,49 @@ void pluginInitializeTree( BalancedBTreeItem_t *item )
 
     plugin = (Plugin_t *)item->item;
     if( plugin->preload ) {
-        pluginLoad( plugin );
+        pluginLoadItem( plugin );
     }
 
     pluginInitializeTree( item->right );
 }
 
-void pluginLoad( Plugin_t *plugin )
+void pluginLoad( char *name )
+{
+    BalancedBTreeItem_t    *item;
+    Plugin_t               *plugin;
+
+    if( !name ) {
+        return;
+    }
+
+    item = BalancedBTreeFind( pluginTree, (void *)&name, UNLOCKED );
+    if( !item ) {
+        return;
+    }
+
+    plugin = (Plugin_t *)item->item;
+    pluginLoadItem( plugin );
+}
+
+void pluginUnload( char *name )
+{
+    BalancedBTreeItem_t    *item;
+    Plugin_t               *plugin;
+
+    if( !name ) {
+        return;
+    }
+
+    item = BalancedBTreeFind( pluginTree, (void *)&name, UNLOCKED );
+    if( !item ) {
+        return;
+    }
+
+    plugin = (Plugin_t *)item->item;
+    pluginUnloadItem( plugin );
+}
+
+void pluginLoadItem( Plugin_t *plugin )
 {
     char       *libfile;
     char       *error;
@@ -112,6 +149,26 @@ void pluginLoad( Plugin_t *plugin )
 
     plugin->init(plugin->args);
 }
+
+void pluginUnloadItem( Plugin_t *plugin )
+{
+    char       *error;
+
+    if( !plugin ) {
+        return;
+    }
+
+    plugin->shutdown();
+
+    printf( "Unloading plugin %s\n", plugin->name );
+    dlclose( plugin->handle );
+    plugin->handle = NULL;
+    if( (error = dlerror()) != NULL ) {
+        fprintf( stderr, "%s\n", error );
+        return;
+    }
+}
+
 
 
 /*
