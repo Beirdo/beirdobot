@@ -72,6 +72,12 @@ BalancedBTree_t *db_get_plugins( void );
 void plugins_initialize( void );
 void pluginLoad( char *name );
 void pluginUnload( char *name );
+void regexp_initialize( void );
+void regexp_add( const char *channelRegexp, const char *contentRegexp, 
+                 RegexpFunc_t func );
+void regexp_remove( char *channelRegexp, char *contentRegexp );
+void regexp_parse( IRCServer_t *server, IRCChannel_t *channel, char *who, 
+                   char *msg );
 
 #endif
 

@@ -336,27 +336,37 @@ void ProcOnPrivateTalk(BN_PInfo I, const char Who[], const char Whom[],
 void ProcOnAction(BN_PInfo I, const char Chan[], const char Who[],
                   const char Msg[])
 {
+    IRCServer_t    *server;
     IRCChannel_t   *channel;
+    char            nick[256];
 
-    channel = FindChannel((IRCServer_t *)I->User, Chan);
+    server  = (IRCServer_t *)I->User;
+    channel = FindChannel(server, Chan);
     db_add_logentry( channel, (char *)Who, TYPE_ACTION, (char *)Msg );
     db_update_nick( channel, (char *)Who, true, true );
+
+    BN_ExtractNick(Who, nick, 256);
+    regexp_parse( server, channel, nick, (char *)Msg );
 }
 
 void ProcOnChannelTalk(BN_PInfo I, const char Chan[], const char Who[],
                        const char Msg[])
 {
     IRCChannel_t   *channel;
+    IRCServer_t    *server;
+    char            nick[256];
 
-    channel = FindChannel((IRCServer_t *)I->User, Chan);
+    server  = (IRCServer_t *)I->User;
+    channel = FindChannel(server, Chan);
     db_add_logentry( channel, (char *)Who, TYPE_MESSAGE, (char *)Msg );
     db_update_nick( channel, (char *)Who, true, true );
+    BN_ExtractNick(Who, nick, 256);
     if( channel->cmdChar ) {
         if( Msg[0] == channel->cmdChar ) {
-            botCmd_parse( (IRCServer_t *)I->User, channel, (char *)Who, 
-                          (char *)&Msg[1] );
+            botCmd_parse( server, channel, nick, (char *)&Msg[1] );
         }
     }
+    regexp_parse( server, channel, nick, (char *)Msg );
 }
 
 void ProcOnNick(BN_PInfo I, const char Who[], const char Msg[])

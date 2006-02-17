@@ -117,8 +117,6 @@ void botCmd_parse( IRCServer_t *server, IRCChannel_t *channel, char *who,
     int                     len;
     BalancedBTreeItem_t    *item;
     BotCmdFunc_t            cmdFunc;
-    char                    nick[256];
-
 
     line = strstr( msg, " " );
     if( line ) {
@@ -137,8 +135,7 @@ void botCmd_parse( IRCServer_t *server, IRCChannel_t *channel, char *who,
     item = BalancedBTreeFind( botCmdTree, (void *)&cmd, UNLOCKED );
     if( item ) {
         cmdFunc = (BotCmdFunc_t)item->item;
-        BN_ExtractNick(who, nick, 256);
-        cmdFunc( server, channel, nick, line );
+        cmdFunc( server, channel, who, line );
     }
     free( cmd );
 }

@@ -69,22 +69,11 @@ int main ( int argc, char **argv )
     /* Setup the bot commands */
     botCmd_initialize();
 
-    /* List the commands */
-    botCmd_parse( NULL, NULL, "test", "list" );
+    /* Setup the regexp support */
+    regexp_initialize();
 
     /* Setup the plugins */
     plugins_initialize();
-
-    /* List the commands (should now include loaded plugins) */
-    botCmd_parse( NULL, NULL, "test", "list" );
-
-#if 0
-    /* Remove trout plugin */
-    pluginUnload( "trout" );
-
-    /* List the commands (should now NOT include trout) */
-    botCmd_parse( NULL, NULL, "test", "list" );
-#endif
 
     /* Start the bot */
     bot_start();

@@ -15,7 +15,7 @@ LIBS	+= $(shell ${BOTNETCFG} --libs-static)
 
 SRCS	= 
 OBJS	= ${SRCS:.c=.o}
-PLUGINS	= plugin_trout.so
+PLUGINS	= plugin_trout.so plugin_fart.so
 
 all:	${PLUGINS}
 

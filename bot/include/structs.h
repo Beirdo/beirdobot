@@ -28,6 +28,7 @@
 #define structs_h_
 
 #include <pthread.h>
+#include <pcre.h>
 #include "botnet.h"
 #include "environment.h"
 #include "linked_list.h"

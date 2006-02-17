@@ -41,6 +41,7 @@
 static char ident[] _UNUSED_ = 
     "$Id$";
 
+static char *channelsAll = "^.*$";
 LinkedList_t   *regexpList;
 
 void regexp_initialize( void )
@@ -51,30 +52,55 @@ void regexp_initialize( void )
 void regexp_add( const char *channelRegexp, const char *contentRegexp, 
                  RegexpFunc_t func )
 {
-    static char *channelsAll = "/^.*$/";
     Regexp_t    *item;
     const char  *error;
     int          erroffset;
 
     item = (Regexp_t *)malloc(sizeof(Regexp_t));
-    if( !item ) {
+    if( !item || !func ) {
         return;
     }
 
     if( !channelRegexp ) {
-        item->channelRegexp = channelsAll;
-    } else {
-        item->channelRegexp = channelRegexp;
+        channelRegexp = channelsAll;
     }
+
+    item->channelRegexp = channelRegexp;
     item->contentRegexp = contentRegexp;
 
     item->reChannel = pcre_compile( channelRegexp, 0, &error, &erroffset, 
                                     NULL );
+    if( error ) {
+        printf( "%s\n", error );
+        return;
+    }
+
     item->peChannel = pcre_study( item->reChannel, 0, &error );
+    if( error ) {
+        printf( "%s\n", error );
+        free( item->reChannel );
+        return;
+    }
 
     item->reContent = pcre_compile( contentRegexp, 0, &error, &erroffset,
                                     NULL );
+    if( error ) {
+        printf( "%s\n", error );
+        free( item->reChannel );
+        free( item->peChannel );
+        return;
+    }
+
     item->peContent = pcre_study( item->reContent, 0, &error );
+    if( error ) {
+        printf( "%s\n", error );
+        free( item->reChannel );
+        free( item->peChannel );
+        free( item->reContent );
+        return;
+    }
+
+    item->func      = func;
 
     LinkedListAdd( regexpList, (LinkedListItem_t *)item, UNLOCKED, AT_TAIL );
 }
@@ -83,6 +109,10 @@ void regexp_remove( char *channelRegexp, char *contentRegexp )
 {
     LinkedListItem_t   *item;
     Regexp_t           *regexp;
+
+    if( !channelRegexp ) {
+        channelRegexp = channelsAll;
+    }
 
     LinkedListLock( regexpList );
 
@@ -116,6 +146,10 @@ void regexp_parse( IRCServer_t *server, IRCChannel_t *channel, char *who,
     int                 lenChan;
     int                 ovector[30];
 
+    if( !channel ) {
+        return;
+    }
+
     lenMsg  = strlen( msg );
     lenChan = strlen( channel->channel );
 
@@ -123,14 +157,17 @@ void regexp_parse( IRCServer_t *server, IRCChannel_t *channel, char *who,
 
     for( item = regexpList->head; item; item = item->next ) {
         regexp = (Regexp_t *)item;
-        if( !pcre_exec( regexp->reChannel, regexp->peChannel,
-                        channel->channel, lenChan, 0, 0, ovector, 30 ) ) {
+
+        rc = pcre_exec( regexp->reChannel, regexp->peChannel,
+                        channel->channel, lenChan, 0, 0, ovector, 30 );
+        if( rc < 0 ) {
             /* Channels don't match */
             continue;
         }
 
-        if( (rc = pcre_exec( regexp->reContent, regexp->peContent, msg, lenMsg,
-                             0, 0, ovector, 30 )) ) {
+        rc = pcre_exec( regexp->reContent, regexp->peContent, msg, lenMsg,
+                        0, 0, ovector, 30 );
+        if( rc >= 0 ) {
             /* We got a channel and content match, call the function */
             regexp->func( server, channel, who, msg, ovector, rc );
         }
