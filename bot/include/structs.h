@@ -96,6 +96,20 @@ typedef struct {
     void          (*shutdown)(void);
 } Plugin_t;
 
+typedef void (*RegexpFunc_t)( IRCServer_t *server, IRCChannel_t *channel, 
+                              char *who, char *msg, int *ovector, 
+                              int ovecsize );
+typedef struct {
+    LinkedListItem_t    item;
+    const char         *channelRegexp;
+    const char         *contentRegexp;
+    pcre               *reChannel;
+    pcre_extra         *peChannel;
+    pcre               *reContent;
+    pcre_extra         *peContent;
+    RegexpFunc_t        func;
+} Regexp_t;
+
 #endif
 
 /*
