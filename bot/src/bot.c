@@ -41,6 +41,8 @@
 #include "environment.h"
 #include "protos.h"
 #include "structs.h"
+#include "linked_list.h"
+#include "balanced_btree.h"
 
 
 LinkedList_t   *ServerList;
@@ -505,6 +507,8 @@ void *bot_server_thread(void *arg)
 {
     BN_TInfo           *Info;
     IRCServer_t        *server;
+    IRCChannel_t       *channel;
+    LinkedListItem_t   *item;
 
     server = (IRCServer_t *)arg;
 
@@ -551,6 +555,17 @@ void *bot_server_thread(void *arg)
     {
         printf("Disconnected from %s:%d.\n", server->server, server->port);
         sleep(10);
+
+        /* Clear the joined flags so we will rejoin on reconnect */
+        if( server->channels ) {
+            LinkedListLock( server->channels );
+            for( item = server->channels->head; item ; item = item->next ) {
+                channel = (IRCChannel_t *)item;
+                channel->joined = FALSE;
+            }
+            LinkedListUnlock( server->channels );
+        }
+
         printf("Reconnecting to %s:%d...\n", server->server, server->port);
     }
 
