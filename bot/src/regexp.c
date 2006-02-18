@@ -137,7 +137,7 @@ void regexp_remove( char *channelRegexp, char *contentRegexp )
 }
 
 void regexp_parse( IRCServer_t *server, IRCChannel_t *channel, char *who, 
-                   char *msg )
+                   char *msg, IRCMsgType_t type )
 {
     LinkedListItem_t   *item;
     Regexp_t           *regexp;
@@ -169,7 +169,7 @@ void regexp_parse( IRCServer_t *server, IRCChannel_t *channel, char *who,
                         0, 0, ovector, 30 );
         if( rc >= 0 ) {
             /* We got a channel and content match, call the function */
-            regexp->func( server, channel, who, msg, ovector, rc );
+            regexp->func( server, channel, who, msg, type, ovector, rc );
         }
     }
 

@@ -346,7 +346,7 @@ void ProcOnAction(BN_PInfo I, const char Chan[], const char Who[],
     db_update_nick( channel, (char *)Who, true, true );
 
     BN_ExtractNick(Who, nick, 256);
-    regexp_parse( server, channel, nick, (char *)Msg );
+    regexp_parse( server, channel, nick, (char *)Msg, TYPE_ACTION );
 }
 
 void ProcOnChannelTalk(BN_PInfo I, const char Chan[], const char Who[],
@@ -373,7 +373,7 @@ void ProcOnChannelTalk(BN_PInfo I, const char Chan[], const char Who[],
 
     if( !ret ) {
         /* There was no command match */
-        regexp_parse( server, channel, nick, (char *)Msg );
+        regexp_parse( server, channel, nick, (char *)Msg, TYPE_MESSAGE );
     }
 }
 

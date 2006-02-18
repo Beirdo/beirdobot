@@ -36,7 +36,7 @@
 
 /* INTERNAL FUNCTION PROTOTYPES */
 void regexpFuncFart( IRCServer_t *server, IRCChannel_t *channel, char *who, 
-                     char *msg, int *ovector, int ovecsize );
+                     char *msg, IRCMsgType_t type, int *ovector, int ovecsize );
 
 /* CVS generated ID string */
 static char ident[] _UNUSED_ = 
@@ -57,7 +57,7 @@ void plugin_shutdown( void )
 }
 
 void regexpFuncFart( IRCServer_t *server, IRCChannel_t *channel, char *who, 
-                     char *msg, int *ovector, int ovecsize )
+                     char *msg, IRCMsgType_t type, int *ovector, int ovecsize )
 {
     char       *message;
 

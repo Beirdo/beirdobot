@@ -77,7 +77,7 @@ void regexp_add( const char *channelRegexp, const char *contentRegexp,
                  RegexpFunc_t func );
 void regexp_remove( char *channelRegexp, char *contentRegexp );
 void regexp_parse( IRCServer_t *server, IRCChannel_t *channel, char *who, 
-                   char *msg );
+                   char *msg, IRCMsgType_t type );
 
 #endif
 

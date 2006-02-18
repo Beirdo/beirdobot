@@ -98,8 +98,8 @@ typedef struct {
 } Plugin_t;
 
 typedef void (*RegexpFunc_t)( IRCServer_t *server, IRCChannel_t *channel, 
-                              char *who, char *msg, int *ovector, 
-                              int ovecsize );
+                              char *who, char *msg, IRCMsgType_t type,
+                              int *ovector, int ovecsize );
 typedef struct {
     LinkedListItem_t    item;
     const char         *channelRegexp;
