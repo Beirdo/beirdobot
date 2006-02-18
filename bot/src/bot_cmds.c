@@ -44,17 +44,20 @@ void botCmdSeen( IRCServer_t *server, IRCChannel_t *channel, char *who,
                  char *msg );
 void botCmdTrout( IRCServer_t *server, IRCChannel_t *channel, char *who, 
                   char *msg );
-char *botCmdDepthFirst( BalancedBTreeItem_t *item );
+char *botHelpHelp( void );
+char *botHelpList( void );
+
+static char *botCmdDepthFirst( BalancedBTreeItem_t *item );
 
 /* CVS generated ID string */
 static char ident[] _UNUSED_ = 
     "$Id$";
 
 static BotCmd_t botCmd[] _UNUSED_ = {
-    { "help",       botCmdHelp },
-    { "list",       botCmdList },
-    { "search",     botCmdSearch },
-    { "seen",       botCmdSeen }
+    { "help",       botCmdHelp,   botHelpHelp },
+    { "list",       botCmdList,   botHelpList },
+    { "search",     botCmdSearch, NULL },
+    { "seen",       botCmdSeen,   NULL }
 };
 static int botCmdCount _UNUSED_ = NELEMENTS(botCmd);
 
@@ -72,7 +75,7 @@ void botCmd_initialize( void )
     for( i = 0; i < botCmdCount; i++ ) {
         item = (BalancedBTreeItem_t *)malloc(sizeof(BalancedBTreeItem_t));
         if( item ) {
-            item->item = (void *)botCmd[i].func;
+            item->item = (void *)&botCmd[i];
             item->key  = (void *)&botCmd[i].command;
             BalancedBTreeAdd( botCmdTree, item, LOCKED, FALSE );
         }
@@ -82,16 +85,31 @@ void botCmd_initialize( void )
     BalancedBTreeUnlock( botCmdTree );
 }
 
-void botCmd_add( const char **command, BotCmdFunc_t func )
+void botCmd_add( const char **command, BotCmdFunc_t func, 
+                 BotCmdHelpFunc_t helpFunc )
 {
     BalancedBTreeItem_t    *item;
+    BotCmd_t               *cmd;
+
+    if( !func ) {
+        return;
+    }
 
     item = (BalancedBTreeItem_t *)malloc(sizeof(BalancedBTreeItem_t));
+    cmd = (BotCmd_t *)malloc(sizeof(BotCmd_t));
     if( !item ) {
         return;
     }
 
-    item->item = (void *)func;
+    if( !cmd ) {
+        free( item );
+        return;
+    }
+
+    cmd->command  = (char *)*command;
+    cmd->func     = func;
+    cmd->helpFunc = helpFunc;
+    item->item = (void *)cmd;
     item->key  = (void *)command;
     BalancedBTreeAdd( botCmdTree, item, UNLOCKED, TRUE );
 }
@@ -105,6 +123,7 @@ void botCmd_remove( char *command )
 
     if( item ) {
         BalancedBTreeRemove( botCmdTree, item, LOCKED, TRUE );
+        free( item->item );
     }
     BalancedBTreeUnlock( botCmdTree );
 }
@@ -116,7 +135,7 @@ int botCmd_parse( IRCServer_t *server, IRCChannel_t *channel, char *who,
     char                   *cmd;
     int                     len;
     BalancedBTreeItem_t    *item;
-    BotCmdFunc_t            cmdFunc;
+    BotCmd_t               *cmdStruct;
     int                     ret;
 
     line = strstr( msg, " " );
@@ -136,8 +155,8 @@ int botCmd_parse( IRCServer_t *server, IRCChannel_t *channel, char *who,
     ret = 0;
     item = BalancedBTreeFind( botCmdTree, (void *)&cmd, UNLOCKED );
     if( item ) {
-        cmdFunc = (BotCmdFunc_t)item->item;
-        cmdFunc( server, channel, who, line );
+        cmdStruct = (BotCmd_t *)item->item;
+        cmdStruct->func( server, channel, who, line );
         ret = 1;
     }
     free( cmd );
@@ -149,14 +168,69 @@ int botCmd_parse( IRCServer_t *server, IRCChannel_t *channel, char *who,
 void botCmdHelp( IRCServer_t *server, IRCChannel_t *channel, char *who, 
                  char *msg )
 {
+    char                   *line;
+    char                   *cmd;
+    int                     len;
+    BalancedBTreeItem_t    *item;
+    BotCmd_t               *cmdStruct;
+    static char            *help = "help";
+    static char            *helpNotFound = "Currently no help on this subject";
+    char                   *helpMsg;
+
     if( !msg ) {
-        printf( "Bot CMD: Help NULL by %s\n", who );
+        msg = help;
+    }
+
+    printf( "Bot CMD: Help %s by %s\n", msg, who );
+
+    line = strstr( msg, " " );
+    if( line ) {
+        /* Command has trailing text, skip the space */
+        len = line - msg;
+        line++;
+
+        cmd = (char *)malloc( len + 2 );
+        strncpy( cmd, msg, len );
+        cmd[len] = '\0';
     } else {
-        printf( "Bot CMD: Help %s by %s\n", msg, who );
+        /* Command is the whole line */
+        cmd = strdup( msg );
+    }
+
+    helpMsg = helpNotFound;
+
+    item = BalancedBTreeFind( botCmdTree, (void *)&cmd, UNLOCKED );
+    if( item ) {
+        cmdStruct = (BotCmd_t *)item->item;
+        if( cmdStruct->helpFunc ) {
+            helpMsg = cmdStruct->helpFunc();
+        }
+    }
+    free( cmd );
+
+    if( server ) {
+        if( !channel ) {
+            /* Private message */
+            BN_SendPrivateMessage(&server->ircInfo, (const char *)who, helpMsg);
+        } else {
+            /* in channel */
+            BN_SendChannelMessage(&server->ircInfo, 
+                                  (const char *)channel->channel, helpMsg);
+        }
+    } else {
+        /* Used for debugging purposes */
+        printf( "help: %s\n", helpMsg );
     }
 }
 
-char *botCmdDepthFirst( BalancedBTreeItem_t *item )
+char *botHelpHelp( void )
+{
+    static char *help = "Use \"help\" followed by a bot command.  For a list "
+                        "of bot commands, use \"list\"";
+    return( help );
+}
+
+static char *botCmdDepthFirst( BalancedBTreeItem_t *item )
 {
     char       *message;
     char       *oldmsg;
@@ -231,6 +305,13 @@ void botCmdList( IRCServer_t *server, IRCChannel_t *channel, char *who,
     }
 
     free( message );
+}
+
+char *botHelpList( void )
+{
+    static char *help = "Shows a list of supported bot commands.";
+
+    return( help );
 }
 
 void botCmdSearch( IRCServer_t *server, IRCChannel_t *channel, char *who, 

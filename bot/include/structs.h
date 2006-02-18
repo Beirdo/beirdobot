@@ -83,9 +83,12 @@ typedef enum {
 
 typedef void (*BotCmdFunc_t)( IRCServer_t *server, IRCChannel_t *channel, 
                               char *who, char *msg );
+typedef char * (*BotCmdHelpFunc_t)( void );
+
 typedef struct {
-    char           *command;
-    BotCmdFunc_t    func;
+    char               *command;
+    BotCmdFunc_t        func;
+    BotCmdHelpFunc_t    helpFunc;
 } BotCmd_t;
 
 typedef struct {
