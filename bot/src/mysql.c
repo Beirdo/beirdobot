@@ -193,6 +193,13 @@ void db_load_channels(void)
             channel->server         = server;
             channel->joined         = false;
 
+            channel->fullspec       = (char *)malloc(strlen(server->nick) + 10 +
+                                                     strlen(server->server) +
+                                                     strlen(channel->channel));
+            sprintf( channel->fullspec, "%s@%s:%d/%s", server->nick,
+                     server->server, server->port, channel->channel );
+            printf( "%s\n", channel->fullspec );
+
             channel->itemName.item  = (void *)channel;
             channel->itemName.key   = (void *)&channel->channel;
             channel->itemNum.item   = (void *)channel;

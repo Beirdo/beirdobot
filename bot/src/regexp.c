@@ -151,7 +151,7 @@ void regexp_parse( IRCServer_t *server, IRCChannel_t *channel, char *who,
     }
 
     lenMsg  = strlen( msg );
-    lenChan = strlen( channel->channel );
+    lenChan = strlen( channel->fullspec );
 
     LinkedListLock( regexpList );
 
@@ -159,7 +159,7 @@ void regexp_parse( IRCServer_t *server, IRCChannel_t *channel, char *who,
         regexp = (Regexp_t *)item;
 
         rc = pcre_exec( regexp->reChannel, regexp->peChannel,
-                        channel->channel, lenChan, 0, 0, ovector, 30 );
+                        channel->fullspec, lenChan, 0, 0, ovector, 30 );
         if( rc < 0 ) {
             /* Channels don't match */
             continue;

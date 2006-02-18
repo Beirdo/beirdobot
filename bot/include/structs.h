@@ -62,6 +62,7 @@ typedef struct {
     int                 channelId;
     IRCServer_t        *server;
     char               *channel;
+    char               *fullspec;
     char               *url;
     int                 notifywindow;
     char                cmdChar;
