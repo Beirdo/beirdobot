@@ -355,18 +355,26 @@ void ProcOnChannelTalk(BN_PInfo I, const char Chan[], const char Who[],
     IRCChannel_t   *channel;
     IRCServer_t    *server;
     char            nick[256];
+    int             ret;
 
     server  = (IRCServer_t *)I->User;
     channel = FindChannel(server, Chan);
     db_add_logentry( channel, (char *)Who, TYPE_MESSAGE, (char *)Msg );
     db_update_nick( channel, (char *)Who, true, true );
+
     BN_ExtractNick(Who, nick, 256);
+
+    ret = 0;
     if( channel->cmdChar ) {
         if( Msg[0] == channel->cmdChar ) {
-            botCmd_parse( server, channel, nick, (char *)&Msg[1] );
+            ret = botCmd_parse( server, channel, nick, (char *)&Msg[1] );
         }
     }
-    regexp_parse( server, channel, nick, (char *)Msg );
+
+    if( !ret ) {
+        /* There was no command match */
+        regexp_parse( server, channel, nick, (char *)Msg );
+    }
 }
 
 void ProcOnNick(BN_PInfo I, const char Who[], const char Msg[])

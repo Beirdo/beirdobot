@@ -109,14 +109,15 @@ void botCmd_remove( char *command )
     BalancedBTreeUnlock( botCmdTree );
 }
 
-void botCmd_parse( IRCServer_t *server, IRCChannel_t *channel, char *who, 
-                   char *msg )
+int botCmd_parse( IRCServer_t *server, IRCChannel_t *channel, char *who, 
+                  char *msg )
 {
     char                   *line;
     char                   *cmd;
     int                     len;
     BalancedBTreeItem_t    *item;
     BotCmdFunc_t            cmdFunc;
+    int                     ret;
 
     line = strstr( msg, " " );
     if( line ) {
@@ -132,12 +133,16 @@ void botCmd_parse( IRCServer_t *server, IRCChannel_t *channel, char *who,
         cmd = strdup( msg );
     }
 
+    ret = 0;
     item = BalancedBTreeFind( botCmdTree, (void *)&cmd, UNLOCKED );
     if( item ) {
         cmdFunc = (BotCmdFunc_t)item->item;
         cmdFunc( server, channel, who, line );
+        ret = 1;
     }
     free( cmd );
+
+    return( ret );
 }
 
 
