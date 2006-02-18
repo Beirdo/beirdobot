@@ -32,6 +32,7 @@
 #include "botnet.h"
 #include "environment.h"
 #include "structs.h"
+#include "protos.h"
 
 /* INTERNAL FUNCTION PROTOTYPES */
 void botCmdHelp( IRCServer_t *server, IRCChannel_t *channel, char *who, 
@@ -46,6 +47,7 @@ void botCmdTrout( IRCServer_t *server, IRCChannel_t *channel, char *who,
                   char *msg );
 char *botHelpHelp( void );
 char *botHelpList( void );
+char *botHelpSeen( void );
 
 static char *botCmdDepthFirst( BalancedBTreeItem_t *item );
 
@@ -57,7 +59,7 @@ static BotCmd_t botCmd[] _UNUSED_ = {
     { "help",       botCmdHelp,   botHelpHelp },
     { "list",       botCmdList,   botHelpList },
     { "search",     botCmdSearch, NULL },
-    { "seen",       botCmdSeen,   NULL }
+    { "seen",       botCmdSeen,   botHelpSeen }
 };
 static int botCmdCount _UNUSED_ = NELEMENTS(botCmd);
 
@@ -327,11 +329,39 @@ void botCmdSearch( IRCServer_t *server, IRCChannel_t *channel, char *who,
 void botCmdSeen( IRCServer_t *server, IRCChannel_t *channel, char *who, 
                  char *msg )
 {
-    if( !msg ) {
-        printf( "Bot CMD: Seen NULL by %s\n", who );
-    } else {
-        printf( "Bot CMD: Seen %s by %s\n", msg, who );
+    char           *message;
+    static char    *huh = "Huh? Who?";
+
+    if( !server ) {
+        return;
     }
+
+    if( !channel ) {
+        BN_SendPrivateMessage(&server->ircInfo, (const char *)who, 
+                              "This needs to be done in a channel!");
+        return;
+    }
+
+    if( !msg ) {
+        message = huh;
+    } else {
+        message = db_get_seen( channel, msg );
+    }
+
+    BN_SendChannelMessage(&server->ircInfo, 
+                          (const char *)channel->channel, message);
+    
+    if( message != huh ) {
+        free( message );
+    }
+}
+
+char *botHelpSeen( void )
+{
+    static char *help = "Shows when the last time a user has been seen, or how"
+                        " long they've been idle.  Must be done in a channel.";
+
+    return( help );
 }
 
 /*

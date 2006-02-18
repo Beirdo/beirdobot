@@ -306,14 +306,15 @@ void db_update_nick( IRCChannel_t *channel, char *nick, bool present,
     mysql_free_result(res);
 
     if( count ) {
-        sprintf( sqlbuf, "UPDATE `nicks` SET `lastseen` = NULL, "
+        sprintf( sqlbuf, "UPDATE `nicks` "
+                         "SET `lastseen` = UNIX_TIMESTAMP(NOW()), "
                          "`present` = %d WHERE `chanid` = %d AND "
                          "`nick` = '%s'",
                          present, channel->channelId, nickQuoted );
     } else {
         sprintf( sqlbuf, "INSERT INTO `nicks` (`chanid`, `nick`, `lastseen`, "
                          "`lastnotice`, `present`) "
-                         "VALUES ( %d, '%s', NULL, '00000000000000', %d )",
+                         "VALUES ( %d, '%s', UNIX_TIMESTAMP(NOW()), 0,  %d )",
                          channel->channelId, nickQuoted, present );
     }
     free(nickQuoted);
@@ -397,7 +398,7 @@ bool db_check_nick_notify( IRCChannel_t *channel, char *nick, int hours )
 
     sprintf( sqlbuf, "SELECT `lastnotice` FROM `nicks` WHERE "
                      "`chanid` = %d AND `nick` = '%s' AND "
-                     "SUBDATE(NOW(), INTERVAL %d HOUR) >= `lastnotice`",
+                     "`lastnotice` <= UNIX_TIMESTAMP(NOW()) - (3600 * %d)",
                      channel->channelId, nickQuoted, hours );
     free(nickQuoted);
     mysql_query(sql, sqlbuf);
@@ -427,7 +428,7 @@ void db_notify_nick( IRCChannel_t *channel, char *nick )
         return;
     }
 
-    sprintf( sqlbuf, "UPDATE `nicks` SET `lastnotice` = NOW() "
+    sprintf( sqlbuf, "UPDATE `nicks` SET `lastnotice` = UNIX_TIMESTAMP(NOW()) "
                      "WHERE `chanid` = %d AND `nick` = '%s'",
                      channel->channelId, nickQuoted );
     mysql_query(sql, sqlbuf);
@@ -495,6 +496,104 @@ BalancedBTree_t *db_get_plugins( void )
     BalancedBTreeUnlock( tree );
 
     return( tree );
+}
+
+char *db_get_seen( IRCChannel_t *channel, char *nick )
+{
+    char           *nickQuoted;
+    int             count;
+    MYSQL_RES      *res;
+    MYSQL_ROW       row;
+    int             i;
+    int             timeout;
+    int             present;
+    char           *result;
+    char            idle[256];
+    char            idle2[256];
+    int             day, hour, min, sec;
+
+    if( !channel || !nick ) {
+        return( false );
+    }
+
+    nickQuoted = db_quote(nick);
+
+    if( !nickQuoted ) {
+        return( false );
+    }
+
+    sprintf( sqlbuf, "SELECT UNIX_TIMESTAMP(NOW()) - `lastseen`, `present` "
+                     "FROM `nicks` WHERE `chanid` = %d AND `nick` = '%s'",
+                     channel->channelId, nickQuoted );
+    free(nickQuoted);
+    mysql_query(sql, sqlbuf);
+
+    res = mysql_store_result(sql);
+    if( !res || !(count = mysql_num_rows(res)) ) {
+        mysql_free_result(res);
+        result = (char *)malloc(strlen(nick) + 25);
+        sprintf( result, "%s has not been seen here", nick );
+        return( result );
+    }
+
+    timeout = 0;
+    present = 0;
+
+    for( i = 0; i < count; i++ ) {
+        row = mysql_fetch_row(res);
+
+        timeout = atoi(row[0]);
+        present = atoi(row[1]);
+    }
+
+    mysql_free_result(res);
+
+    sec = timeout % 60;
+    timeout /= 60;
+
+    min = timeout % 60;
+    timeout /= 60;
+
+    hour = timeout % 24;
+    timeout /= 24;
+
+    day = timeout;
+
+    idle[0] = '\0';
+
+    if( day ) {
+        sprintf( idle2, " %d day%s", day, (day == 1 ? "" : "s") );
+        strcat( idle, idle2 );
+    }
+
+    if( hour ) {
+        sprintf( idle2, " %d hour%s", hour, (hour == 1 ? "" : "s") );
+        strcat( idle, idle2 );
+    }
+
+    if( min ) {
+        sprintf( idle2, " %d minute%s", min, (min == 1 ? "" : "s") );
+        strcat( idle, idle2 );
+    }
+
+    if( sec ) {
+        sprintf( idle2, " %d second%s", sec, (sec == 1 ? "" : "s") );
+        strcat( idle, idle2 );
+    }
+
+    if( !idle[0] ) {
+        sprintf( idle, " 0 seconds" );
+    }
+
+    if( present ) {
+        result = (char *)malloc(strlen(nick) + strlen(idle) + 34);
+        sprintf( result, "%s is here and has been idle for%s", nick, idle );
+    } else {
+        result = (char *)malloc(strlen(nick) + strlen(idle) + 21);
+        sprintf( result, "%s was last seen%s ago", nick, idle );
+    }
+
+    return( result );
 }
 
 
