@@ -1,0 +1,109 @@
+#
+# .htaccess file for Beirdobot.  Please read the descriptive comments for help
+# using these directives in your own setup.  If you so desire (and for a small
+# increase in efficiency, you can put this entire block into the apache config
+# for your Beirdobot host configuration).
+#
+# @url       $URL$
+# @date      $Date: 2006-02-17 14:28:54 -0800 (Fri, 17 Feb 2006) $
+# @version   $Revision: 9023 $
+# @author    $Author: xris $
+#
+
+#
+# I *strongly* urge you to turn on authentication for Beirdobot congfiguration.
+# It is disabled by default because it requires you to set up your own password
+# file.  Please see the man page for htdigest and then configure the folowing
+# directives to suit your authentication needs.
+#
+#    AuthType           Digest
+#    AuthName           "Beirdobot"
+#    AuthDigestFile     /var/www/htdigest
+#
+#    <Location config>
+#        Require        valid-user
+#    </Location>
+
+# Some special instructions for the PHP files of MythWeb.
+    <FilesMatch "\.php$">
+
+    #
+    # Use the following environment settings to tell Beirdobot where you want it
+    # to look to connect to the database, the name of the database to connect
+    # to, and the authentication info to use to connect.  The defaults will
+    # usually work fine unless you've change the bot's commandline options, or
+    # are running Beirdobot on a different server from your database.  Make sure
+    # you have mod_env enabled.
+    #
+        setenv db_server        "localhost"
+        setenv db_name          "beirdobot"
+        setenv db_login         "beirdobot"
+        setenv db_password      "beirdobot"
+
+    # By default, php will always search the current directory for include files,
+    # but if you wish to install these directories outside of the current path
+    # (eg. for security reasons), set this variable to the directory that
+    # contains the directories like languages and templates.  eg.
+    #
+    #   setenv include_path      "/usr/share/mythweb"
+
+    #  These settings are intended for apache 2.x.  If your version of apache
+    #  doesn't support php_value, or things like memory_limit aren't working
+    #  as expected, then use these settings as examples for your own php.ini
+    #  files.
+        php_value safe_mode                     0
+
+        php_value memory_limit                  32M
+
+        php_value session.save_path             php_sessions
+
+        php_value output_buffering              4096
+        php_value register_globals              0
+        php_value magic_quotes_gpc              0
+        php_value file_uploads                  0
+        php_value allow_url_fopen               On
+
+        php_value zlib.output_handler           Off
+        php_value zlib.output_compression       16384
+        php_value zlib.output_compression_level 4
+
+        php_value url_rewriter.tags             a=href,area=href,frame=src,input=src,form=action
+
+    # These values do not change - bug in php
+        php_value output_handler                NULL
+
+    # php_flag does not work in older versions of php
+        php_flag output_handler                 "NULL"
+        php_flag short_open_tag                 "On"
+
+    </FilesMatch>
+
+#
+# The settings below relate specifically to mod_rewrite and the rewrite engine
+# used to make the Beirdobot user experience a little easier to deal with by
+# simplifying the URL's neeced to access the various sections.  Do not touch
+# these settings.
+#
+
+# If Beirdobot is installed outside of the document root (eg. using Alias) then
+# you will need to set this directive to the base URL that Beirdobot is visible
+# from externally.  If you do not, the web server will return 'not found'.  eg.
+#    RewriteBase    /beirdobot
+
+# Turn on the rewrite engine
+    RewriteEngine  on
+
+# Skip out early if we've already been through rewrites,
+# or if this is a /css/, /js/ or /cache/ directory request.
+    RewriteRule    ^(css|images|js|themes|skins|[a-z_]+\.php)(/|$)     -     [L]
+
+# Redirect most of the remaining URL requests to the main beirdobot script.
+# It will then handle any requests given to it.
+    RewriteRule     ^(.+)$                  beirdobot.php/$1              [QSA,L]
+
+# If you're experiencing trouble with the previous line in your copy of apache,
+# you could instead use something like:
+#    RewriteRule     ^([\w\-]+(/.*)?)?$      beirdobot.php?PATH_INFO=/$1   [L,QSA]
+
+# Catch anything else that comes through and send it to beirdobot.php with no parameters.
+    RewriteRule     ^(.*)$                  beirdobot.php                 [QSA,L]
