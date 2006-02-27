@@ -3,7 +3,7 @@
 -- http://www.phpmyadmin.net
 -- 
 -- Host: localhost
--- Generation Time: Feb 18, 2006 at 03:04 PM
+-- Generation Time: Feb 27, 2006 at 12:36 AM
 -- Server version: 4.0.24
 -- PHP Version: 4.4.0-3ubuntu1
 -- 
@@ -42,6 +42,7 @@ CREATE TABLE `irclog` (
   `message` text NOT NULL,
   PRIMARY KEY  (`msgid`),
   KEY `timeChan` (`timestamp`,`chanid`),
+  KEY `messageType` (`chanid`,`msgtype`,`timestamp`),
   FULLTEXT KEY `searchtext` (`nick`,`message`)
 ) TYPE=MyISAM;
 
