@@ -36,7 +36,8 @@ foreach ($Servers as $server) {
     }
     else {
         foreach ($server->channels as $channel) {
-            echo '    <li>'.$channel->channel, ' ('.date('Y-m-d H:m:s', $channel->latest_entry).")</li>\n";
+            echo '    <li><a href="'.root.'/channel/'.$channel->chanid.'">'.$channel->channel,
+                 '</a> ('.date('Y-m-d H:m:s', $channel->first_entry).")</li>\n";
         }
     }
     echo "        </ul>\n        </li>\n";

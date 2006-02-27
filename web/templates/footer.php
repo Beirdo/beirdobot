@@ -13,3 +13,6 @@
 ?>
 <hr />
 footer...
+
+</body>
+</html>

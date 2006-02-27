@@ -22,7 +22,8 @@
 
 // Load all of the servers
     $sh = $db->query('SELECT channels.*,
-                             MAX(irclog.timestamp) AS latest_entry
+                             MAX(irclog.timestamp) AS last_entry,
+                             MIN(irclog.timestamp) AS first_entry
                         FROM channels
                              NATURAL LEFT JOIN irclog
                     GROUP BY chanid');
@@ -43,9 +44,12 @@ class irc_channel {
     var $url;
     var $notifywindow;
     var $cmdChar;
-    var $latest_entry;
+    var $last_entry;
+    var $first_entry;
 
     var $server;
+    var $messages = array();
+    var $users    = array();
 
 /**
  * Object constructor
@@ -61,7 +65,8 @@ class irc_channel {
         $this->url          = $channel_vars['url'];
         $this->notifywindow = $channel_vars['notifywindow'];
         $this->cmdChar      = $channel_vars['cmdChar'];
-        $this->latest_entry = $channel_vars['latest_entry'];
+        $this->last_entry   = $channel_vars['last_entry'];
+        $this->first_entry  = $channel_vars['first_entry'];
     // Keep a reference to this channel's server
         $this->server       =& $Servers[$this->serverid];
     // Add this channel to its parent server
@@ -77,4 +82,55 @@ class irc_channel {
         return $this->__construct($channel_vars);
     }
 
+/**
+ * Load all of the messages from the requested channel that were sent between
+ * $from and $to.
+ *
+ * @param int $from timestamp of the first message to load
+ * @param int $to   timestamp of the last message to load (default: now)
+/**/
+    function load_messages($from, $to = NULL) {
+        global $db;
+    // Default the end time to now
+        if (is_null($to))
+            $to = time();
+    // Load the messages
+        $sh = $db->query('SELECT *
+                            FROM irclog
+                           WHERE chanid=?
+                                 AND timestamp >= ?
+                                 AND timestamp <= ?',
+                         $this->chanid,
+                         $from,
+                         $to
+                        );
+        while ($row = $sh->fetch_assoc()) {
+            $this->messages[$row['msgid']] = $row;
+        }
+        $sh->finish();
+
+    }
+
+/**
+ * Load all currently in this channel.
+/**/
+    function load_users() {
+        global $db;
+    // Default the end time to now
+        if (is_null($to))
+            $to = time();
+    // Load the messages
+        $sh = $db->query('SELECT *
+                            FROM nicks
+                           WHERE chanid=?
+                                 AND present = 1',
+                         $this->chanid
+                        );
+        while ($row = $sh->fetch_assoc()) {
+            $this->users[$row['nick']] = $row;
+        }
+        $sh->finish();
+    }
+
 }
+
