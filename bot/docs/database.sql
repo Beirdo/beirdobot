@@ -3,7 +3,7 @@
 -- http://www.phpmyadmin.net
 -- 
 -- Host: localhost
--- Generation Time: Feb 27, 2006 at 12:36 AM
+-- Generation Time: Feb 27, 2006 at 12:41 AM
 -- Server version: 4.0.24
 -- PHP Version: 4.4.0-3ubuntu1
 -- 
@@ -93,3 +93,15 @@ CREATE TABLE `servers` (
   PRIMARY KEY  (`serverid`),
   KEY `serverNick` (`server`,`port`,`nick`)
 ) TYPE=MyISAM PACK_KEYS=0;
+
+-- --------------------------------------------------------
+
+-- 
+-- Table structure for table `settings`
+-- 
+
+CREATE TABLE `settings` (
+  `name` varchar(80) NOT NULL default '',
+  `value` varchar(255) NOT NULL default '',
+  PRIMARY KEY  (`name`)
+) TYPE=MyISAM;

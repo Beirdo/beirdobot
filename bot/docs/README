@@ -11,3 +11,7 @@ mysql> quit;
 
 
 mysql -u beirdobot -p < database.sql
+
+To add the initial data (preload of the plugins, and the dbSchema setting)
+
+mysql -u beirdobot -p < initialdata.sql
