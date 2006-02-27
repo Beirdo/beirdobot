@@ -70,11 +70,8 @@ class irc_message {
     }
 
 /**
- *
- *
- * @param
- *
- * @return
+ * Sets $this->message from $this->raw_message, and then performs some regex
+ * magic to add links, etc.
 /**/
     function parse_message() {
         $this->message = htmlentities($this->raw_message);

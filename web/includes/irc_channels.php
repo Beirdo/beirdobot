@@ -115,22 +115,41 @@ class irc_channel {
 /**
  * Load all currently in this channel.
 /**/
-    function load_users() {
+    function load_users($time=NULL) {
         global $db;
     // Default the end time to now
-        if (is_null($to))
-            $to = time();
-    // Load the messages
-        $sh = $db->query('SELECT *
-                            FROM nicks
-                           WHERE chanid=?
-                                 AND present = 1',
-                         $this->chanid
-                        );
-        while ($row = $sh->fetch_assoc()) {
-            $this->users[$row['nick']] = $row;
+        if (is_null($time) || $time == time()) {
+        // Load the messages
+            $sh = $db->query('SELECT *
+                                FROM nicks
+                               WHERE chanid=?
+                                     AND present = 1
+                            ORDER BY nick',
+                             $this->chanid
+                            );
+            while ($row = $sh->fetch_assoc()) {
+                $this->users[$row['nick']] = $row;
+            }
+            $sh->finish();
         }
-        $sh->finish();
+    // If not now, we need to do some heavier math
+        else {
+            $sh = $db->query('SELECT nicks.*,
+                                     IF(SUM(IF(irclog.msgtype=6, 1, -1)) > 0, 1, 0) AS present
+                                FROM nicks, irclog
+                               WHERE irclog.nick = nicks.nick
+                                     AND irclog.timestamp <= ?
+                                     AND irclog.chanid = ?
+                                     AND irclog.msgtype IN (6, 7)
+                            GROUP BY irclog.nick',
+                             $time,
+                             $this->chanid
+                            );
+            while ($row = $sh->fetch_assoc()) {
+                $this->users[$row['nick']] = $row;
+            }
+            $sh->finish();
+        }
     }
 
 }
