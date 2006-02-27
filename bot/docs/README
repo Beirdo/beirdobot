@@ -5,7 +5,7 @@ mysql -u root -p     (assuming you put a password!)
 mysql> create database beirdobot;
 mysql> grant usage on *.* to beirdobot@localhost identified by 'beirdobot';
 mysql> grant select, insert, update, create, drop, index, alter, 
-       create temporary tables on beirdobot.* beirdobot@local;
+       create temporary tables on beirdobot.* beirdobot@localhost;
 mysql> flush privileges;
 mysql> quit;
 
