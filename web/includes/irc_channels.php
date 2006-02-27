@@ -9,6 +9,7 @@
  *
  * @package     Beirdobot
  *
+ * @uses        includes/irc_messages.php
  * @uses        includes/irc_servers.php
  * @uses        $Servers
  *
@@ -105,7 +106,7 @@ class irc_channel {
                          $to
                         );
         while ($row = $sh->fetch_assoc()) {
-            $this->messages[$row['msgid']] = $row;
+            $this->messages[$row['msgid']] = new irc_message($row);
         }
         $sh->finish();
 

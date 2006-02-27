@@ -184,7 +184,8 @@ README about the AllowOverride settings.
     define('skin_dir', 'skins/'.skin);
     define('skin_url', root.skin_dir);
 
-// Load the IRC server and channel info
+// Load the IRC classes
+    require_once 'includes/irc_messages.php';
     require_once 'includes/irc_servers.php';
     require_once 'includes/irc_channels.php';
 

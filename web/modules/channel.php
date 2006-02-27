@@ -25,7 +25,7 @@
     }
 
 // Load the last N minutes of messages from this channel
-    $Channel->load_messages(time() - 300);
+    $Channel->load_messages(time() - (60 * 15));
 
 // Load the names of the users currently logged into the channel
     $Channel->load_users();

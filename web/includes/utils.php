@@ -157,6 +157,37 @@
     }
 
 /**
+ * encoded_mailto:
+ *  returns <a href="mailto:$email">$title</a>, but hex-encoded for obscurity
+/**/
+    function encoded_mailto($email, $title=NULL, $obfuscate=false) {
+    // Pull off any query string
+        if (preg_match('/^(.+?)(\?.*)$/', $email, $match)) {
+            $email = $match[1];
+            $query = $match[2];
+        }
+    // Do some fun obfuscation to the email address
+        if ($obfuscate) {
+            $email = str_replace('@', '(a)', $email);
+            $email = str_replace('.', '*', $email);
+        }
+    // Default title is the email address
+        if (empty($title))
+            $title = $email;
+    // hex-encode the mailto link
+        return '<a href="'
+               # Safari doesn't allow the "mailto:" to be encoded, too
+               #.'&#x00'.rtrim(chunk_split(bin2hex('mailto:'), 2, ';&#x00'), '&#x00')
+               .'mailto:'
+               .'%'.rtrim(chunk_split(bin2hex($email), 2, '%'), '%')
+               .$query
+               .'">'
+               .'&#x00'.rtrim(chunk_split(bin2hex($title), 2, ';&#x00'), '&#x00')
+               .'</a>';
+
+    }
+
+/**
  * DEBUG:
  *  prints out a piece of data
 /**/
