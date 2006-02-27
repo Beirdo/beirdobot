@@ -28,39 +28,69 @@
 
 #include <stdio.h>
 #include <string.h>
+#include <stdarg.h>
 #include <mysql.h>
 #include <stdlib.h>
 #include "botnet.h"
 #include "environment.h"
 #include "structs.h"
 #include "protos.h"
+#include "protected_data.h"
 
 static char ident[] _UNUSED_ =
     "$Id$";
 
-static MYSQL *sql;
+typedef struct {
+    MYSQL  *sql;
+    char    sqlbuf[MAX_STRING_LENGTH];
+    int     buflen;
+} MysqlData_t;
 
-static char sqlbuf[MAX_STRING_LENGTH] _UNUSED_;
+static ProtectedData_t *sql;
 
 /* Internal protos */
 char *db_quote(char *string);
+MYSQL_RES *db_query( char *format, ... );
 
 
 void db_setup(void)
 {
-    if( !(sql = mysql_init(NULL)) ) {
+    MysqlData_t    *item;
+
+    item = (MysqlData_t *)malloc(sizeof(MysqlData_t));
+    if( !item ) {
+        fprintf(stderr, "Unable to create a MySQL structure||\n");
+        exit(1);
+    }
+
+    sql = ProtectedDataCreate();
+    if( !sql ) {
+        fprintf(stderr, "Unable to create a MySQL protected structure||\n");
+        exit(1);
+    }
+
+    sql->data = (void *)item;
+
+    item->buflen = MAX_STRING_LENGTH;
+
+    if( !(item->sql = mysql_init(NULL)) ) {
         fprintf(stderr, "Unable to initialize a MySQL structure!!\n");
         exit(1);
     }
 
     printf("Using database %s at %s:%d\n", mysql_db, mysql_host, mysql_portnum);
 
-    if( !mysql_real_connect(sql, mysql_host, mysql_user, mysql_password, 
+    if( !mysql_real_connect(item->sql, mysql_host, mysql_user, mysql_password, 
                             mysql_db, mysql_port, NULL, 0) ) {
         fprintf(stderr, "Unable to connect to the database\n");
-        mysql_error(sql);
+        mysql_error(item->sql);
         exit(1);
     }
+}
+
+void db_thread_init( void )
+{
+    mysql_thread_init();
 }
 
 char *db_quote(char *string)
@@ -96,6 +126,29 @@ char *db_quote(char *string)
 }
 
 
+MYSQL_RES *db_query( char *format, ... )
+{
+    MYSQL_RES      *res;
+    MysqlData_t    *item;
+    va_list         arguments;
+
+    ProtectedDataLock( sql );
+
+    item = (MysqlData_t *)sql->data;
+
+    va_start( arguments, format );
+    vsnprintf( item->sqlbuf, item->buflen, format, arguments );
+    va_end( arguments );
+    item->sqlbuf[item->buflen-1] = '\0';
+
+    mysql_query(item->sql, item->sqlbuf);
+    res = mysql_store_result(item->sql);
+
+    ProtectedDataUnlock( sql );
+
+    return( res );
+}
+
 void db_load_servers(void)
 {
     IRCServer_t    *server;
@@ -104,12 +157,10 @@ void db_load_servers(void)
     MYSQL_RES      *res;
     MYSQL_ROW       row;
 
-    strcpy(sqlbuf, "SELECT `serverid`, `server`, `port`, `nick`, `username`, "
-                   "`realname`, `nickserv`, `nickservmsg` FROM `servers` "
-                   "ORDER BY `serverid`" );
-    mysql_query(sql, sqlbuf);
+    res = db_query( "SELECT `serverid`, `server`, `port`, `nick`, `username`, "
+                    "`realname`, `nickserv`, `nickservmsg` FROM `servers` "
+                    "ORDER BY `serverid`" );
 
-    res = mysql_store_result(sql);
     if( !res || !(count = mysql_num_rows(res)) ) {
         mysql_free_result(res);
         return;
@@ -156,13 +207,10 @@ void db_load_channels(void)
     for( item = ServerList->head; item; item = item->next ) {
         server = (IRCServer_t *)item;
 
-        sprintf(sqlbuf, "SELECT `chanid`, `channel`, `url`, `notifywindow`, "
+        res = db_query( "SELECT `chanid`, `channel`, `url`, `notifywindow`, "
                         "`cmdChar` "
                         "FROM `channels` WHERE `serverid` = %d "
                         "ORDER BY `chanid`", server->serverId );
-        mysql_query(sql, sqlbuf);
-
-        res = mysql_store_result(sql);
         if( !res || !(count = mysql_num_rows(res)) ) {
             mysql_free_result(res);
             continue;
@@ -229,6 +277,7 @@ void db_load_channels(void)
 void db_add_logentry( IRCChannel_t *channel, char *nick, IRCMsgType_t msgType, 
                       char *text )
 {
+    MYSQL_RES      *res;
     char           *nickOnly;
     char           *nickQuoted;
     char           *textQuoted;
@@ -251,14 +300,13 @@ void db_add_logentry( IRCChannel_t *channel, char *nick, IRCMsgType_t msgType,
     }
 
     if( nickQuoted && textQuoted ) {
-        sprintf( sqlbuf, "INSERT INTO `irclog` (`chanid`, `timestamp`, "
-                         "`nick`, `msgtype`, `message`) "
-                         "VALUES ( %d, UNIX_TIMESTAMP(NOW()), '%s', %d, '%s' )",
-                         channel->channelId, nickQuoted, msgType, textQuoted );
+        res = db_query( "INSERT INTO `irclog` (`chanid`, `timestamp`, "
+                        "`nick`, `msgtype`, `message`) "
+                        "VALUES ( %d, UNIX_TIMESTAMP(NOW()), '%s', %d, '%s' )",
+                        channel->channelId, nickQuoted, msgType, textQuoted );
+        mysql_free_result(res);
         free(nickQuoted);
         free(textQuoted);
-
-        mysql_query(sql, sqlbuf);
     }
 }
 
@@ -295,38 +343,36 @@ void db_update_nick( IRCChannel_t *channel, char *nick, bool present,
         return;
     }
 
-    sprintf( sqlbuf, "SELECT * FROM `nicks` WHERE `chanid` = %d AND "
-                     "`nick` = '%s'", channel->channelId, nickQuoted );
-    mysql_query(sql, sqlbuf);
-
-    res = mysql_store_result(sql);
+    res = db_query( "SELECT * FROM `nicks` WHERE `chanid` = %d AND "
+                    "`nick` = '%s'", channel->channelId, nickQuoted );
     if( !res || !(count = mysql_num_rows(res)) ) {
         count = 0;
     }
     mysql_free_result(res);
 
     if( count ) {
-        sprintf( sqlbuf, "UPDATE `nicks` "
-                         "SET `lastseen` = UNIX_TIMESTAMP(NOW()), "
-                         "`present` = %d WHERE `chanid` = %d AND "
-                         "`nick` = '%s'",
-                         present, channel->channelId, nickQuoted );
+        res = db_query( "UPDATE `nicks` "
+                        "SET `lastseen` = UNIX_TIMESTAMP(NOW()), "
+                        "`present` = %d WHERE `chanid` = %d AND "
+                        "`nick` = '%s'",
+                        present, channel->channelId, nickQuoted );
     } else {
-        sprintf( sqlbuf, "INSERT INTO `nicks` (`chanid`, `nick`, `lastseen`, "
-                         "`lastnotice`, `present`) "
-                         "VALUES ( %d, '%s', UNIX_TIMESTAMP(NOW()), 0,  %d )",
-                         channel->channelId, nickQuoted, present );
+        res = db_query( "INSERT INTO `nicks` (`chanid`, `nick`, `lastseen`, "
+                        "`lastnotice`, `present`) "
+                        "VALUES ( %d, '%s', UNIX_TIMESTAMP(NOW()), 0,  %d )",
+                        channel->channelId, nickQuoted, present );
     }
+    mysql_free_result(res);
     free(nickQuoted);
-
-    mysql_query(sql, sqlbuf);
 }
 
 void db_flush_nicks( IRCChannel_t *channel )
 {
-    sprintf( sqlbuf, "UPDATE `nicks` SET `present` = 0 WHERE `chanid` = %d",
-                     channel->channelId );
-    mysql_query(sql, sqlbuf);
+    MYSQL_RES          *res;
+
+    res = db_query( "UPDATE `nicks` SET `present` = 0 WHERE `chanid` = %d",
+                    channel->channelId );
+    mysql_free_result(res);
 }
 
 void db_flush_nick( IRCServer_t *server, char *nick, IRCMsgType_t type, 
@@ -349,14 +395,12 @@ void db_flush_nick( IRCServer_t *server, char *nick, IRCMsgType_t type,
 
     nickQuoted = db_quote(nickOnly);
 
-    sprintf(sqlbuf, "SELECT DISTINCT `nicks`.`chanid` FROM `nicks`, `channels` "
+    res = db_query( "SELECT DISTINCT `nicks`.`chanid` FROM `nicks`, `channels` "
                     "WHERE `nicks`.`chanid` = `channels`.`chanid` AND "
                     "`channels`.`serverid` = %d AND `nicks`.`nick` = '%s'",
                     server->serverId, nickQuoted );
     free( nickQuoted );
-    mysql_query(sql, sqlbuf);
 
-    res = mysql_store_result(sql);
     if( !res || !(count = mysql_num_rows(res)) ) {
         mysql_free_result(res);
         return;
@@ -396,19 +440,13 @@ bool db_check_nick_notify( IRCChannel_t *channel, char *nick, int hours )
         return( false );
     }
 
-    sprintf( sqlbuf, "SELECT `lastnotice` FROM `nicks` WHERE "
-                     "`chanid` = %d AND `nick` = '%s' AND "
-                     "`lastnotice` <= UNIX_TIMESTAMP(NOW()) - (3600 * %d)",
-                     channel->channelId, nickQuoted, hours );
+    res = db_query( "SELECT `lastnotice` FROM `nicks` WHERE "
+                    "`chanid` = %d AND `nick` = '%s' AND "
+                    "`lastnotice` <= UNIX_TIMESTAMP(NOW()) - (3600 * %d)",
+                    channel->channelId, nickQuoted, hours );
     free(nickQuoted);
-    mysql_query(sql, sqlbuf);
 
-    res = mysql_store_result(sql);
-    if( !res || !(count = mysql_num_rows(res)) ) {
-        mysql_free_result(res);
-        return( false );
-    }
-
+    count = ( res ? mysql_num_rows(res) : 0 );
     mysql_free_result(res);
 
     if( count ) {
@@ -420,6 +458,7 @@ bool db_check_nick_notify( IRCChannel_t *channel, char *nick, int hours )
 
 void db_notify_nick( IRCChannel_t *channel, char *nick )
 {
+    MYSQL_RES      *res;
     char           *nickQuoted;
 
     nickQuoted = db_quote(nick);
@@ -428,10 +467,10 @@ void db_notify_nick( IRCChannel_t *channel, char *nick )
         return;
     }
 
-    sprintf( sqlbuf, "UPDATE `nicks` SET `lastnotice` = UNIX_TIMESTAMP(NOW()) "
-                     "WHERE `chanid` = %d AND `nick` = '%s'",
-                     channel->channelId, nickQuoted );
-    mysql_query(sql, sqlbuf);
+    res = db_query( "UPDATE `nicks` SET `lastnotice` = UNIX_TIMESTAMP(NOW()) "
+                    "WHERE `chanid` = %d AND `nick` = '%s'",
+                    channel->channelId, nickQuoted );
+    mysql_free_result(res);
 }
 
 
@@ -450,11 +489,8 @@ BalancedBTree_t *db_get_plugins( void )
         return( tree );
     }
     
-    sprintf(sqlbuf, "SELECT `pluginName`, `libName`, `preload`, `arguments` "
+    res = db_query( "SELECT `pluginName`, `libName`, `preload`, `arguments` "
                     "FROM `plugins`" );
-    mysql_query(sql, sqlbuf);
-
-    res = mysql_store_result(sql);
     if( !res || !(count = mysql_num_rows(res)) ) {
         mysql_free_result(res);
         return( tree );
@@ -522,13 +558,11 @@ char *db_get_seen( IRCChannel_t *channel, char *nick )
         return( false );
     }
 
-    sprintf( sqlbuf, "SELECT UNIX_TIMESTAMP(NOW()) - `lastseen`, `present` "
-                     "FROM `nicks` WHERE `chanid` = %d AND `nick` = '%s'",
-                     channel->channelId, nickQuoted );
+    res = db_query( "SELECT UNIX_TIMESTAMP(NOW()) - `lastseen`, `present` "
+                    "FROM `nicks` WHERE `chanid` = %d AND `nick` = '%s'",
+                    channel->channelId, nickQuoted );
     free(nickQuoted);
-    mysql_query(sql, sqlbuf);
 
-    res = mysql_store_result(sql);
     if( !res || !(count = mysql_num_rows(res)) ) {
         mysql_free_result(res);
         result = (char *)malloc(strlen(nick) + 25);
@@ -594,6 +628,31 @@ char *db_get_seen( IRCChannel_t *channel, char *nick )
     }
 
     return( result );
+}
+
+char *db_get_setting( char *name )
+{
+    int             count;
+    MYSQL_RES      *res;
+    MYSQL_ROW       row;
+    char           *value;
+
+    if( !name ) {
+        return( NULL );
+    }
+
+    res = db_query( "SELECT `value` "
+                    "FROM `settings` WHERE `name` = '%s' LIMIT 1", name );
+    if( !res || !(count = mysql_num_rows(res)) ) {
+        mysql_free_result(res);
+        return( NULL );
+    }
+
+    row = mysql_fetch_row(res);
+    value = strdup(row[0]);
+    mysql_free_result(res);
+
+    return( value );
 }
 
 

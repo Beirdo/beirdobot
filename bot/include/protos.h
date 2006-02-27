@@ -50,7 +50,9 @@ extern bool Daemon;
 /* Prototypes */
 const char *svn_version(void);
 void bot_start(void);
+
 void db_setup(void);
+void db_thread_init( void );
 void db_load_servers(void);
 void db_load_channels(void);
 void db_add_logentry( IRCChannel_t *channel, char *nick, IRCMsgType_t msgType, 
@@ -63,6 +65,7 @@ void db_flush_nick( IRCServer_t *server, char *nick, IRCMsgType_t type,
 bool db_check_nick_notify( IRCChannel_t *channel, char *nick, int hours );
 void db_notify_nick( IRCChannel_t *channel, char *nick );
 char *db_get_seen( IRCChannel_t *channel, char *nick );
+char *db_get_setting( char *name );
 
 IRCChannel_t *FindChannelNum( IRCServer_t *server, int channum );
 void botCmd_initialize( void );

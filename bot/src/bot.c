@@ -516,6 +516,8 @@ void *bot_server_thread(void *arg)
         return(NULL);
     }
 
+    db_thread_init();
+
     Info = &server->ircInfo;
 
     memset(Info, 0, sizeof(BN_TInfo));
