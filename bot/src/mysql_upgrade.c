@@ -73,19 +73,20 @@ void db_check_schema(void)
     printed = FALSE;
     do {
         verString = db_get_setting("dbSchema");
-
         if( !verString ) {
             ver = 0;
         } else {
             ver = atoi( verString );
             free( verString );
         }
+
+        if( !printed ) {
+            fprintf( stderr, "Current database schema version %d\n", ver );
+            fprintf( stderr, "Code supports version %d\n", CURRENT_SCHEMA );
+            printed = TRUE;
+        }
+
         if( ver < CURRENT_SCHEMA ) {
-            if( !printed ) {
-                fprintf( stderr, "Current database schema version %d, code "
-                                 "supports version %d\n", ver, CURRENT_SCHEMA );
-                printed = TRUE;
-            }
             ver = db_upgrade_schema( ver, CURRENT_SCHEMA );
         }
     } while( ver < CURRENT_SCHEMA );
