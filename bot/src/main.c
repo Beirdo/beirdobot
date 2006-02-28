@@ -65,6 +65,7 @@ int main ( int argc, char **argv )
 
     /* Setup the MySQL connection */
     db_setup();
+    db_check_schema();
 
     /* Setup the bot commands */
     botCmd_initialize();

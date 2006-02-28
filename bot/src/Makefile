@@ -18,7 +18,7 @@ LIBS	+= $(shell ${PCRECFG} --libs)
 LIBS    += -ldl
 
 SRCS	= main.c plugin_api.c bot.c bot_cmds.c mysql.c linked_list.c regexp.c
-SRCS    += balanced_btree.c protected_data.c
+SRCS    += balanced_btree.c protected_data.c mysql_upgrade.c
 OBJS	= ${SRCS:.c=.o}
 EXE	= beirdobot
 

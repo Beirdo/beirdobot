@@ -655,6 +655,37 @@ char *db_get_setting( char *name )
     return( value );
 }
 
+void db_set_setting( char *name, char *format, ... )
+{
+    int             count;
+    MYSQL_RES      *res;
+    char            value[256];
+    va_list         arguments;
+
+    if( !name || !format ) {
+        return;
+    }
+
+    va_start( arguments, format );
+    vsnprintf( value, 256, format, arguments );
+    va_end( arguments );
+
+    res = db_query( "SELECT `value` FROM `settings` WHERE `name` = '%s' "
+                    "LIMIT 1", name );
+    if( !res || !(count = mysql_num_rows(res)) ) {
+        count = 0;
+    }
+    mysql_free_result(res);
+
+    if( count ) {
+        res = db_query( "UPDATE `settings` SET `value` = '%s' "
+                        "WHERE `name` = '%s'", value, name );
+    } else {
+        res = db_query( "INSERT INTO `settings` (`name`, `value`) "
+                        "VALUES ( '%s', '%s' )", name, value );
+    }
+    mysql_free_result(res);
+}
 
 /*
  * vim:ts=4:sw=4:ai:et:si:sts=4

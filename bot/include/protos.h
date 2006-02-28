@@ -66,6 +66,8 @@ bool db_check_nick_notify( IRCChannel_t *channel, char *nick, int hours );
 void db_notify_nick( IRCChannel_t *channel, char *nick );
 char *db_get_seen( IRCChannel_t *channel, char *nick );
 char *db_get_setting( char *name );
+void db_set_setting( char *name, char *format, ... );
+void db_check_schema(void);
 
 IRCChannel_t *FindChannelNum( IRCServer_t *server, int channum );
 void botCmd_initialize( void );
