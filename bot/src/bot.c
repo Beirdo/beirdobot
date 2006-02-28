@@ -236,6 +236,7 @@ void ProcOnWho(BN_PInfo I, const char Channel[], const char *Info[],
 
         nick = (char *)Info[i + 0];
         db_update_nick( channel, nick, true, false );
+        db_nick_history( channel, nick, HIST_INITIAL );
         if( strcmp( channel->url, "" ) && 
             db_check_nick_notify( channel, nick, channel->notifywindow ) ) {
             snprintf( string, MAX_STRING_LENGTH, 
@@ -315,14 +316,17 @@ void ProcOnKick(BN_PInfo I, const char Chan[], const char Who[],
 {
     char           *string;
     IRCChannel_t   *channel;
+    char            nick[256];
 
     string = (char *)malloc(MAX_STRING_LENGTH);
+    BN_ExtractNick(Whom, nick, 256);
     sprintf(string, "%s has been kicked from %s by %s (%s)\n", Whom, Chan, Who,
                     Msg);
 
     channel = FindChannel((IRCServer_t *)I->User, Chan);
     db_add_logentry( channel, (char *)Who, TYPE_KICK, string );
-    db_update_nick( channel, (char *)Who, false, true );
+    db_update_nick( channel, nick, false, false );
+    db_nick_history( channel, nick, HIST_LEAVE );
     free( string );
 }
 
@@ -397,7 +401,8 @@ void ProcOnJoin(BN_PInfo I, const char Chan[], const char Who[])
 
     channel = FindChannel((IRCServer_t *)I->User, Chan);
     db_add_logentry( channel, (char *)Who, TYPE_JOIN, string );
-    db_update_nick( channel, (char *)Who, true, true );
+    db_update_nick( channel, nick, true, false );
+    db_nick_history( channel, nick, HIST_JOIN );
 
     if( strcmp( channel->url, "" ) && 
         db_check_nick_notify( channel, nick, channel->notifywindow ) ) {
@@ -424,7 +429,8 @@ void ProcOnPart(BN_PInfo I, const char Chan[], const char Who[],
 
     channel = FindChannel((IRCServer_t *)I->User, Chan);
     db_add_logentry( channel, (char *)Who, TYPE_PART, string );
-    db_update_nick( channel, (char *)Who, false, true );
+    db_update_nick( channel, nick, false, false );
+    db_nick_history( channel, nick, HIST_LEAVE );
     free( string );
 }
 

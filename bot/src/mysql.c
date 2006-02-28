@@ -411,8 +411,10 @@ void db_flush_nick( IRCServer_t *server, char *nick, IRCMsgType_t type,
 
         channel = FindChannelNum( server, atoi(row[0]) );
         db_update_nick( channel, nickOnly, false, false );
+        db_nick_history( channel, nickOnly, HIST_LEAVE );
         if( newNick ) {
             db_update_nick( channel, newNick, true, false );
+            db_nick_history( channel, newNick, HIST_JOIN );
         }
         db_add_logentry( channel, nick, type, text );
     }
@@ -454,6 +456,25 @@ bool db_check_nick_notify( IRCChannel_t *channel, char *nick, int hours )
     } else {
         return( false );
     }
+}
+
+void db_nick_history( IRCChannel_t *channel, char *nick, NickHistory_t type )
+{
+    MYSQL_RES      *res;
+    char           *nickQuoted;
+
+    if( !channel || !nick ) {
+        return;
+    }
+
+    nickQuoted = db_quote(nick);
+
+    res = db_query( "INSERT INTO `nickhistory` "
+                    "( `chanid`, `nick`, `histType`, `timestamp` )"
+                    "VALUES ( %d, '%s', %d, UNIX_TIMESTAMP(NOW()) )",
+                    channel->channelId, nickQuoted, type );
+    mysql_free_result(res);
+    free(nickQuoted);
 }
 
 void db_notify_nick( IRCChannel_t *channel, char *nick )

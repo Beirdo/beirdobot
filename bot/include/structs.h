@@ -115,6 +115,12 @@ typedef struct {
     RegexpFunc_t        func;
 } Regexp_t;
 
+typedef enum {
+    HIST_INITIAL,
+    HIST_JOIN,
+    HIST_LEAVE
+} NickHistory_t;
+
 #endif
 
 /*
