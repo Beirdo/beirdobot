@@ -100,7 +100,8 @@ class irc_channel {
                             FROM irclog
                            WHERE chanid=?
                                  AND timestamp >= ?
-                                 AND timestamp <= ?',
+                                 AND timestamp <= ?
+                        ORDER BY timestamp ASC',
                          $this->chanid,
                          $from,
                          $to
@@ -113,7 +114,9 @@ class irc_channel {
     }
 
 /**
- * Load all currently in this channel.
+ * Load all nicks currently in this channel, or those at time $time
+ *
+ * @param int $time The requested timestamp to pull the user list from.
 /**/
     function load_users($time=NULL) {
         global $db;
@@ -134,16 +137,27 @@ class irc_channel {
         }
     // If not now, we need to do some heavier math
         else {
-            $sh = $db->query('SELECT nicks.*,
-                                     IF(SUM(IF(irclog.msgtype=6, 1, -1)) > 0, 1, 0) AS present
-                                FROM nicks, irclog
-                               WHERE irclog.nick = nicks.nick
-                                     AND irclog.timestamp <= ?
-                                     AND irclog.chanid = ?
-                                     AND irclog.msgtype IN (6, 7)
-                            GROUP BY irclog.nick',
-                             $time,
-                             $this->chanid
+        // First, we find the most recent bot login before the requested time period
+            $start = $db->query_col('SELECT MAX(timestamp)
+                                       FROM nickhistory
+                                      WHERE chanid = ?
+                                            AND timestamp <= ?
+                                            AND histType   = 0',
+                                    $this->chanid,
+                                    $time);
+            if (empty($start))
+                $start = 0;
+        // Then we query everything
+            $sh = $db->query('SELECT *,
+                                     IF(SUM(IF(histType<=2, 1, -1)) > 0, 1, 0) AS present
+                                FROM nickhistory
+                               WHERE chanid = ?
+                                     AND timestamp >= ?
+                                     AND timestamp <= ?
+                            GROUP BY nick',
+                             $this->chanid,
+                             $start,
+                             $time
                             );
             while ($row = $sh->fetch_assoc()) {
                 $this->users[$row['nick']] = $row;

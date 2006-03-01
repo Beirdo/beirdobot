@@ -15,15 +15,15 @@
 /**/
 
 // Define some message-related contstants
-    define('MSG_NORMAL',  0);
-    define('MSG_ACTION',  1);
-    define('MSG_UNKNOWN', 2);
-    define('MSG_UNKNOWN', 3);
-    define('MSG_MODE',    4);
-    define('MSG_UNKNOWN', 5);
-    define('MSG_JOIN',    6);
-    define('MSG_LEAVE',   7);
-    define('MSG_SYSTEM',  8);
+    define('MSG_NORMAL', 0);
+    define('MSG_ACTION', 1);
+    define('MSG_TOPIC',  2);
+    define('MSG_KICK',   3);
+    define('MSG_MODE',   4);
+    define('MSG_NICK',   5);
+    define('MSG_JOIN',   6);
+    define('MSG_PART',   7);
+    define('MSG_QUIT',   8);
 
 /**
  * Class to hold an individual IRC message

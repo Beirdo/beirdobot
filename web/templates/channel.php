@@ -11,7 +11,7 @@
  *
 /**/
 // Set the desired page title
-$page_title = 'Beirdobot, '.$Channel->server->server.' :: '.$Channel->channel;
+    $page_title = 'Beirdobot, '.$Channel->server->server.' :: '.$Channel->channel;
 
 // Custom headers
     $headers[] = '<link rel="stylesheet" type="text/css" href="'.skin_url.'/channel.css" />';
@@ -47,6 +47,10 @@ $page_title = 'Beirdobot, '.$Channel->server->server.' :: '.$Channel->channel;
 ?>
 </p>
 
+<p>
+<a href="<?php echo root, 'channel/', $Channel->chanid, '/history' ?>">Daily chat history</a>
+</p>
+
 <table border="1">
 <?php
     if (empty($Channel->messages)) {
@@ -56,7 +60,8 @@ $page_title = 'Beirdobot, '.$Channel->server->server.' :: '.$Channel->channel;
         foreach ($Channel->messages as $message) {
 ?>
 <tr>
-    <td nowrap valign="top"><?php echo date('Y-m-d H:m:s', $message->timestamp) ?></td>
+    <td nowrap valign="top"><?php echo $message->timestamp ?></td>
+    <td nowrap valign="top"><?php echo date('Y-m-d H:i:s', $message->timestamp) ?></td>
 <?php
             switch ($message->msgtype) {
                 case MSG_NORMAL:
@@ -66,10 +71,13 @@ $page_title = 'Beirdobot, '.$Channel->server->server.' :: '.$Channel->channel;
                 case MSG_ACTION:
                     echo '<td colspan="2"><b>** ', $message->nick, ' ', $message->message, ' **</b></td>';
                     break;
+                case MSG_TOPIC:
+                case MSG_KICK:
                 case MSG_MODE:
+                case MSG_NICK:
                 case MSG_JOIN:
-                case MSG_LEAVE:
-                case MSG_SYSTEM:
+                case MSG_PART:
+                case MSG_QUIT:
                 default:
                     echo '<td colspan="2"><i>', $message->message, '</i></td>';
             }
