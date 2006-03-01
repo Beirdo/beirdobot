@@ -32,7 +32,7 @@
 static char db_schema_h_ident[] _UNUSED_ = 
     "$Id$";
 
-#define CURRENT_SCHEMA  2
+#define CURRENT_SCHEMA  3
 
 
 char *defSchema[] = {
@@ -101,7 +101,7 @@ char *defSchema[] = {
 "  `nick` varchar(64) NOT NULL default '',\n"
 "  `histType` int(11) NOT NULL default '0',\n"
 "  `timestamp` int(11) NOT NULL default '0',\n"
-"  PRIMARY KEY  (`chanid`,`nick`,`histType`,`timestamp`)\n"
+"  PRIMARY KEY  (`chanid`,`histType`,`timestamp`,`nick`)\n"
 ") TYPE=MyISAM;\n"
 };
 int defSchemaCount = NELEMENTS(defSchema);

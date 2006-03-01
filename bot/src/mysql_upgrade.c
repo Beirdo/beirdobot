@@ -55,6 +55,11 @@ SchemaUpgrade_t schemaUpgrade[CURRENT_SCHEMA] = {
         "  PRIMARY KEY  (`chanid`,`nick`,`histType`,`timestamp`)\n"
         ") TYPE=MyISAM;\n",
         NULL
+    },
+    /* 2 -> 3 */
+    {
+        "ALTER TABLE `nickhistory` DROP PRIMARY KEY ,\n"
+        "ADD PRIMARY KEY ( `chanid` , `histType` , `timestamp` , `nick` );\n"
     }
 };
 

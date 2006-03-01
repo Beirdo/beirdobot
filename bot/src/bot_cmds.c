@@ -25,12 +25,12 @@
 */
 
 /* INCLUDE FILES */
+#include "environment.h"
 #include <pthread.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include "botnet.h"
-#include "environment.h"
 #include "structs.h"
 #include "protos.h"
 

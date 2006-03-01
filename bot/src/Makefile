@@ -4,9 +4,8 @@ PCRECFG		= pcre-config
 
 CC	= gcc
 
-CFLAGS	= -O6 -g -Wall -Werror -I../include
+CFLAGS	= -O6 -g -Wall -Werror -I../include -std=c99 -pedantic 
 # -DDEBUG
-#-ansi -pedantic 
 CFLAGS	+= $(shell ${MYSQLCFG} --cflags)
 CFLAGS  += $(shell ${BOTNETCFG} --cflags)
 CFLAGS  += $(shell ${PCRECFG} --cflags)
@@ -20,23 +19,33 @@ LIBS    += -ldl
 SRCS	= main.c plugin_api.c bot.c bot_cmds.c mysql.c linked_list.c regexp.c
 SRCS    += balanced_btree.c protected_data.c mysql_upgrade.c
 OBJS	= ${SRCS:.c=.o}
+DEPS	= ${SRCS:.c=.d}
 EXE	= beirdobot
 
-.PHONY:	plugins
+.PHONY:	plugins clean cleanall
 
 all:	${EXE} plugins
 
 plugins:
 	${MAKE} -C plugins all
 
-%.o:	%.c
-	${CC} ${CFLAGS} -c -o $@ $<
-
 ${EXE}:	${OBJS}
 	${CC} ${LDFLAGS} -o $@ $+ ${LIBS}
+
+depend:		${DEPS}
+${DEPS}:	Makefile
+
+%.d: %.c
+	@echo "Making $@ (dependencies for $<)"
+	@${CC} -MM ${CFLAGS} $< | sed 's,\($*\)\.o[ :]*,\1.o $@ : ,g'  > $@
 
 clean:
 	${RM} ${OBJS} ${EXE}
 	${MAKE} -C plugins clean
 
-main.o:	main.c ../include/release.h
+cleanall:	clean
+	${RM} ${DEPS}
+	${MAKE} -C plugins cleanall
+
+-include ${DEPS}
+

@@ -3,9 +3,8 @@ MYSQLCFG	= mysql_config
 
 CC	= gcc
 
-CFLAGS	= -O6 -g -Wall -Werror -I../../include
+CFLAGS	= -O6 -g -Wall -Werror -I../../include -std=c99 -pedantic
 # -DDEBUG
-#-ansi -pedantic 
 CFLAGS	+= $(shell ${MYSQLCFG} --cflags)
 CFLAGS  += $(shell ${BOTNETCFG} --cflags)
 
@@ -13,17 +12,29 @@ LDFLAGS = -g
 LIBS	= $(shell ${MYSQLCFG} --libs_r)
 LIBS	+= $(shell ${BOTNETCFG} --libs-static)
 
-SRCS	= 
-OBJS	= ${SRCS:.c=.o}
-PLUGINS	= plugin_trout.so plugin_fart.so
+SRCS	= trout.c fart.c
+OBJS	= ${SRCS:%.c=plugin_%.so}
+DEPS	= ${SRCS:.c=.d}
 
-all:	${PLUGINS}
+.PHONY:	clean cleanall
 
-%.o:	%.c
-	${CC} ${CFLAGS} -c -o $@ $<
+all:	${OBJS}
 
 plugin_%.so:	%.c
 	${CC} ${CFLAGS} -fPIC -shared -o $@ $<
 
+depend:		${DEPS}
+${DEPS}:	Makefile
+
+%.d: %.c
+	@echo "Making $@ (dependencies for $<)"
+	@${CC} -MM ${CFLAGS} $< | sed 's,\($*\)\.o[ :]*,\1.o $@ : ,g'  > $@
+
 clean:
-	${RM} ${OBJS} ${PLUGINS}
+	${RM} ${OBJS}
+
+cleanall:	clean
+	${RM} ${DEPS}
+
+-include ${DEPS}
+

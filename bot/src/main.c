@@ -25,6 +25,7 @@
 *
 */
 
+#include "environment.h"
 #include <stdio.h>
 #include <pthread.h>
 #include <string.h>
@@ -35,7 +36,6 @@
 #include <errno.h>
 #include <getopt.h>
 #include "botnet.h"
-#include "environment.h"
 #include "protos.h"
 #include "release.h"
 

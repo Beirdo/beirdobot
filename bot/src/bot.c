@@ -30,6 +30,7 @@
  */
 
 #include "botnet.h"
+#include "environment.h"
 #include <stdio.h>
 #include <stdlib.h>
 #ifdef __unix__
@@ -38,7 +39,7 @@
 #endif
 #include <errno.h>
 #include <string.h>
-#include "environment.h"
+#include <strings.h>
 #include "protos.h"
 #include "structs.h"
 #include "linked_list.h"

@@ -161,8 +161,8 @@ void LinkedListRemove( LinkedList_t *list, LinkedListItem_t *item,
 
     if( item->list != list )
     {
-        fprintf( stderr, "Item %p not on list %p! (on %p)\n", item, list,
-                 item->list );
+        fprintf( stderr, "Item %p not on list %p! (on %p)\n", (void *)item, 
+                 (void *)list, (void *)item->list );
         return;
     }
 

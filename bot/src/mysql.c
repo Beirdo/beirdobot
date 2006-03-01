@@ -26,13 +26,13 @@
  * Handles MySQL database connections
  */
 
+#include "environment.h"
 #include <stdio.h>
 #include <string.h>
 #include <stdarg.h>
 #include <mysql.h>
 #include <stdlib.h>
 #include "botnet.h"
-#include "environment.h"
 #include "structs.h"
 #include "protos.h"
 #include "protected_data.h"

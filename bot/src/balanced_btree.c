@@ -188,8 +188,8 @@ void BalancedBTreeRemove( BalancedBTree_t *btree, BalancedBTreeItem_t *item,
 
     if( item != NULL && item->btree != btree )
     {
-        fprintf( stderr, "Item %p not on btree %p! (on %p)\n", item, btree,
-                 item->btree );
+        fprintf( stderr, "Item %p not on btree %p! (on %p)\n", (void *)item, 
+                 (void *)btree, (void *)item->btree );
         return;
     }
 
