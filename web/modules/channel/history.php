@@ -21,11 +21,6 @@
 // One day, in seconds
     define('day_in_seconds',  60 * 60 * 24);
 
-// Round back to the nearest day (adjust for timezone differences)
-    $min = day_in_seconds * intVal($min / day_in_seconds) - date('Z');
-    $max = day_in_seconds * intVal($max / day_in_seconds);
-
-
 /**
  * @global  array    $GLOBALS['Years']
  * @name    $Years
@@ -34,7 +29,10 @@
 
 // Start counting
     while ($min <= $max) {
-        $Years[date('Y', $min)][date('n', $min)][] = $min;
+    // Round back to the nearest day and adjust for timezone differences.
+        $t = day_in_seconds * intVal($min / day_in_seconds) - date('Z');
+        $Years[date('Y', $t)][date('n', $t)][] = $t;
+    // On to the next
         $min += day_in_seconds;
     }
 
