@@ -60,11 +60,16 @@
             echo "<tr><td>No activity has been logged in the last 15 minutes.</td></tr>";
     }
     else {
+        $last_day = null;
         foreach ($Channel->messages as $message) {
+            $day = date('l, F jS, Y', $message->timestamp);
+            if ($day != $last_day) {
+                $last_day = $day;
+                echo "<tr>\n    <th nowrap colspan=\"3\">$day</th>\n</tr>";
+            }
 ?>
 <tr>
-    <td nowrap valign="top"><?php echo $message->timestamp ?></td>
-    <td nowrap valign="top"><?php echo date('Y-m-d H:i:s', $message->timestamp) ?></td>
+    <td nowrap valign="top"><?php echo date('H:i:s', $message->timestamp) ?></td>
 <?php
             switch ($message->msgtype) {
                 case MSG_NORMAL:
