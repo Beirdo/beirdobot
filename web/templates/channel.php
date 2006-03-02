@@ -54,7 +54,10 @@
 <table border="1">
 <?php
     if (empty($Channel->messages)) {
-        echo "<tr><td>No activity has been logged in the last 15 minutes</td></tr>";
+        if ($_GET['start'])
+            echo "<tr><td>No activity was logged during the requested time period.</td></tr>";
+        else
+            echo "<tr><td>No activity has been logged in the last 15 minutes.</td></tr>";
     }
     else {
         foreach ($Channel->messages as $message) {

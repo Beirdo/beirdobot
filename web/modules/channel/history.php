@@ -23,7 +23,7 @@
 
 // Round back to the nearest day (adjust for timezone differences)
     $min = day_in_seconds * intVal($min / day_in_seconds) - date('Z');
-    $max = day_in_seconds * intVal($max / day_in_seconds) - date('Z');
+    $max = day_in_seconds * intVal($max / day_in_seconds);
 
 
 /**
@@ -34,7 +34,7 @@
 
 // Start counting
     while ($min <= $max) {
-        $Years[date('Y')][date('n')][] = $min;
+        $Years[date('Y', $min)][date('n', $min)][] = $min;
         $min += day_in_seconds;
     }
 
