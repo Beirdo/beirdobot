@@ -79,10 +79,12 @@
                 case MSG_ACTION:
                     echo '<td colspan="2"><b>** ', $message->nick, ' ', $message->message, ' **</b></td>';
                     break;
+                case MSG_NICK:
+                    echo '<td colspan="2"><i>', $message->nick, ' has changed nicks to ', $message->message, '</i></td>';
+                    break;
                 case MSG_TOPIC:
                 case MSG_KICK:
                 case MSG_MODE:
-                case MSG_NICK:
                 case MSG_JOIN:
                 case MSG_PART:
                 case MSG_QUIT:
