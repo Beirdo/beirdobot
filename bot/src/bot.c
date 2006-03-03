@@ -303,8 +303,7 @@ void ProcOnTopic(BN_PInfo I, const char Chan[], const char Who[],
     IRCChannel_t   *channel;
 
     string = (char *)malloc(MAX_STRING_LENGTH);
-    sprintf(string, "Topic for %s has been changed by %s (%s)\n", Chan, Who, 
-                    Msg);
+    sprintf(string, "%s changes topic to %s\n", Who, Msg);
 
     channel = FindChannel((IRCServer_t *)I->User, Chan);
     db_add_logentry( channel, (char *)Who, TYPE_TOPIC, string );
