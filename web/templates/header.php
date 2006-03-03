@@ -15,6 +15,12 @@
 <html>
 <head>
     <title><?php echo $page_title ?></title>
+
+    <link rel="stylesheet" type="text/css" href="<?php echo skin_url ?>/global.css" />
+<?php
+    if (!empty($headers))
+        echo "\n    ", implode("\n    ", $headers), "\n";
+?>
 </head>
 
 <body>

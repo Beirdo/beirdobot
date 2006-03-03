@@ -18,8 +18,8 @@
                                      GROUP BY chanid',
                                       $Channel->chanid);
 
-// One day, in seconds
-    define('day_in_seconds',  60 * 60 * 24);
+    $min = day_in_seconds * intVal(($min + date('Z')) / day_in_seconds) - date('Z');
+    $max = day_in_seconds * intVal(($max + date('Z')) / day_in_seconds) - date('Z');
 
 /**
  * @global  array    $GLOBALS['Years']
@@ -29,9 +29,11 @@
 
 // Start counting
     while ($min <= $max) {
+     #   echo date('Y-m-d H:i:s', $min).' &lt;= '.date('Y-m-d H:i:s', $max)."<br/>";
     // Round back to the nearest day and adjust for timezone differences.
-        $t = day_in_seconds * intVal($min / day_in_seconds) - date('Z');
-        $Years[date('Y', $t)][date('n', $t)][] = $t;
+        #$t = day_in_seconds * intVal($min / day_in_seconds) - date('Z');
+        #$Years[date('Y', $t)][date('n', $t)][] = $t;
+        $Years[date('Y', $min)][date('n', $min)][] = $min;
     // On to the next
         $min += day_in_seconds;
     }

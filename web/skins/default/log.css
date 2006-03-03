@@ -1,0 +1,96 @@
+/*
+ * Classes for the table cell containing the nick
+ *
+/*/
+
+table.log {
+    border:             1px solid #666;
+    border-collapse:    collapse;
+    font-size:          11pt;
+    background:         black;
+    color:              white;
+}
+
+table.log a {
+    color:              #55c;
+}
+
+table.log td {
+    border-top:     1px dotted #666;
+    border-bottom:  1px dotted #666;
+    padding:        0 .5em;
+}
+
+td.log_day {
+    font-weight:    bold;
+    background:     #303030;
+    border:         1px solid #666 !important;
+    text-align:     center;
+}
+
+tr.log_line {
+    vertical-align: top;
+}
+
+td.log_nick {
+    text-align: right;
+}
+
+td.log_timestamp {
+    border-right:   1px dotted #222;
+    color:          #755;
+}
+
+/*
+ * Classes for the table cell containing the conversation
+ *
+/*/
+
+td.msg_normal {
+}
+
+td.msg_action {
+    font-weight: bold;
+    color:      #4f4;
+}
+
+td.msg_topic {
+    font-size:  10pt;
+    background: #000019;
+    color:      #447;
+}
+
+td.msg_kick {
+    background: #160000;
+    color:      #633;
+}
+
+td.msg_mode {
+    font-size:  10pt;
+    background: #000019;
+    color:      #447;
+}
+
+td.msg_nick {
+    background: #000019;
+    color:      #447;
+}
+
+td.msg_join {
+    font-size:  10pt;
+    background: #001000;
+    color:      #353;
+}
+
+td.msg_part {
+    font-size:  10pt;
+    background: #160000;
+    color:      #633;
+}
+
+td.msg_quit {
+    font-size:  10pt;
+    background: #160000;
+    color:      #633;
+}
+

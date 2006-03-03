@@ -38,6 +38,7 @@ class irc_message {
     var $raw_message;
     var $message;
 
+    var $class;
     var $channel;
 
 /**
@@ -53,11 +54,32 @@ class irc_message {
         $this->timestamp    = $msg_vars['timestamp'];
         $this->nick         = $msg_vars['nick'];
         $this->msgtype      = $msg_vars['msgtype'];
-        $this->raw_message  = $msg_vars['message'];
+        $this->raw_message  = trim($msg_vars['message']);
     // Keep a reference to this channel's server
         $this->channel      =& $Channels[$this->chanid];
     // Make a printable version of the message text
         $this->parse_message();
+    // Build a css class
+        switch ($this->msgtype) {
+            case MSG_NORMAL:
+                $this->class = 'msg_normal';    break;
+            case MSG_ACTION:
+                $this->class = 'msg_action';    break;
+            case MSG_TOPIC:
+                $this->class = 'msg_topic';     break;
+            case MSG_KICK:
+                $this->class = 'msg_kick';      break;
+            case MSG_MODE:
+                $this->class = 'msg_mode';      break;
+            case MSG_NICK:
+                $this->class = 'msg_nick';      break;
+            case MSG_JOIN:
+                $this->class = 'msg_join';      break;
+            case MSG_PART:
+                $this->class = 'msg_part';      break;
+            case MSG_QUIT:
+                $this->class = 'msg_quit';      break;
+        }
     }
 
 /**

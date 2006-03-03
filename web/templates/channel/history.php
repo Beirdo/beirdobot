@@ -43,9 +43,7 @@
                  "                <ul>\n";
             foreach ($days as $day) {
                 echo '                <li><a href="'.root.'channel/',
-                     $Channel->chanid,
-                     '?start=', $day,
-                     '&end=',   ($day + day_in_seconds - 1),
+                     $Channel->chanid, '/', date('Y-m-d', $day),
                      '">', date('Y-m-d</\a> (l)', $day), "</li>\n";
             }
             echo "                </ul></li>\n";

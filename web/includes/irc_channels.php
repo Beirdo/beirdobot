@@ -92,6 +92,9 @@ class irc_channel {
 /**/
     function load_messages($from, $to = NULL) {
         global $db;
+    // Default the start time to this morning
+        if (is_null($from))
+            $from = mktime(0, 0, 0);
     // Default the end time to now
         if (is_null($to))
             $to = time();

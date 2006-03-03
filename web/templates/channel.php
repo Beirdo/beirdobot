@@ -15,6 +15,7 @@
 
 // Custom headers
     $headers[] = '<link rel="stylesheet" type="text/css" href="'.skin_url.'/channel.css" />';
+    $headers[] = '<link rel="stylesheet" type="text/css" href="'.skin_url.'/log.css" />';
 
 // Print the page header
     require_once 'templates/header.php';
@@ -35,7 +36,7 @@
 <b>Current users:</b>
 <?php
     if (empty($Channel->users)) {
-        echo "<tr><td>No one is currently logged into ".$Channel->channel."</td></tr>";
+        echo '<tr><td>No one is currently logged into ', $Channel->channel, "</td></tr>";
     }
     else {
         $users = array();
@@ -51,10 +52,10 @@
 <a href="<?php echo root, 'channel/', $Channel->chanid, '/history' ?>">Daily chat history</a>
 </p>
 
-<table border="1">
+<table class="log">
 <?php
     if (empty($Channel->messages)) {
-        if ($_GET['start'])
+        if ($start)
             echo "<tr><td>No activity was logged during the requested time period.</td></tr>";
         else
             echo "<tr><td>No activity has been logged in the last 15 minutes.</td></tr>";
@@ -62,26 +63,31 @@
     else {
         $last_day = null;
         foreach ($Channel->messages as $message) {
+        // Print out a nice separator between each day
             $day = date('l, F jS, Y', $message->timestamp);
             if ($day != $last_day) {
                 $last_day = $day;
-                echo "<tr>\n    <th nowrap colspan=\"3\">$day</th>\n</tr>";
+                echo "<tr class=\"log_line\">\n    <td class=\"log_day\" colspan=\"3\">$day</td>\n</tr>";
             }
+        // Now print the normal row
 ?>
-<tr>
-    <td nowrap valign="top"><?php echo date('H:i:s', $message->timestamp) ?></td>
+<tr class="log_line">
+    <td class="log_timestamp">[<?php echo date('H:i:s', $message->timestamp) ?>]</td>
 <?php
+            if ($message->msgtype == MSG_NORMAL)
+                echo '    <td class="log_nick">', $message->nick, ":</td>\n",
+                     '    <td';
+            else
+                echo '    <td colspan="2"';
+            echo ' class="', $message->class, '">';
             switch ($message->msgtype) {
-                case MSG_NORMAL:
-                    echo '<td nowrap align="right" valign="top">', $message->nick,
-                         ":</td>\n    <td>", $message->message, '</td>';
-                    break;
                 case MSG_ACTION:
-                    echo '<td colspan="2"><b>** ', $message->nick, ' ', $message->message, ' **</b></td>';
+                    echo '** ', $message->nick, ' ', $message->message, ' **';
                     break;
                 case MSG_NICK:
-                    echo '<td colspan="2"><i>', $message->nick, ' has changed nicks to ', $message->message, '</i></td>';
+                    echo $message->nick, ' has changed nicks to ', $message->message;
                     break;
+                case MSG_NORMAL:
                 case MSG_TOPIC:
                 case MSG_KICK:
                 case MSG_MODE:
@@ -89,10 +95,9 @@
                 case MSG_PART:
                 case MSG_QUIT:
                 default:
-                    echo '<td colspan="2"><i>', $message->message, '</i></td>';
+                    echo $message->message;
             }
-            echo "\n";
-?>
+    ?></td>
 </tr>
 <?php
         }

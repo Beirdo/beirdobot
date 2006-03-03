@@ -12,6 +12,9 @@
  *
 /**/
 
+// One day, in seconds
+    define('day_in_seconds',  60 * 60 * 24);
+
 /**
  * Get or set a database setting.
 /**/
