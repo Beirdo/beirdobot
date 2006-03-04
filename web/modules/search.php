@@ -70,7 +70,7 @@
     $sh->finish();
 
 // How long
-    $search_time = microtime_float() - $search_time;
+    $search_time = round(microtime_float() - $search_time, 4) + 0;
 
 // Print the page
     require 'templates/search.php';
