@@ -28,6 +28,7 @@ table.results th.channel, table.results td.channel {
 }
 
 table.results th.score, table.results td.score {
+    border-right:   1px dotted #222;
     text-align:     center;
 }
 
