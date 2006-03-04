@@ -41,8 +41,9 @@
             if ($result['channel']->server->port != 6667)
                 echo ':', $result['channel']->server->port;
             echo "</td>\n    <td class=\"channel\">",
+                 '<a href="', root, 'channel/', $result['channel']->chanid, '">',
                  $result['channel']->channel,
-                 "</td>\n    <td class=\"date\"><a href=\"",
+                 "</a></td>\n    <td class=\"date\"><a href=\"",
                                                 root, 'channel/', $result['channel']->chanid,
                                                 '/', date('Y-m-d', $result['starttime']),
                                                 '">',
