@@ -55,7 +55,7 @@
     $Results = array();
 
 // Start the timer
-    $search_time = microtime();
+    $search_time = microtime_float();
 
 // Run the query and gather the results
     $sh = $db->query($query, $params);
@@ -70,7 +70,7 @@
     $sh->finish();
 
 // How long
-    $search_time = microtime() - $search_time;
+    $search_time = microtime_float() - $search_time;
 
 // Print the page
     require 'templates/search.php';

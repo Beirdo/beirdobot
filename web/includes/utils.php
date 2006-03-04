@@ -155,6 +155,14 @@
     }
 
 /**
+ * Simple function to replicate PHP 5 behaviour
+/*/
+    function microtime_float() {
+       list($usec, $sec) = explode(' ', microtime());
+       return ((float)$usec + (float)$sec);
+    }
+
+/**
  * returns $this or $or_this
  * if $gt is set to true, $this will only be returned if it's > 0
  * if $gt is set to a number, $this will only be returned if it's > $gt
