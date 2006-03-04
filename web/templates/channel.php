@@ -79,7 +79,10 @@
                      '    <td';
             else
                 echo '    <td colspan="2"';
-            echo ' class="', $message->class, '">';
+            echo ' class="', $message->class;
+            if ($message->msgtype == MSG_ACTION)
+                echo ' nick_', $message->nick_color();
+            echo '">';
             switch ($message->msgtype) {
                 case MSG_ACTION:
                     echo '** ', $message->nick, ' ', $message->message, ' **';

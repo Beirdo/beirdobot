@@ -49,9 +49,8 @@ td.log_timestamp {
 td.msg_normal {
 }
 
-td.msg_action {
+td.msg_action { /* color is taken from the nick */
     font-weight: bold;
-    color:      #4f4;
 }
 
 td.msg_topic {
