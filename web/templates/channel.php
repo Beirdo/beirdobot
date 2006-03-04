@@ -55,7 +55,7 @@
 <table class="log">
 <?php
     if (empty($Channel->messages)) {
-        if ($start)
+        if ($end)
             echo "<tr><td>No activity was logged during the requested time period.</td></tr>";
         else
             echo "<tr><td>No activity has been logged in the last 15 minutes.</td></tr>";
@@ -64,10 +64,13 @@
         $last_day = null;
         foreach ($Channel->messages as $message) {
         // Print out a nice separator between each day
-            $day = date('l, F jS, Y', $message->timestamp);
+            $day = date('Y-m-d', $message->timestamp);
             if ($day != $last_day) {
+                echo "<tr class=\"log_line\">\n    <td class=\"log_day\" colspan=\"3\">",
+                     date($last_day ? 'l, F jS, Y' : 'l, F jS, Y, H:i T',
+                          $message->timestamp),
+                     "</td>\n</tr>";
                 $last_day = $day;
-                echo "<tr class=\"log_line\">\n    <td class=\"log_day\" colspan=\"3\">$day</td>\n</tr>";
             }
         // Now print the normal row
 ?>

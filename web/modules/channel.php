@@ -41,17 +41,21 @@
     $end = null;
 
 // Date?
-    if (preg_match('/^(\d+)-(\d+)-(\d+)$/', $Path[2], $match)) {
+    if (preg_match('/^(\d+)-(\d+)-(\d+)(?::(\d+):(\d+):(\d+))?$/', $Path[2], $match)) {
         $start = mktime(0, 0, 0, $match[2], $match[3], $match[1]);
-        if (preg_match('/^(\d+)-(\d+)-(\d+)$/', $Path[3], $match))
+        if (preg_match('/^(\d+)-(\d+)-(\d+)(?::(\d+):(\d+):(\d+))?$/', $Path[3], $match))
             $end = mktime(23, 59, 59, $match[2], $match[3], $match[1]);
         else {
             $end = $start + day_in_seconds - 1;
         }
     }
 
+// No start time -- show the most recent 15 minutes (or so)
+    if (!$start) {
+        $start = 60 * intVal((time() - (15 * 60)) / 60);
+    }
 // No end date
-    if ($start && (!$end || $start == $end)) {
+    elseif ($start && (!$end || $start == $end)) {
         $end = $start + day_in_seconds - 1;
     }
 // Out of order?
