@@ -16,6 +16,11 @@
 <head>
     <title><?php echo $page_title ?></title>
 
+    <script type="text/javascript" src="<?php echo root ?>js/utils.js"></script>
+    <script type="text/javascript" src="<?php echo root ?>js/browser.js"></script>
+    <script type="text/javascript" src="<?php echo root ?>js/visibility.js"></script>
+    <script type="text/javascript" src="<?php echo root ?>js/ajax.js"></script>
+
     <link rel="stylesheet" type="text/css" href="<?php echo skin_url ?>/global.css" >
 <?php
     if (!empty($headers))

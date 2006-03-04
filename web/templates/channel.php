@@ -24,11 +24,10 @@
 <?php
         echo $Channel->server->nick,
              '@',
-             $Channel->server->server,
-             ':',
-             $Channel->server->port,
-             ' :: ',
-             $Channel->channel;
+             $Channel->server->server;
+        if ($Channel->server->port != 6667)
+            echo ':', $Channel->server->port;
+        echo ' :: ', $Channel->channel;
 ?>
 </h3>
 

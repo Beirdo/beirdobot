@@ -1,0 +1,40 @@
+/*
+ * Classes for the search results table
+ *
+/*/
+
+table.results {
+    border:             1px solid #111;
+    border-collapse:    collapse;
+    font-size:          11pt;
+}
+
+table.results th {
+    font-weight:    bold;
+    text-align:     left;
+    border-top:     1px dotted #222;
+    border-bottom:  1px dotted #222;
+    padding:        0 .5em;
+}
+
+table.results td {
+    border-top:     1px dotted #222;
+    border-bottom:  1px dotted #222;
+    padding:        0 .5em;
+}
+
+table.results th.channel, table.results td.channel {
+    border-right:   1px dotted #222;
+}
+
+table.results th.score, table.results td.score {
+    text-align:     center;
+}
+
+table.results th.date, table.results td.date {
+    text-align:     center;
+}
+
+table.results th.time, table.results td.time {
+    text-align:     center;
+}

@@ -41,10 +41,23 @@
     $end = null;
 
 // Date?
-    if (preg_match('/^(\d+)-(\d+)-(\d+)(?::(\d+):(\d+):(\d+))?$/', $Path[2], $match)) {
-        $start = mktime(0, 0, 0, $match[2], $match[3], $match[1]);
-        if (preg_match('/^(\d+)-(\d+)-(\d+)(?::(\d+):(\d+):(\d+))?$/', $Path[3], $match))
-            $end = mktime(23, 59, 59, $match[2], $match[3], $match[1]);
+    if (preg_match('/^(\d+)-(\d+)-(\d+)(?::(\d+):(\d+)(?::(\d+))?)?$/', $Path[2], $match)) {
+        if (empty($match[4])) {
+            $match[4] = 0;
+            $match[5] = 0;
+        }
+        if (empty($match[6]))
+            $match[6] = 0;
+        $start = mktime($match[4], $match[5], $match[6], $match[2], $match[3], $match[1]);
+        if (preg_match('/^(\d+)-(\d+)-(\d+)(?::(\d+):(\d+)(?::(\d+))?)?$/', $Path[3], $match)) {
+            if (empty($match[4])) {
+                $match[4] = 23;
+                $match[5] = 59;
+            }
+            if (empty($match[6]))
+                $match[6] = 59;
+            $end = mktime($match[4], $match[5], $match[6], $match[2], $match[3], $match[1]);
+        }
         else {
             $end = $start + day_in_seconds - 1;
         }
