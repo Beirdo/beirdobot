@@ -93,6 +93,12 @@
 # Turn on the rewrite engine
     RewriteEngine  on
 
+    RewriteCond    %{QUERY_STRING}  ^date=(\d{4}-\d{2}-\d{2})$
+    RewriteRule    ^index\.php    /bot/channel/1/%1?    [L,R=permanent]
+
+    RewriteRule    ^index\.php    /bot/  [L,R=permanent]
+
+
 # Skip out early if we've already been through rewrites,
 # or if this is a /css/, /js/ or /cache/ directory request.
     RewriteRule    ^(css|images|js|themes|skins|[a-z_]+\.php)(/|$)     -     [L]

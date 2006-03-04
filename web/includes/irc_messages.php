@@ -92,19 +92,45 @@ class irc_message {
     }
 
 /**
+ * Return a color code for this nick.
+/**/
+    function nick_color() {
+        static $cache = array();
+        if (empty($cache[$this->nick])) {
+            $color = 0;
+        // PHP 5 or PHP_Compat?
+            if (function_exists('str_split')) {
+                foreach (str_split($this->nick) as $char) {
+                    $color += ord($char);
+                }
+            }
+        // Do it manually
+            else {
+                for ($i = 0; $i < strlen($this->nick); $i++) {
+                    $color += ord($this->nick[$i]);
+                }
+            }
+        // Cache
+            $cache[$this->nick] = ($color % 8) + 1;
+        }
+        return $cache[$this->nick];
+    }
+
+
+/**
  * Sets $this->message from $this->raw_message, and then performs some regex
  * magic to add links, etc.
 /**/
     function parse_message() {
-        $this->message = htmlentities($this->raw_message);
+        $this->message = html_entities($this->raw_message);
     // Only interact with certain kinds of messages
         if (!in_array($this->msgtype, array(MSG_NORMAL, MSG_ACTION)))
             return;
     // Perform some basic tag and text substitutions
 		static $reg = array(
-                        // Add links to url's
-                            '#(\w+://[^\s<>]+)#'
-                                => '<a href="$1">$1</a>',
+                        // Add links to url's (accounting for html_entities and &amp;)
+                            '#(\w+://\S+)#e'
+                                => '\'<a href="\'.str_replace(\'&amp;\', \'&\', strip_quote_slashes(\'$1\')).\'">$1</a>\'',
                         // Add links to email addresses (does only a basic scan for valid email address formats)
                             '#((?:
                                   (?:[^<>\(\)\[\]\\.,;:\s@\"]+(?:\.[^<>\(\)\[\]\\.,;:\s@\"]+)*)

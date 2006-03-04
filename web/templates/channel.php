@@ -14,8 +14,8 @@
     $page_title = 'Beirdobot, '.$Channel->server->server.' :: '.$Channel->channel;
 
 // Custom headers
-    $headers[] = '<link rel="stylesheet" type="text/css" href="'.skin_url.'/channel.css" />';
-    $headers[] = '<link rel="stylesheet" type="text/css" href="'.skin_url.'/log.css" />';
+    $headers[] = '<link rel="stylesheet" type="text/css" href="'.skin_url.'/channel.css" >';
+    $headers[] = '<link rel="stylesheet" type="text/css" href="'.skin_url.'/log.css" >';
 
 // Print the page header
     require_once 'templates/header.php';
@@ -75,7 +75,7 @@
     <td class="log_timestamp">[<?php echo date('H:i:s', $message->timestamp) ?>]</td>
 <?php
             if ($message->msgtype == MSG_NORMAL)
-                echo '    <td class="log_nick">', $message->nick, ":</td>\n",
+                echo '    <td class="log_nick nick_', $message->nick_color(),'">', $message->nick, ":</td>\n",
                      '    <td';
             else
                 echo '    <td colspan="2"';

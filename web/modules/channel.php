@@ -55,7 +55,7 @@
         $end = $start + day_in_seconds - 1;
     }
 // Out of order?
-    if ($start > $end) {
+    elseif ($start > $end) {
         $tmp   = $start;
         $start = $end;
         $end   = $tmp;

@@ -16,7 +16,7 @@
 <head>
     <title><?php echo $page_title ?></title>
 
-    <link rel="stylesheet" type="text/css" href="<?php echo skin_url ?>/global.css" />
+    <link rel="stylesheet" type="text/css" href="<?php echo skin_url ?>/global.css" >
 <?php
     if (!empty($headers))
         echo "\n    ", implode("\n    ", $headers), "\n";
@@ -25,5 +25,6 @@
 
 <body>
 
-header...
-<hr />
+<p>header...</p>
+<hr >
+

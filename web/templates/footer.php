@@ -11,8 +11,8 @@
  *
 /**/
 ?>
-<hr />
-footer...
+<hr >
+<p>footer...</p>
 
 </body>
 </html>

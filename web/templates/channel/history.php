@@ -14,7 +14,7 @@
     $page_title = 'Beirdobot, '.$Channel->server->server.' :: '.$Channel->channel;
 
 // Custom headers
-    $headers[] = '<link rel="stylesheet" type="text/css" href="'.skin_url.'/channel.css" />';
+    $headers[] = '<link rel="stylesheet" type="text/css" href="'.skin_url.'/channel.css" >';
 
 // Print the page header
     require_once 'templates/header.php';

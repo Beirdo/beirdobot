@@ -94,3 +94,16 @@ td.msg_quit {
     color:      #633;
 }
 
+/*
+ * Various classes for colors of nicks
+/*/
+
+td.nick_1 { color: #f6f; }
+td.nick_2 { color: #ff0; }
+td.nick_3 { color: #f90; }
+td.nick_4 { color: #2f2; }
+td.nick_5 { color: #96f; }
+td.nick_6 { color: #88f; }
+td.nick_7 { color: #4ff; }
+td.nick_8 { color: #f21; }
+
