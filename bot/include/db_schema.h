@@ -32,7 +32,7 @@
 static char db_schema_h_ident[] _UNUSED_ = 
     "$Id$";
 
-#define CURRENT_SCHEMA  4
+#define CURRENT_SCHEMA  5
 
 
 char *defSchema[] = {
@@ -56,8 +56,8 @@ char *defSchema[] = {
 "  `msgtype` int(11) NOT NULL default '0',\n"
 "  `message` text NOT NULL,\n"
 "  PRIMARY KEY  (`msgid`),\n"
-"  KEY `timeChan` (`timestamp`,`chanid`),\n"
-"  KEY `messageType` (`chanid`,`msgtype`,`timestamp`),\n"
+"  KEY `timeChan` (`chanid`,`timestamp`),\n"
+"  KEY `messageType` (`msgtype`,`chanid`,`timestamp`),\n"
 "  FULLTEXT KEY `searchtext` (`nick`,`message`)\n"
 ") TYPE=MyISAM;\n",
 

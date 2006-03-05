@@ -59,13 +59,23 @@ SchemaUpgrade_t schemaUpgrade[CURRENT_SCHEMA] = {
     /* 2 -> 3 */
     {
         "ALTER TABLE `nickhistory` DROP PRIMARY KEY ,\n"
-        "ADD PRIMARY KEY ( `chanid` , `histType` , `timestamp` , `nick` );\n"
+        "ADD PRIMARY KEY ( `chanid` , `histType` , `timestamp` , `nick` );\n",
+        NULL
     },
     /* 3 -> 4 */
     {
         "ALTER TABLE `channels` ADD `notify` INT DEFAULT '0' NOT NULL AFTER "
         "`channel`\n",
-        "UPDATE `channels` SET `notify` = '1' WHERE `url` != ''\n"
+        "UPDATE `channels` SET `notify` = '1' WHERE `url` != ''\n",
+        NULL
+    },
+    /* 4 -> 5 */
+    {
+        "ALTER TABLE `irclog` DROP INDEX `timeChan` ,\n"
+        "ADD INDEX `timeChan` ( `chanid` , `timestamp` )\n",
+        "ALTER TABLE `irclog` DROP INDEX `messageType` ,\n"
+        "ADD INDEX `messageType` ( `msgid` , `chanid` , `timestamp` )\n",
+        NULL
     }
 };
 
