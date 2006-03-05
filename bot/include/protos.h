@@ -56,7 +56,7 @@ void db_thread_init( void );
 void db_load_servers(void);
 void db_load_channels(void);
 void db_add_logentry( IRCChannel_t *channel, char *nick, IRCMsgType_t msgType, 
-                      char *text );
+                      char *text, bool extract );
 void db_update_nick( IRCChannel_t *channel, char *nick, bool present, 
                      bool extract );
 void db_flush_nicks( IRCChannel_t *channel );
@@ -87,6 +87,11 @@ void regexp_add( const char *channelRegexp, const char *contentRegexp,
 void regexp_remove( char *channelRegexp, char *contentRegexp );
 void regexp_parse( IRCServer_t *server, IRCChannel_t *channel, char *who, 
                    char *msg, IRCMsgType_t type );
+
+void LoggedChannelMessage( IRCServer_t *server, IRCChannel_t *channel,
+                           char *message );
+void LoggedActionMessage( IRCServer_t *server, IRCChannel_t *channel,
+                          char *message );
 
 #endif
 

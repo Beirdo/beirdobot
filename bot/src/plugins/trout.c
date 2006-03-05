@@ -84,8 +84,7 @@ void botCmdTrout( IRCServer_t *server, IRCChannel_t *channel, char *who,
         sprintf( message, "slaps %s with a trout on behalf of %s...", msg, 
                  who );
     }
-    BN_SendActionMessage( &server->ircInfo, (const char *)channel->channel,
-                          (const char *)message );
+    LoggedActionMessage( server, channel, message );
     free(message);
 }
 

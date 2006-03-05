@@ -275,7 +275,7 @@ void db_load_channels(void)
 
 
 void db_add_logentry( IRCChannel_t *channel, char *nick, IRCMsgType_t msgType, 
-                      char *text )
+                      char *text, bool extract )
 {
     MYSQL_RES      *res;
     char           *nickOnly;
@@ -286,11 +286,15 @@ void db_add_logentry( IRCChannel_t *channel, char *nick, IRCMsgType_t msgType,
         return;
     }
 
-    nickOnly = (char *)malloc(strlen(nick));
-    if( !nickOnly ) {
-        nickOnly = nick;
+    if( extract ) {
+        nickOnly = (char *)malloc(strlen(nick));
+        if( !nickOnly ) {
+            nickOnly = nick;
+        } else {
+            BN_ExtractNick(nick, nickOnly, strlen(nick));
+        }
     } else {
-        BN_ExtractNick(nick, nickOnly, strlen(nick));
+        nickOnly = nick;
     }
 
     nickQuoted = db_quote(nickOnly);
@@ -416,7 +420,7 @@ void db_flush_nick( IRCServer_t *server, char *nick, IRCMsgType_t type,
             db_update_nick( channel, newNick, true, false );
             db_nick_history( channel, newNick, HIST_JOIN );
         }
-        db_add_logentry( channel, nick, type, text );
+        db_add_logentry( channel, nickOnly, type, text, false );
     }
 
     mysql_free_result(res);

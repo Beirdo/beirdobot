@@ -156,6 +156,23 @@ int botCmd_parse( IRCServer_t *server, IRCChannel_t *channel, char *who,
         cmd = strdup( msg );
     }
 
+    /* Strip leading spaces */
+    while( line && *line == ' ' ) {
+        line++;
+    }
+
+    /* Strip trailing spaces */
+    if( line ) {
+        for( len = strlen(line); len && line[len-1] == ' '; 
+             len = strlen(line) ) {
+            line[len-1] = '\0';
+        }
+
+        if( *line == '\0' ) {
+            line = NULL;
+        }
+    }
+
     ret = 0;
     item = BalancedBTreeFind( botCmdTree, (void *)&cmd, UNLOCKED );
     if( item ) {
@@ -218,8 +235,7 @@ void botCmdHelp( IRCServer_t *server, IRCChannel_t *channel, char *who,
             BN_SendPrivateMessage(&server->ircInfo, (const char *)who, helpMsg);
         } else {
             /* in channel */
-            BN_SendChannelMessage(&server->ircInfo, 
-                                  (const char *)channel->channel, helpMsg);
+            LoggedChannelMessage(server, channel, helpMsg);
         }
     } else {
         /* Used for debugging purposes */
@@ -300,8 +316,7 @@ void botCmdList( IRCServer_t *server, IRCChannel_t *channel, char *who,
             BN_SendPrivateMessage(&server->ircInfo, (const char *)who, message);
         } else {
             /* in channel */
-            BN_SendChannelMessage(&server->ircInfo, 
-                                  (const char *)channel->channel, message);
+            LoggedChannelMessage(server, channel, message);
         }
     } else {
         /* Used for debugging purposes */
@@ -350,8 +365,7 @@ void botCmdSeen( IRCServer_t *server, IRCChannel_t *channel, char *who,
         message = db_get_seen( channel, msg );
     }
 
-    BN_SendChannelMessage(&server->ircInfo, 
-                          (const char *)channel->channel, message);
+    LoggedChannelMessage(server, channel, message);
     
     if( message != huh ) {
         free( message );
@@ -392,8 +406,7 @@ void botCmdNotice( IRCServer_t *server, IRCChannel_t *channel, char *who,
                   channel->channel );
     }
 
-    BN_SendChannelMessage(&server->ircInfo, 
-                          (const char *)channel->channel, message);
+    LoggedChannelMessage(server, channel, message);
     
     free( message );
 }

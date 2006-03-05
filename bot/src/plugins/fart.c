@@ -69,8 +69,7 @@ void regexpFuncFart( IRCServer_t *server, IRCChannel_t *channel, char *who,
 
     message = (char *)malloc(14+strlen(who)+2);
     sprintf( message, "farts back at %s", who );
-    BN_SendActionMessage( &server->ircInfo, (const char *)channel->channel,
-                          (const char *)message );
+    LoggedActionMessage( server, channel, message );
     free(message);
 }
 

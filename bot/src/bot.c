@@ -186,7 +186,7 @@ void ProcOnMode(BN_PInfo I, const char Channel[], const char Who[],
     sprintf(string, "Mode for %s by %s : %s\n", Channel, Who, Msg);
 
     channel = FindChannel((IRCServer_t *)I->User, Channel);
-    db_add_logentry( channel, (char *)Who, TYPE_MODE, string );
+    db_add_logentry( channel, (char *)Who, TYPE_MODE, string, true );
     db_update_nick( channel, (char *)Who, true, true );
     free( string );
 }
@@ -306,7 +306,7 @@ void ProcOnTopic(BN_PInfo I, const char Chan[], const char Who[],
     sprintf(string, "%s changes topic to %s\n", Who, Msg);
 
     channel = FindChannel((IRCServer_t *)I->User, Chan);
-    db_add_logentry( channel, (char *)Who, TYPE_TOPIC, string );
+    db_add_logentry( channel, (char *)Who, TYPE_TOPIC, string, true );
     db_update_nick( channel, (char *)Who, true, true );
     free( string );
 }
@@ -324,7 +324,7 @@ void ProcOnKick(BN_PInfo I, const char Chan[], const char Who[],
                     Msg);
 
     channel = FindChannel((IRCServer_t *)I->User, Chan);
-    db_add_logentry( channel, (char *)Who, TYPE_KICK, string );
+    db_add_logentry( channel, (char *)Who, TYPE_KICK, string, true );
     db_update_nick( channel, nick, false, false );
     db_nick_history( channel, nick, HIST_LEAVE );
     free( string );
@@ -348,7 +348,7 @@ void ProcOnAction(BN_PInfo I, const char Chan[], const char Who[],
 
     server  = (IRCServer_t *)I->User;
     channel = FindChannel(server, Chan);
-    db_add_logentry( channel, (char *)Who, TYPE_ACTION, (char *)Msg );
+    db_add_logentry( channel, (char *)Who, TYPE_ACTION, (char *)Msg, true );
     db_update_nick( channel, (char *)Who, true, true );
 
     BN_ExtractNick(Who, nick, 256);
@@ -365,7 +365,7 @@ void ProcOnChannelTalk(BN_PInfo I, const char Chan[], const char Who[],
 
     server  = (IRCServer_t *)I->User;
     channel = FindChannel(server, Chan);
-    db_add_logentry( channel, (char *)Who, TYPE_MESSAGE, (char *)Msg );
+    db_add_logentry( channel, (char *)Who, TYPE_MESSAGE, (char *)Msg, true );
     db_update_nick( channel, (char *)Who, true, true );
 
     BN_ExtractNick(Who, nick, 256);
@@ -400,7 +400,7 @@ void ProcOnJoin(BN_PInfo I, const char Chan[], const char Who[])
     sprintf(string, "%s (%s) has joined %s\n", nick, Who, Chan);
 
     channel = FindChannel((IRCServer_t *)I->User, Chan);
-    db_add_logentry( channel, (char *)Who, TYPE_JOIN, string );
+    db_add_logentry( channel, nick, TYPE_JOIN, string, false );
     db_update_nick( channel, nick, true, false );
     db_nick_history( channel, nick, HIST_JOIN );
 
@@ -428,7 +428,7 @@ void ProcOnPart(BN_PInfo I, const char Chan[], const char Who[],
     sprintf(string, "%s (%s) has left %s (%s)\n", nick, Who, Chan, Msg);
 
     channel = FindChannel((IRCServer_t *)I->User, Chan);
-    db_add_logentry( channel, (char *)Who, TYPE_PART, string );
+    db_add_logentry( channel, nick, TYPE_PART, string, false );
     db_update_nick( channel, nick, false, false );
     db_nick_history( channel, nick, HIST_LEAVE );
     free( string );
@@ -609,6 +609,23 @@ IRCChannel_t *FindChannelNum( IRCServer_t *server, int channum )
     return( channel );
 }
 
+void LoggedChannelMessage( IRCServer_t *server, IRCChannel_t *channel,
+                           char *message )
+{
+    BN_SendChannelMessage(&server->ircInfo, (const char *)channel->channel,
+                          message);
+    db_add_logentry( channel, server->nick, TYPE_MESSAGE, message, false );
+    db_update_nick( channel, server->nick, true, false );
+}
+
+void LoggedActionMessage( IRCServer_t *server, IRCChannel_t *channel,
+                          char *message )
+{
+    BN_SendActionMessage( &server->ircInfo, (const char *)channel->channel,
+                          (const char *)message );
+    db_add_logentry( channel, server->nick, TYPE_ACTION, message, false );
+    db_update_nick( channel, server->nick, true, false );
+}
 
 /*
  * vim:ts=4:sw=4:ai:et:si:sts=4
