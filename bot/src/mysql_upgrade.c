@@ -60,6 +60,12 @@ SchemaUpgrade_t schemaUpgrade[CURRENT_SCHEMA] = {
     {
         "ALTER TABLE `nickhistory` DROP PRIMARY KEY ,\n"
         "ADD PRIMARY KEY ( `chanid` , `histType` , `timestamp` , `nick` );\n"
+    },
+    /* 3 -> 4 */
+    {
+        "ALTER TABLE `channels` ADD `notify` INT DEFAULT '0' NOT NULL AFTER "
+        "`channel`\n",
+        "UPDATE `channels` SET `notify` = '1' WHERE `url` != ''\n"
     }
 };
 

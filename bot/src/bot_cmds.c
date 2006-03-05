@@ -43,11 +43,12 @@ void botCmdSearch( IRCServer_t *server, IRCChannel_t *channel, char *who,
                    char *msg );
 void botCmdSeen( IRCServer_t *server, IRCChannel_t *channel, char *who, 
                  char *msg );
-void botCmdTrout( IRCServer_t *server, IRCChannel_t *channel, char *who, 
-                  char *msg );
+void botCmdNotice( IRCServer_t *server, IRCChannel_t *channel, char *who, 
+                   char *msg );
 char *botHelpHelp( void );
 char *botHelpList( void );
 char *botHelpSeen( void );
+char *botHelpNotice( void );
 
 static char *botCmdDepthFirst( BalancedBTreeItem_t *item );
 
@@ -59,7 +60,8 @@ static BotCmd_t botCmd[] _UNUSED_ = {
     { "help",       botCmdHelp,   botHelpHelp },
     { "list",       botCmdList,   botHelpList },
     { "search",     botCmdSearch, NULL },
-    { "seen",       botCmdSeen,   botHelpSeen }
+    { "seen",       botCmdSeen,   botHelpSeen },
+    { "notice",     botCmdNotice, botHelpNotice }
 };
 static int botCmdCount _UNUSED_ = NELEMENTS(botCmd);
 
@@ -363,6 +365,47 @@ char *botHelpSeen( void )
 
     return( help );
 }
+
+void botCmdNotice( IRCServer_t *server, IRCChannel_t *channel, char *who, 
+                   char *msg )
+{
+    char           *message;
+
+    if( !server ) {
+        return;
+    }
+
+    if( !channel ) {
+        BN_SendPrivateMessage(&server->ircInfo, (const char *)who, 
+                              "This needs to be done in a channel!");
+        return;
+    }
+
+    message = (char *)malloc(MAX_STRING_LENGTH);
+    if( strcmp( channel->url, "" ) ) {
+        snprintf( message, MAX_STRING_LENGTH, 
+                  "This channel (%s) is logged -- %s", channel->channel, 
+                  channel->url );
+    } else {
+        snprintf( message, MAX_STRING_LENGTH,
+                  "This channel (%s) has no configured URL for logs",
+                  channel->channel );
+    }
+
+    BN_SendChannelMessage(&server->ircInfo, 
+                          (const char *)channel->channel, message);
+    
+    free( message );
+}
+
+char *botHelpNotice( void )
+{
+    static char *help = "Shows the channel's notice which includes the URL to "
+                        " the logs online.";
+
+    return( help );
+}
+
 
 /*
  * vim:ts=4:sw=4:ai:et:si:sts=4
