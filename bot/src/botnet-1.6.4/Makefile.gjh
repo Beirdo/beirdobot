@@ -1,4 +1,8 @@
-all:
+.PHONY:	all clean
+
+all:	../../lib/libbotnet.a
+
+../../lib/libbotnet.a:
 	./configure --prefix=`cd ../.. ; pwd`
 	${MAKE}
 	${MAKE} install
