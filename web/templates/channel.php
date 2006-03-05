@@ -90,7 +90,7 @@
                     echo '** ', $message->nick, ' ', $message->message, ' **';
                     break;
                 case MSG_NICK:
-                    echo $message->nick, ' has changed nicks to ', $message->message;
+                    echo $message->nick, ' is now known as ', $message->message;
                     break;
                 case MSG_NORMAL:
                 case MSG_TOPIC:
