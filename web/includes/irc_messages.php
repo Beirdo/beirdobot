@@ -128,9 +128,9 @@ class irc_message {
             return;
     // Perform some basic tag and text substitutions
 		static $reg = array(
-                        // Add links to url's (accounting for html_entities and &amp;)
+                        // Add links to url's
                             '#(\w+://\S+)#e'
-                                => '\'<a href="\'.str_replace(\'&amp;\', \'&\', strip_quote_slashes(\'$1\')).\'">$1</a>\'',
+                            => 'irc_message::_parse_link(strip_quote_slashes(\'$1\'))',
                         // Add links to email addresses (does only a basic scan for valid email address formats)
                             '#((?:
                                   (?:[^<>\(\)\[\]\\.,;:\s@\"]+(?:\.[^<>\(\)\[\]\\.,;:\s@\"]+)*)
@@ -156,6 +156,25 @@ class irc_message {
     // Perform the replacements
         $this->message = preg_replace(array_keys($reg), array_values($reg),
                                       $this->message);
+    }
+
+/**
+ * Send in a link, and get a formatted href out (called by parse_message)
+ *
+ * @param   string  $link   the link to turn into an href
+ *
+ * @return  formatted href link
+/**/
+    function _parse_link($link) {
+    // parse_message() runs htmlentities first, so undo a bit of that
+        $str = '<a href="'.str_replace('&amp;', '&', $link).'">';
+    // Long links mess up the page wrapping, since browsers don't know to wrap
+    // on characters like & or +
+        if (strlen($link) > 64) {
+            $link = substr($link, 0, 45) . ' . . . ' . substr($link, - 12);
+        }
+    // Return
+        return $str.$link.'</a>';
     }
 }
 
