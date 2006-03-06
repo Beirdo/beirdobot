@@ -42,7 +42,7 @@ void regexpFuncFart( IRCServer_t *server, IRCChannel_t *channel, char *who,
 static char ident[] _UNUSED_ = 
     "$Id$";
 
-static char    *contentRegexp = "(\\s|^)farts?(\\s|$)";
+static char    *contentRegexp = "(?i)(\\s|^)farts?(\\s|\\.|$)";
 
 void plugin_initialize( char *args )
 {
