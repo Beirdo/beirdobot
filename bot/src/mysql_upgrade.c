@@ -74,7 +74,7 @@ SchemaUpgrade_t schemaUpgrade[CURRENT_SCHEMA] = {
         "ALTER TABLE `irclog` DROP INDEX `timeChan` ,\n"
         "ADD INDEX `timeChan` ( `chanid` , `timestamp` )\n",
         "ALTER TABLE `irclog` DROP INDEX `messageType` ,\n"
-        "ADD INDEX `messageType` ( `msgid` , `chanid` , `timestamp` )\n",
+        "ADD INDEX `messageType` ( `msgtype` , `chanid` , `timestamp` )\n",
         NULL
     }
 };
