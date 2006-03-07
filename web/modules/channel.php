@@ -77,15 +77,6 @@
         $end   = $tmp;
     }
 
-// Don't load more than a week at a time
-    if ($end - $start > day_in_seconds * 7) {
-        $end = $start + (day_in_seconds * 7) - 1;
-        ### add an error explaining that the most you can pull is a week
-    }
-
-// Load the last N minutes of messages from this channel
-    $Channel->load_messages($start, $end);
-
 // Load the names of the users currently logged into the channel
     $Channel->load_users($end);
 

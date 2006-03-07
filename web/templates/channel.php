@@ -51,64 +51,17 @@
 <a href="<?php echo root, 'channel/', $Channel->chanid, '/history' ?>">Daily chat history</a>
 </p>
 
-<table class="log">
 <?php
-    if (empty($Channel->messages)) {
-        if ($end)
-            echo "<tr><td>No activity was logged during the requested time period.</td></tr>";
-        else
-            echo "<tr><td>No activity has been logged in the last 15 minutes.</td></tr>";
-    }
-    else {
-        $last_day = null;
-        foreach ($Channel->messages as $message) {
-        // Print out a nice separator between each day
-            $day = date('Y-m-d', $message->timestamp);
-            if ($day != $last_day) {
-                echo "<tr class=\"log_line\">\n    <td class=\"log_day\" colspan=\"3\">",
-                     date($last_day ? 'l, F jS, Y' : 'l, F jS, Y, H:i T',
-                          $message->timestamp),
-                     "</td>\n</tr>";
-                $last_day = $day;
-            }
-        // Now print the normal row
+// Start the timer
+#    $render_time = microtime_float();
+
+    $Channel->print_log($start, $end);
+
+// How long
+#    $render_time = round(microtime_float() - $render_time, 4) + 0;
+#    echo 'Logs rendered in ', $render_time, ' seconds.';
+
 ?>
-<tr class="log_line">
-    <td class="log_timestamp">[<?php echo date('H:i:s', $message->timestamp) ?>]</td>
-<?php
-            if ($message->msgtype == MSG_NORMAL)
-                echo '    <td class="log_nick nick_', $message->nick_color(),'">', $message->nick, ":</td>\n",
-                     '    <td';
-            else
-                echo '    <td colspan="2"';
-            echo ' class="', $message->class;
-            if ($message->msgtype == MSG_ACTION)
-                echo ' nick_', $message->nick_color();
-            echo '">';
-            switch ($message->msgtype) {
-                case MSG_ACTION:
-                    echo '** ', $message->nick, ' ', $message->message, ' **';
-                    break;
-                case MSG_NICK:
-                    echo $message->nick, ' is now known as ', $message->message;
-                    break;
-                case MSG_NORMAL:
-                case MSG_TOPIC:
-                case MSG_KICK:
-                case MSG_MODE:
-                case MSG_JOIN:
-                case MSG_PART:
-                case MSG_QUIT:
-                default:
-                    echo $message->message;
-            }
-    ?></td>
-</tr>
-<?php
-        }
-    }
-?>
-</table>
 
 <?php
 // Print the page footer
