@@ -184,6 +184,19 @@ README about the AllowOverride settings.
     define('skin_dir', 'skins/'.skin);
     define('skin_url', root.skin_dir);
 
+// Make sure the data directory exists and is writable
+    if (!is_dir('data') && !mkdir('data', 0755)) {
+        $Error = 'Error creating the data directory. Please check permissions.';
+        require_once 'templates/_error.php';
+        exit;
+    }
+    if (!is_writable('data')) {
+        $process_user = posix_getpwuid(posix_geteuid());
+        $Error = 'data directory is not writable by '.$process_user['name'].'. Please check permissions.';
+        require_once 'templates/_error.php';
+        exit;
+    }
+
 // Load the IRC classes
     require_once 'includes/irc_messages.php';
     require_once 'includes/irc_servers.php';

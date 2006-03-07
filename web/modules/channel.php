@@ -17,10 +17,9 @@
 /**/
     $Channel = $Channels[$Path[1]];
 
-// Unknown channel
-    if (empty($Channel)) {
-        $Error = 'Unknown channel:  '.$Path[1];
-        require 'templates/_error.php';
+// Unknown or empty channel
+    if (empty($Path[1]) || empty($Channel)) {
+        redirect_browser(root);
     }
 
 // Channel history page?
