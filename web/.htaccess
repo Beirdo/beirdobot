@@ -93,6 +93,9 @@
 # Turn on the rewrite engine
     RewriteEngine  on
 
+# The following two rewrite rules are used to redirect output from an old 
+# PircBot install to a beirdobot install.  Be sure to change "/bot/" to the 
+# actual web path used on your install as this will be redirecting to it.
     RewriteCond    %{QUERY_STRING}  ^date=(\d{4}-\d{2}-\d{2})$
     RewriteRule    ^index\.php    /bot/channel/1/%1?    [L,R=permanent]
 
