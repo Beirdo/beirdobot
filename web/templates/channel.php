@@ -52,14 +52,10 @@
 </p>
 
 <?php
-// Start the timer
-#    $render_time = microtime_float();
 
+    #timer();
     $Channel->print_log($start, $end);
-
-// How long
-#    $render_time = round(microtime_float() - $render_time, 4) + 0;
-#    echo 'Logs rendered in ', $render_time, ' seconds.';
+    #echo timer('Logs rendered in %.4f seconds.');
 
 ?>
 
