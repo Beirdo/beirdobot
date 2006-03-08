@@ -229,6 +229,7 @@ void ProcOnWho(BN_PInfo I, const char Channel[], const char *Info[],
         printf("Who infos for channel (%s)\n", Channel);
     }
 
+    db_nick_history( channel, NULL, HIST_START );
     for (i = 0; i < (Count * WHO_INFO_COUNT); i += WHO_INFO_COUNT) {
         if( verbose ) {
             printf("\t%s,%s,%s,%s,%s,%s\n", Info[i + 0], Info[i + 1],

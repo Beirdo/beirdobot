@@ -466,19 +466,27 @@ void db_nick_history( IRCChannel_t *channel, char *nick, NickHistory_t type )
 {
     MYSQL_RES      *res;
     char           *nickQuoted;
+    static char    *empty = "";
 
-    if( !channel || !nick ) {
+    if( !channel ) {
         return;
     }
 
-    nickQuoted = db_quote(nick);
+    if( nick ) {
+        nickQuoted = db_quote(nick);
+    } else {
+        nickQuoted = empty;
+    }
 
     res = db_query( "INSERT INTO `nickhistory` "
                     "( `chanid`, `nick`, `histType`, `timestamp` )"
                     "VALUES ( %d, '%s', %d, UNIX_TIMESTAMP(NOW()) )",
                     channel->channelId, nickQuoted, type );
     mysql_free_result(res);
-    free(nickQuoted);
+
+    if( nickQuoted != empty ) {
+        free(nickQuoted);
+    }
 }
 
 void db_notify_nick( IRCChannel_t *channel, char *nick )

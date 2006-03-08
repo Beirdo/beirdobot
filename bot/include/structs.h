@@ -116,6 +116,7 @@ typedef struct {
 } Regexp_t;
 
 typedef enum {
+    HIST_START = -1,
     HIST_INITIAL,
     HIST_JOIN,
     HIST_LEAVE
