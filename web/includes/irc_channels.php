@@ -144,18 +144,19 @@ class irc_channel {
                                        FROM nickhistory
                                       WHERE chanid = ?
                                             AND timestamp <= ?
-                                            AND histType   = 0',
+                                            AND histType   = -1',
                                     $this->chanid,
                                     $time);
             if (empty($start))
                 $start = 0;
         // Then we query everything
             $sh = $db->query('SELECT *,
-                                     IF(SUM(IF(histType<=2, 1, -1)) > 0, 1, 0) AS present
+                                     IF(SUM(IF(histType=2, -1, 1)) > 0, 1, 0) AS present
                                 FROM nickhistory
                                WHERE chanid = ?
                                      AND timestamp >= ?
                                      AND timestamp <= ?
+                                     AND histType  <= 0
                             GROUP BY nick',
                              $this->chanid,
                              $start,
