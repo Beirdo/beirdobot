@@ -27,15 +27,10 @@
 /**/
     $Years = array();
 
-// Start counting
-    while ($min <= $max) {
-     #   echo date('Y-m-d H:i:s', $min).' &lt;= '.date('Y-m-d H:i:s', $max)."<br/>";
-    // Round back to the nearest day and adjust for timezone differences.
-        #$t = day_in_seconds * intVal($min / day_in_seconds) - date('Z');
-        #$Years[date('Y', $t)][date('n', $t)][] = $t;
-        $Years[date('Y', $min)][date('n', $min)][] = $min;
-    // On to the next
-        $min += day_in_seconds;
+// Start counting backwards
+    while ($max >= $min) {
+        $Years[date('Y', $max)][date('n', $max)][] = $max;
+        $max -= day_in_seconds;
     }
 
 // Display
