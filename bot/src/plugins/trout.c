@@ -65,22 +65,21 @@ void botCmdTrout( IRCServer_t *server, IRCChannel_t *channel, char *who,
     char           *message;
     char           *chan;
     bool            privmsg = false;
-    int             len;
+    int             len = 0;
 
     if( !channel ) {
         privmsg = true;
         message = strstr( msg, " " );
-        if( !message ) {
-            BN_SendPrivateMessage(&server->ircInfo, (const char *)who, 
-                                  "You must specify \"trout #channel nick\"");
-            return;
-        }
-
-        len = message - msg;
-        chan = strndup((const char *)msg, len);
-        msg += (len + 1);
-        while( *msg == ' ' ) {
-            msg++;
+        if( message ) {
+            len = message - msg;
+            chan = strndup((const char *)msg, len);
+            msg += (len + 1);
+            while( *msg == ' ' ) {
+                msg++;
+            }
+        } else {
+            chan = msg;
+            msg = NULL;
         }
 
         channel = FindChannel(server, chan);
@@ -89,11 +88,19 @@ void botCmdTrout( IRCServer_t *server, IRCChannel_t *channel, char *who,
             sprintf( message, "Can't find channel %s", chan );
             BN_SendPrivateMessage(&server->ircInfo, (const char *)who, 
                                   message);
-            free( message );
-            free( chan );
+            if( message ) {
+                free( message );
+            }
+
+            if( chan != msg ) {
+                free( chan );
+            }
             return;
         }
-        free( chan );
+
+        if( chan != msg ) {
+            free( chan );
+        }
     }
 
     if( !msg ) {
