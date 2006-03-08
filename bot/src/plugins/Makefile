@@ -12,7 +12,7 @@ LDFLAGS = -g
 LIBS	= $(shell ${MYSQLCFG} --libs_r)
 LIBS	+= $(shell ${BOTNETCFG} --libs-static)
 
-SRCS	= trout.c fart.c
+SRCS	= trout.c fart.c core.c
 OBJS	= ${SRCS:%.c=plugin_%.so}
 DEPS	= ${SRCS:.c=.d}
 

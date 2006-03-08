@@ -39,16 +39,8 @@ void botCmdHelp( IRCServer_t *server, IRCChannel_t *channel, char *who,
                  char *msg );
 void botCmdList( IRCServer_t *server, IRCChannel_t *channel, char *who, 
                  char *msg );
-void botCmdSearch( IRCServer_t *server, IRCChannel_t *channel, char *who,
-                   char *msg );
-void botCmdSeen( IRCServer_t *server, IRCChannel_t *channel, char *who, 
-                 char *msg );
-void botCmdNotice( IRCServer_t *server, IRCChannel_t *channel, char *who, 
-                   char *msg );
 char *botHelpHelp( void );
 char *botHelpList( void );
-char *botHelpSeen( void );
-char *botHelpNotice( void );
 
 static char *botCmdDepthFirst( BalancedBTreeItem_t *item );
 
@@ -58,10 +50,7 @@ static char ident[] _UNUSED_ =
 
 static BotCmd_t botCmd[] _UNUSED_ = {
     { "help",       botCmdHelp,   botHelpHelp },
-    { "list",       botCmdList,   botHelpList },
-    { "search",     botCmdSearch, NULL },
-    { "seen",       botCmdSeen,   botHelpSeen },
-    { "notice",     botCmdNotice, botHelpNotice }
+    { "list",       botCmdList,   botHelpList }
 };
 static int botCmdCount _UNUSED_ = NELEMENTS(botCmd);
 
@@ -321,138 +310,6 @@ void botCmdList( IRCServer_t *server, IRCChannel_t *channel, char *who,
 char *botHelpList( void )
 {
     static char *help = "Shows a list of supported bot commands.";
-
-    return( help );
-}
-
-void botCmdSearch( IRCServer_t *server, IRCChannel_t *channel, char *who, 
-                   char *msg )
-{
-    if( !msg ) {
-        printf( "Bot CMD: Search NULL by %s\n", who );
-    } else {
-        printf( "Bot CMD: Search %s by %s\n", msg, who );
-    }
-}
-
-void botCmdSeen( IRCServer_t *server, IRCChannel_t *channel, char *who, 
-                 char *msg )
-{
-    char           *message;
-    static char    *huh = "Huh? Who?";
-    char           *chan;
-    bool            privmsg = false;
-    int             len;
-
-    if( !server || !msg ) {
-        return;
-    }
-
-    if( !channel ) {
-        privmsg = true;
-        message = strstr( msg, " " );
-        if( !message ) {
-            BN_SendPrivateMessage(&server->ircInfo, (const char *)who, 
-                                  "You must specify \"seen #channel nick\"");
-            return;
-        }
-
-        len = message - msg;
-        chan = strndup(msg, len);
-        msg += (len + 1);
-        while( *msg == ' ' ) {
-            msg++;
-        }
-
-        channel = FindChannel(server, chan);
-        if( !channel ) {
-            message = (char *)malloc(22 + len);
-            sprintf( message, "Can't find channel %s", chan );
-            BN_SendPrivateMessage(&server->ircInfo, (const char *)who, 
-                                  message);
-            free( message );
-            free( chan );
-            return;
-        }
-        free( chan );
-    }
-
-    if( !msg ) {
-        message = huh;
-    } else {
-        message = db_get_seen( channel, msg, privmsg );
-    }
-
-    if( privmsg ) {
-        BN_SendPrivateMessage(&server->ircInfo, (const char *)who, message);
-    } else {
-        LoggedChannelMessage(server, channel, message);
-    }
-    
-    if( message != huh ) {
-        free( message );
-    }
-}
-
-char *botHelpSeen( void )
-{
-    static char *help = "Shows when the last time a user has been seen, or how"
-                        " long they've been idle.  "
-                        "Syntax: (in channel) seen nick  "
-                        "(in privmsg) seen #channel nick.";
-
-    return( help );
-}
-
-void botCmdNotice( IRCServer_t *server, IRCChannel_t *channel, char *who, 
-                   char *msg )
-{
-    char           *message;
-    bool            privmsg = false;
-
-    if( !server ) {
-        return;
-    }
-
-    message = (char *)malloc(MAX_STRING_LENGTH);
-    if( !channel ) {
-        privmsg = true;
-        channel = FindChannel(server, msg);
-        if( !channel ) {
-            snprintf( message, MAX_STRING_LENGTH, "Can't find channel %s", 
-                      msg );
-            BN_SendPrivateMessage(&server->ircInfo, (const char *)who, 
-                                  message );
-            free( message );
-            return;
-        }
-    }
-
-    if( strcmp( channel->url, "" ) ) {
-        snprintf( message, MAX_STRING_LENGTH, 
-                  "This channel (%s) is logged -- %s", channel->channel, 
-                  channel->url );
-    } else {
-        snprintf( message, MAX_STRING_LENGTH,
-                  "This channel (%s) has no configured URL for logs",
-                  channel->channel );
-    }
-
-    if( privmsg ) {
-        BN_SendPrivateMessage(&server->ircInfo, (const char *)who, message );
-    } else {
-        LoggedChannelMessage(server, channel, message);
-    }
-    
-    free( message );
-}
-
-char *botHelpNotice( void )
-{
-    static char *help = "Shows the channel's notice which includes the URL to "
-                        " the logs online.  "
-                        "Syntax: (in channel) notice  "
-                        "(in privmsg) notice #channel";
 
     return( help );
 }
