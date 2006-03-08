@@ -49,7 +49,6 @@
 LinkedList_t   *ServerList;
 
 void *bot_server_thread(void *arg);
-IRCChannel_t *FindChannel(IRCServer_t *server, const char *channame);
 
 
 void ProcOnConnected(BN_PInfo I, const char HostName[])
@@ -334,10 +333,13 @@ void ProcOnKick(BN_PInfo I, const char Chan[], const char Who[],
 void ProcOnPrivateTalk(BN_PInfo I, const char Who[], const char Whom[],
                        const char Msg[])
 {
+    char            nick[256];
+
     if( verbose ) {
         printf("%s sent you (%s) a private message (%s)\n", Who, Whom, Msg);
     }
-    botCmd_parse( (IRCServer_t *)I->User, NULL, (char *)Who, (char *)Msg );
+    BN_ExtractNick(Who, nick, 256);
+    botCmd_parse( (IRCServer_t *)I->User, NULL, nick, (char *)Msg );
 }
 
 void ProcOnAction(BN_PInfo I, const char Chan[], const char Who[],

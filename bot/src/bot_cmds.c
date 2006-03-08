@@ -348,24 +348,51 @@ void botCmdSeen( IRCServer_t *server, IRCChannel_t *channel, char *who,
 {
     char           *message;
     static char    *huh = "Huh? Who?";
+    char           *chan;
+    int             privmsg = false;
+    int             len;
 
-    if( !server ) {
+    if( !server || !msg ) {
         return;
     }
 
     if( !channel ) {
-        BN_SendPrivateMessage(&server->ircInfo, (const char *)who, 
-                              "This needs to be done in a channel!");
-        return;
+        privmsg = true;
+        message = strstr( msg, " " );
+        if( !message ) {
+            BN_SendPrivateMessage(&server->ircInfo, (const char *)who, 
+                                  "You must specify \"seen #channel nick\"");
+            return;
+        }
+
+        len = message - msg;
+        chan = strndup(msg, len);
+        msg += (len + 1);
+
+        channel = FindChannel(server, chan);
+        if( !channel ) {
+            message = (char *)malloc(22 + len);
+            sprintf( message, "Can't find channel %s", chan );
+            BN_SendPrivateMessage(&server->ircInfo, (const char *)who, 
+                                  message);
+            free( message );
+            free( chan );
+            return;
+        }
+        free( chan );
     }
 
     if( !msg ) {
         message = huh;
     } else {
-        message = db_get_seen( channel, msg );
+        message = db_get_seen( channel, msg, privmsg );
     }
 
-    LoggedChannelMessage(server, channel, message);
+    if( privmsg ) {
+        BN_SendPrivateMessage(&server->ircInfo, (const char *)who, message);
+    } else {
+        LoggedChannelMessage(server, channel, message);
+    }
     
     if( message != huh ) {
         free( message );
@@ -375,7 +402,9 @@ void botCmdSeen( IRCServer_t *server, IRCChannel_t *channel, char *who,
 char *botHelpSeen( void )
 {
     static char *help = "Shows when the last time a user has been seen, or how"
-                        " long they've been idle.  Must be done in a channel.";
+                        " long they've been idle.  "
+                        "Syntax: (in channel) seen nick  "
+                        "(in privmsg) seen #channel nick.";
 
     return( help );
 }

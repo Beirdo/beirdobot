@@ -64,13 +64,15 @@ void db_flush_nick( IRCServer_t *server, char *nick, IRCMsgType_t type,
                     char *text, char *newNick );
 bool db_check_nick_notify( IRCChannel_t *channel, char *nick, int hours );
 void db_notify_nick( IRCChannel_t *channel, char *nick );
-char *db_get_seen( IRCChannel_t *channel, char *nick );
+char *db_get_seen( IRCChannel_t *channel, char *nick, bool privmsg );
 char *db_get_setting( char *name );
 void db_set_setting( char *name, char *format, ... );
 void db_check_schema(void);
 void db_nick_history( IRCChannel_t *channel, char *nick, NickHistory_t type ); 
 
 IRCChannel_t *FindChannelNum( IRCServer_t *server, int channum );
+IRCChannel_t *FindChannel(IRCServer_t *server, const char *channame);
+
 void botCmd_initialize( void );
 void botCmd_add( const char **command, BotCmdFunc_t func,
                  BotCmdHelpFunc_t helpFunc );

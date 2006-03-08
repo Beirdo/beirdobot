@@ -567,7 +567,7 @@ BalancedBTree_t *db_get_plugins( void )
     return( tree );
 }
 
-char *db_get_seen( IRCChannel_t *channel, char *nick )
+char *db_get_seen( IRCChannel_t *channel, char *nick, bool privmsg )
 {
     char           *nickQuoted;
     int             count;
@@ -580,6 +580,7 @@ char *db_get_seen( IRCChannel_t *channel, char *nick )
     char            idle[256];
     char            idle2[256];
     int             day, hour, min, sec;
+    int             len;
 
     if( !channel || !nick ) {
         return( false );
@@ -598,8 +599,14 @@ char *db_get_seen( IRCChannel_t *channel, char *nick )
 
     if( !res || !(count = mysql_num_rows(res)) ) {
         mysql_free_result(res);
-        result = (char *)malloc(strlen(nick) + 25);
-        sprintf( result, "%s has not been seen here", nick );
+        len = strlen(nick) + 26 + (privmsg ? strlen(channel->channel) : 0 );
+        result = (char *)malloc(len);
+        if( privmsg ) {
+            sprintf( result, "%s has not been seen in %s", nick, 
+                     channel->channel );
+        } else {
+            sprintf( result, "%s has not been seen here", nick );
+        }
         return( result );
     }
 
@@ -652,12 +659,25 @@ char *db_get_seen( IRCChannel_t *channel, char *nick )
         sprintf( idle, " 0 seconds" );
     }
 
+    len = strlen(nick) + strlen(idle) + 
+          (privmsg ? strlen(channel->channel) : 0);
+
     if( present ) {
-        result = (char *)malloc(strlen(nick) + strlen(idle) + 34);
-        sprintf( result, "%s is here and has been idle for%s", nick, idle );
+        result = (char *)malloc(len + 34);
+        if( privmsg ) {
+            sprintf( result, "%s is in %s and has been idle for%s", nick, 
+                     channel->channel, idle );
+        } else {
+            sprintf( result, "%s is here and has been idle for%s", nick, idle );
+        }
     } else {
-        result = (char *)malloc(strlen(nick) + strlen(idle) + 21);
-        sprintf( result, "%s was last seen%s ago", nick, idle );
+        result = (char *)malloc(len + 25);
+        if( privmsg ) {
+            sprintf( result, "%s was last seen in %s%s ago", nick, 
+                     channel->channel, idle );
+        } else {
+            sprintf( result, "%s was last seen%s ago", nick, idle );
+        }
     }
 
     return( result );
