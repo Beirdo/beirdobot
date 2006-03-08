@@ -156,7 +156,7 @@ class irc_channel {
                                WHERE chanid = ?
                                      AND timestamp >= ?
                                      AND timestamp <= ?
-                                     AND histType  <= 0
+                                     AND histType  >= 0
                             GROUP BY nick',
                              $this->chanid,
                              $start,
