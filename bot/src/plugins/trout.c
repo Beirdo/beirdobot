@@ -25,12 +25,12 @@
 */
 
 /* INCLUDE FILES */
+#include "environment.h"
+#include "botnet.h"
 #include <pthread.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include "botnet.h"
-#include "environment.h"
 #include "structs.h"
 #include "protos.h"
 
@@ -62,18 +62,38 @@ void plugin_shutdown( void )
 void botCmdTrout( IRCServer_t *server, IRCChannel_t *channel, char *who, 
                   char *msg )
 {
-    char       *message;
-
-    if( !msg ) {
-        printf( "Bot CMD: Trout NULL by %s\n", who );
-    } else {
-        printf( "Bot CMD: Trout %s by %s\n", msg, who );
-    }
+    char           *message;
+    char           *chan;
+    bool            privmsg = false;
+    int             len;
 
     if( !channel ) {
-        BN_SendPrivateMessage(&server->ircInfo, (const char *)who,
-                              "You need to do this in a public channel!");
-        return;
+        privmsg = true;
+        message = strstr( msg, " " );
+        if( !message ) {
+            BN_SendPrivateMessage(&server->ircInfo, (const char *)who, 
+                                  "You must specify \"trout #channel nick\"");
+            return;
+        }
+
+        len = message - msg;
+        chan = strndup((const char *)msg, len);
+        msg += (len + 1);
+        while( *msg == ' ' ) {
+            msg++;
+        }
+
+        channel = FindChannel(server, chan);
+        if( !channel ) {
+            message = (char *)malloc(22 + len);
+            sprintf( message, "Can't find channel %s", chan );
+            BN_SendPrivateMessage(&server->ircInfo, (const char *)who, 
+                                  message);
+            free( message );
+            free( chan );
+            return;
+        }
+        free( chan );
     }
 
     if( !msg ) {
@@ -90,8 +110,9 @@ void botCmdTrout( IRCServer_t *server, IRCChannel_t *channel, char *who,
 
 char *botHelpTrout( void )
 {
-    static char *help = "Slaps someone with a trout on your behalf.  Currently "
-                        "must be used in a public channel.";
+    static char *help = "Slaps someone with a trout on your behalf.  "
+                        "Syntax: (in channel) trout nick  "
+                        "(in privmsg) trout #channel nick.";
     
     return( help );
 }

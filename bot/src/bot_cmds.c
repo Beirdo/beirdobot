@@ -202,8 +202,6 @@ void botCmdHelp( IRCServer_t *server, IRCChannel_t *channel, char *who,
         msg = help;
     }
 
-    printf( "Bot CMD: Help %s by %s\n", msg, who );
-
     line = strstr( msg, " " );
     if( line ) {
         /* Command has trailing text, skip the space */
@@ -300,12 +298,6 @@ void botCmdList( IRCServer_t *server, IRCChannel_t *channel, char *who,
 {
     char       *message;
 
-    if( !msg ) {
-        printf( "Bot CMD: List NULL by %s\n", who );
-    } else {
-        printf( "Bot CMD: List %s by %s\n", msg, who );
-    }
-
     BalancedBTreeLock( botCmdTree );
     message = botCmdDepthFirst( botCmdTree->root );
     BalancedBTreeUnlock( botCmdTree );
@@ -349,7 +341,7 @@ void botCmdSeen( IRCServer_t *server, IRCChannel_t *channel, char *who,
     char           *message;
     static char    *huh = "Huh? Who?";
     char           *chan;
-    int             privmsg = false;
+    bool            privmsg = false;
     int             len;
 
     if( !server || !msg ) {
@@ -368,6 +360,9 @@ void botCmdSeen( IRCServer_t *server, IRCChannel_t *channel, char *who,
         len = message - msg;
         chan = strndup(msg, len);
         msg += (len + 1);
+        while( *msg == ' ' ) {
+            msg++;
+        }
 
         channel = FindChannel(server, chan);
         if( !channel ) {
@@ -413,18 +408,26 @@ void botCmdNotice( IRCServer_t *server, IRCChannel_t *channel, char *who,
                    char *msg )
 {
     char           *message;
+    bool            privmsg = false;
 
     if( !server ) {
         return;
     }
 
+    message = (char *)malloc(MAX_STRING_LENGTH);
     if( !channel ) {
-        BN_SendPrivateMessage(&server->ircInfo, (const char *)who, 
-                              "This needs to be done in a channel!");
-        return;
+        privmsg = true;
+        channel = FindChannel(server, msg);
+        if( !channel ) {
+            snprintf( message, MAX_STRING_LENGTH, "Can't find channel %s", 
+                      msg );
+            BN_SendPrivateMessage(&server->ircInfo, (const char *)who, 
+                                  message );
+            free( message );
+            return;
+        }
     }
 
-    message = (char *)malloc(MAX_STRING_LENGTH);
     if( strcmp( channel->url, "" ) ) {
         snprintf( message, MAX_STRING_LENGTH, 
                   "This channel (%s) is logged -- %s", channel->channel, 
@@ -435,7 +438,11 @@ void botCmdNotice( IRCServer_t *server, IRCChannel_t *channel, char *who,
                   channel->channel );
     }
 
-    LoggedChannelMessage(server, channel, message);
+    if( privmsg ) {
+        BN_SendPrivateMessage(&server->ircInfo, (const char *)who, message );
+    } else {
+        LoggedChannelMessage(server, channel, message);
+    }
     
     free( message );
 }
@@ -443,7 +450,9 @@ void botCmdNotice( IRCServer_t *server, IRCChannel_t *channel, char *who,
 char *botHelpNotice( void )
 {
     static char *help = "Shows the channel's notice which includes the URL to "
-                        " the logs online.";
+                        " the logs online.  "
+                        "Syntax: (in channel) notice  "
+                        "(in privmsg) notice #channel";
 
     return( help );
 }
