@@ -32,6 +32,10 @@
 </h3>
 
 <p>
+<a href="<?php echo root, 'channel/', $Channel->chanid ?>">Current activity</a>
+</p>
+
+<p>
 <b>Channel history:</b>
 </p>
 <ul>

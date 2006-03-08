@@ -1,0 +1,10 @@
+#current_users {
+    margin:     1em 0px;
+    padding:    5px;
+    border:     1px solid black;
+}
+
+#current_users h4 {
+    padding: 0;
+    margin:  0;
+}

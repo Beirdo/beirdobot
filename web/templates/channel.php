@@ -32,7 +32,11 @@
 </h3>
 
 <p>
-<b>Current users:</b>
+<a href="<?php echo root, 'channel/', $Channel->chanid, '/history' ?>">Daily chat history</a>
+</p>
+
+<div id="current_users">
+<h4>Current users:</h4>
 <?php
     if (empty($Channel->users)) {
         echo '<tr><td>No one is currently logged into ', $Channel->channel, "</td></tr>";
@@ -45,11 +49,7 @@
         echo implode(', ', $users);
     }
 ?>
-</p>
-
-<p>
-<a href="<?php echo root, 'channel/', $Channel->chanid, '/history' ?>">Daily chat history</a>
-</p>
+</div>
 
 <?php
 
