@@ -153,7 +153,7 @@ class irc_message {
                             '/(?<=\d)-(?=\d)(?!\d+-)/' => '&ndash;',        // N dash between individual sequences of numbers
                             '/ -- /'                   => '&nbsp;&mdash; ', // M dash
                         // Break up really long strings (that aren't inside of links)
-                            '/(\S{80})(?![^<]*?(?:>|<\\/a>))/'    => '$1 ',
+                            '/(\S{80})(?![^<]*?(?:>|<\\/a>))/' => '$1 ',
                            );
     // Perform the replacements
         $this->message = preg_replace(array_keys($reg), array_values($reg),
