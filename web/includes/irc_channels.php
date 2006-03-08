@@ -187,10 +187,10 @@ class irc_channel {
         if (empty($start))
             $start = mktime(0, 0, 0);
     // Name of the cache file
-        $cachefile = "data/static/$this->chanid.$start.$end.$format";
+        $cachefile = "data/static/$this->chanid.$start.$end.$format.gz";
     // Return the cached version?
         if (file_exists($cachefile) && filesize($cachefile) > 0) {
-            include $cachefile;
+            readgzfile($cachefile);
             return;
         }
     // No cached version?  Generate.
@@ -201,7 +201,7 @@ class irc_channel {
         require "templates/log/{$format}_head.php";
     // Cache?
         if ($cache) {
-            $fp = fopen($cachefile, 'w');
+            $fp = gzopen($cachefile, 'w');
             if ($fp === false) {
                 # error, error!
             }
@@ -248,7 +248,7 @@ class irc_channel {
                     echo $log;
                 // Cache?
                     if ($fp)
-                        fwrite($fp, $log);
+                        gzwrite($fp, $log);
                 // Start the output buffer again
                     ob_start();
                 }
@@ -264,8 +264,8 @@ class irc_channel {
         echo $log;
     // Cache?
         if ($fp) {
-            fwrite($fp, $log);
-            fclose($fp);
+            gzwrite($fp, $log);
+            gzclose($fp);
         }
     }
 
