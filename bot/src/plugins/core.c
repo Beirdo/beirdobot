@@ -30,9 +30,15 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/time.h>
+#include <time.h>
+#include <mysql.h>
 #include "botnet.h"
 #include "structs.h"
 #include "protos.h"
+
+char *db_quote(char *string);
+MYSQL_RES *db_query( char *format, ... );
 
 /* INTERNAL FUNCTION PROTOTYPES */
 void botCmdSearch( IRCServer_t *server, IRCChannel_t *channel, char *who,
@@ -44,6 +50,8 @@ void botCmdNotice( IRCServer_t *server, IRCChannel_t *channel, char *who,
 char *botHelpSearch( void );
 char *botHelpSeen( void );
 char *botHelpNotice( void );
+void db_search_text( IRCServer_t *server, IRCChannel_t *channel, char *who, 
+                     char *text );
 
 /* CVS generated ID string */
 static char ident[] _UNUSED_ = 
@@ -75,6 +83,7 @@ void botCmdSearch( IRCServer_t *server, IRCChannel_t *channel, char *who,
     char           *chan;
     bool            privmsg = false;
     int             len;
+    struct timeval  start, end;
 
     if( !server || !msg ) {
         return;
@@ -109,13 +118,28 @@ void botCmdSearch( IRCServer_t *server, IRCChannel_t *channel, char *who,
         free( chan );
     }
 
-    message = db_search_text( channel, msg );
-
-    if( privmsg ) {
-        BN_SendPrivateMessage(&server->ircInfo, (const char *)who, message);
-    } else {
-        LoggedChannelMessage(server, channel, message);
+    if( !strcmp( channel->url, "" ) ) {
+        BN_SendPrivateMessage(&server->ircInfo, (const char *)who, 
+                              "No URL configured" );
+        return;
     }
+
+    BN_SendPrivateMessage(&server->ircInfo, (const char *)who, "Searching..." );
+
+    gettimeofday( &start, NULL );
+    db_search_text( server, channel, who, msg );
+    gettimeofday( &end, NULL );
+
+    end.tv_sec  -= start.tv_sec;
+    end.tv_usec -= start.tv_usec;
+    while( end.tv_usec < 0 ) {
+        end.tv_usec += 10000;
+        end.tv_sec  -= 1;
+    }
+
+    message = (char *)malloc(32);
+    sprintf( message, "Search took %ld.%06lds", end.tv_sec, end.tv_usec );
+    BN_SendPrivateMessage(&server->ircInfo, (const char *)who, message);
     
     free( message );
 }
@@ -250,6 +274,71 @@ char *botHelpNotice( void )
                         "(in privmsg) notice #channel";
 
     return( help );
+}
+
+#define SEARCH_WINDOW (15*60)
+void db_search_text( IRCServer_t *server, IRCChannel_t *channel, char *who, 
+                     char *text )
+{
+    int             count = 0;
+    int             i;
+    int             len;
+    MYSQL_RES      *res;
+    MYSQL_ROW       row;
+    char           *value = NULL;
+    static char    *none = "No matches found";
+    time_t          time_start, time_end;
+    struct tm       tm_start, tm_end;
+    char            start[20], stop[20];
+    float           score;
+    char           *quotedText;
+
+    if( !text || !channel || !server ) {
+        return;
+    }
+
+    quotedText = db_quote(text);
+
+    res = db_query( "SELECT "
+                    "%d * FLOOR(MIN(`timestamp`) / %d) AS starttime, "
+                    "SUM(MATCH(`nick`, `message`) AGAINST ('%s')) AS score "
+                    "FROM `irclog` WHERE `msgtype` IN (0, 1) "
+                    "AND MATCH(`nick`, `message`) AGAINST ('%s') > 0 "
+                    "AND `chanid` = %d "
+                    "GROUP BY %d * FLOOR(`timestamp` / %d) "
+                    "ORDER BY score DESC, `msgid` ASC LIMIT 5", SEARCH_WINDOW,
+                    SEARCH_WINDOW, quotedText, quotedText, channel->channelId,
+                    SEARCH_WINDOW, SEARCH_WINDOW );
+
+    if( !res || !(count = mysql_num_rows(res)) ) {
+        mysql_free_result(res);
+        BN_SendPrivateMessage(&server->ircInfo, (const char *)who, none);
+        return;
+    }
+
+    len = 16;
+    value = (char *)realloc(value, len + 1);
+    sprintf( value, "Top %d matches:", count );
+    BN_SendPrivateMessage(&server->ircInfo, (const char *)who, value);
+
+    for( i = 0; i < count; i++ ) {
+        row = mysql_fetch_row(res);
+
+        time_start = atoi(row[0]);
+        time_end   = time_start + SEARCH_WINDOW - 1;
+        localtime_r(&time_start, &tm_start);
+        localtime_r(&time_end, &tm_end);
+        strftime( start, 20, "%Y-%m-%d:%H:%M", &tm_start );
+        strftime( stop, 20, "%Y-%m-%d:%H:%M", &tm_end );
+        score = atof(row[1]);
+
+        len = strlen(channel->url) + 70;
+        value = (char *)realloc(value, len + 1);
+        sprintf( value, "    %s/%s/%s (%.2f)", channel->url, start, stop, 
+                                               score );
+        BN_SendPrivateMessage(&server->ircInfo, (const char *)who, value);
+    }
+    mysql_free_result(res);
 }
 
 

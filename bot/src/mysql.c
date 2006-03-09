@@ -32,7 +32,6 @@
 #include <stdarg.h>
 #include <mysql.h>
 #include <stdlib.h>
-#include <time.h>
 #include "botnet.h"
 #include "structs.h"
 #include "protos.h"
@@ -739,69 +738,6 @@ void db_set_setting( char *name, char *format, ... )
                         "VALUES ( '%s', '%s' )", name, value );
     }
     mysql_free_result(res);
-}
-
-#define SEARCH_WINDOW (15*60)
-char *db_search_text( IRCChannel_t *channel, char *text )
-{
-    int             count;
-    int             i;
-    int             len;
-    MYSQL_RES      *res;
-    MYSQL_ROW       row;
-    char           *value = NULL;
-    static char    *none = "No matches found";
-    time_t          time_start, time_end;
-    struct tm       tm_start, tm_end;
-    char            start[20], stop[20];
-    float           score;
-    char           *quotedText;
-
-    if( !text || !channel ) {
-        return( NULL );
-    }
-
-    quotedText = db_quote(text);
-
-    res = db_query( "SELECT "
-                    "%d * FLOOR(MIN(`timestamp`) / %d) AS starttime, "
-                    "SUM(MATCH(`nick`, `message`) AGAINST ('%s')) AS score "
-                    "FROM `irclog` WHERE `msgtype` IN (0, 1) "
-                    "AND MATCH(`nick`, `message`) AGAINST ('%s') > 0 "
-                    "AND `chanid` = %d "
-                    "GROUP BY %d * FLOOR(`timestamp` / %d) "
-                    "ORDER BY score DESC, `msgid` ASC LIMIT 5", SEARCH_WINDOW,
-                    SEARCH_WINDOW, quotedText, quotedText, channel->channelId,
-                    SEARCH_WINDOW, SEARCH_WINDOW );
-
-    if( !res || !(count = mysql_num_rows(res)) ) {
-        mysql_free_result(res);
-        return( strdup(none) );
-    }
-
-    len = 16;
-    value = (char *)realloc(value, len + 1);
-    sprintf( value, "Top %d matches:  ", count );
-
-    for( i = 0; i < count; i++ ) {
-        row = mysql_fetch_row(res);
-
-        time_start = atoi(row[0]);
-        time_end   = time_start + SEARCH_WINDOW - 1;
-        localtime_r(&time_start, &tm_start);
-        localtime_r(&time_end, &tm_end);
-        strftime( start, 20, "%Y-%m-%d:%H:%M", &tm_start );
-        strftime( stop, 20, "%Y-%m-%d:%H:%M", &tm_end );
-        score = atof(row[1]);
-
-        len = strlen(value) + strlen(channel->url) + 60;
-        value = (char *)realloc(value, len + 1);
-        sprintf( value, "%s %s/%s/%s (%.2f) ", value, channel->url,
-                 start, stop, score );
-    }
-    mysql_free_result(res);
-
-    return( value );
 }
 
 /*

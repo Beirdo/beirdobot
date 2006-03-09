@@ -69,7 +69,6 @@ char *db_get_setting( char *name );
 void db_set_setting( char *name, char *format, ... );
 void db_check_schema(void);
 void db_nick_history( IRCChannel_t *channel, char *nick, NickHistory_t type ); 
-char *db_search_text( IRCChannel_t *channel, char *text );
 
 IRCChannel_t *FindChannelNum( IRCServer_t *server, int channum );
 IRCChannel_t *FindChannel(IRCServer_t *server, const char *channame);
