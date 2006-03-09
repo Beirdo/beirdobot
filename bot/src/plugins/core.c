@@ -133,7 +133,7 @@ void botCmdSearch( IRCServer_t *server, IRCChannel_t *channel, char *who,
     end.tv_sec  -= start.tv_sec;
     end.tv_usec -= start.tv_usec;
     while( end.tv_usec < 0 ) {
-        end.tv_usec += 10000;
+        end.tv_usec += 1000000;
         end.tv_sec  -= 1;
     }
 
@@ -147,7 +147,7 @@ void botCmdSearch( IRCServer_t *server, IRCChannel_t *channel, char *who,
 char *botHelpSearch( void )
 {
     static char *help = "Search for text in a channel's log, "
-                        "returns top 5 matches.  "
+                        "returns top 5 matches by privmsg.  "
                         "Syntax: (in channel) search text  "
                         "(in privmsg) search #channel text.";
 
@@ -325,7 +325,7 @@ void db_search_text( IRCServer_t *server, IRCChannel_t *channel, char *who,
         row = mysql_fetch_row(res);
 
         time_start = atoi(row[0]);
-        time_end   = time_start + SEARCH_WINDOW - 1;
+        time_end   = time_start + SEARCH_WINDOW;
         localtime_r(&time_start, &tm_start);
         localtime_r(&time_end, &tm_end);
         strftime( start, 20, "%Y-%m-%d:%H:%M", &tm_start );
