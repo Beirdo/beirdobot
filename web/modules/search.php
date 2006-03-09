@@ -63,8 +63,8 @@
         $row['channel']        = &$Channels[$row['chanid']];
         $row['server']         = &$row['channel']->server;
         $row['endtime']        = $row['starttime'] + $division;
-        $row['link_starttime'] = $row['starttime'] - intVal($division / 2);
-        $row['link_endtime']   = $row['starttime'] + intVal($division / 2);
+        $row['link_starttime'] = $row['starttime'];
+        $row['link_endtime']   = $row['endtime'];
         $Results[] = $row;
     }
     $sh->finish();
