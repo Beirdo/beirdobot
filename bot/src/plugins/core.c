@@ -41,6 +41,7 @@ void botCmdSeen( IRCServer_t *server, IRCChannel_t *channel, char *who,
                  char *msg );
 void botCmdNotice( IRCServer_t *server, IRCChannel_t *channel, char *who, 
                    char *msg );
+char *botHelpSearch( void );
 char *botHelpSeen( void );
 char *botHelpNotice( void );
 
@@ -53,7 +54,7 @@ void plugin_initialize( char *args )
     static char    *commands[] = { "search", "seen", "notice" };
 
     printf( "Initializing core plugin...\n" );
-    botCmd_add( (const char **)&commands[0], botCmdSearch, NULL );
+    botCmd_add( (const char **)&commands[0], botCmdSearch, botHelpSearch );
     botCmd_add( (const char **)&commands[1], botCmdSeen,   botHelpSeen );
     botCmd_add( (const char **)&commands[2], botCmdNotice, botHelpNotice );
 }
@@ -70,11 +71,63 @@ void plugin_shutdown( void )
 void botCmdSearch( IRCServer_t *server, IRCChannel_t *channel, char *who, 
                    char *msg )
 {
-    if( !msg ) {
-        printf( "Bot CMD: Search NULL by %s\n", who );
-    } else {
-        printf( "Bot CMD: Search %s by %s\n", msg, who );
+    char           *message;
+    char           *chan;
+    bool            privmsg = false;
+    int             len;
+
+    if( !server || !msg ) {
+        return;
     }
+
+    if( !channel ) {
+        privmsg = true;
+        message = strstr( msg, " " );
+        if( !message ) {
+            BN_SendPrivateMessage(&server->ircInfo, (const char *)who, 
+                                  "You must specify \"search #channel text\"");
+            return;
+        }
+
+        len = message - msg;
+        chan = strndup(msg, len);
+        msg += (len + 1);
+        while( *msg == ' ' ) {
+            msg++;
+        }
+
+        channel = FindChannel(server, chan);
+        if( !channel ) {
+            message = (char *)malloc(22 + len);
+            sprintf( message, "Can't find channel %s", chan );
+            BN_SendPrivateMessage(&server->ircInfo, (const char *)who, 
+                                  message);
+            free( message );
+            free( chan );
+            return;
+        }
+        free( chan );
+    }
+
+    message = db_search_text( channel, msg );
+
+    if( privmsg ) {
+        BN_SendPrivateMessage(&server->ircInfo, (const char *)who, message);
+    } else {
+        LoggedChannelMessage(server, channel, message);
+    }
+    
+    free( message );
+}
+
+char *botHelpSearch( void )
+{
+    static char *help = "Search for text in a channel's log, "
+                        "returns top 5 matches.  "
+                        "Syntax: (in channel) search text  "
+                        "(in privmsg) search #channel text.";
+
+    return( help );
 }
 
 void botCmdSeen( IRCServer_t *server, IRCChannel_t *channel, char *who, 
