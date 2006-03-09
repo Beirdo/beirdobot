@@ -79,6 +79,9 @@ void botCmd_add( const char **command, BotCmdFunc_t func,
 int botCmd_parse( IRCServer_t *server, IRCChannel_t *channel, char *who, 
                   char *msg );
 void botCmd_remove( char *command );
+void send_notice( IRCChannel_t *channel, char *nick );
+void notify_start(void);
+
 BalancedBTree_t *db_get_plugins( void );
 void plugins_initialize( void );
 void pluginLoad( char *name );

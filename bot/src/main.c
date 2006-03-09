@@ -76,6 +76,9 @@ int main ( int argc, char **argv )
     /* Setup the plugins */
     plugins_initialize();
 
+    /* Start the notifier thread */
+    notify_start();
+
     /* Start the bot */
     bot_start();
 

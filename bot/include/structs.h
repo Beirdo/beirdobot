@@ -122,6 +122,12 @@ typedef enum {
     HIST_LEAVE
 } NickHistory_t;
 
+typedef struct {
+    IRCServer_t        *server;
+    IRCChannel_t       *channel;
+    char               *nick;
+} NotifyItem_t;
+
 #endif
 
 /*

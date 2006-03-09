@@ -46,6 +46,10 @@
 #include "balanced_btree.h"
 
 
+/* CVS generated ID string */
+static char ident[] _UNUSED_ = 
+    "$Id$";
+
 LinkedList_t   *ServerList;
 
 void *bot_server_thread(void *arg);
@@ -219,7 +223,6 @@ void ProcOnWho(BN_PInfo I, const char Channel[], const char *Info[],
 {
     int             i;
     IRCChannel_t   *channel;
-    char            string[MAX_STRING_LENGTH];
     char           *nick;
 
     channel = FindChannel((IRCServer_t *)I->User, Channel);
@@ -240,12 +243,7 @@ void ProcOnWho(BN_PInfo I, const char Channel[], const char *Info[],
         db_nick_history( channel, nick, HIST_INITIAL );
         if( strcmp( channel->url, "" ) && 
             db_check_nick_notify( channel, nick, channel->notifywindow ) ) {
-            snprintf( string, MAX_STRING_LENGTH, 
-                      "%s :This channel (%s) is logged -- %s", nick, 
-                      channel->channel, channel->url );
-            BN_SendMessage(I, BN_MakeMessage(NULL, "NOTICE", string),
-                           BN_LOW_PRIORITY);
-            db_notify_nick( channel, nick );
+            send_notice( channel, nick );
         }
     }
 
