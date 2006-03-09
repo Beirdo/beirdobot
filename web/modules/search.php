@@ -70,7 +70,7 @@
     $sh->finish();
 
 // How long
-    $search_time = timer(true);
+    $search_time = sprintf('%.4f', timer(true));
 
 // Print the page
     require 'templates/search.php';
