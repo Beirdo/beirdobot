@@ -30,6 +30,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <pcre.h>
 #include "botnet.h"
 #include "structs.h"
 #include "protos.h"
@@ -43,6 +44,9 @@ char *botHelpHelp( void );
 char *botHelpList( void );
 
 static char *botCmdDepthFirst( BalancedBTreeItem_t *item );
+void regexpBotCmdParse( IRCServer_t *server, IRCChannel_t *channel, char *who, 
+                        char *msg, IRCMsgType_t type, int *ovector, 
+                        int ovecsize );
 
 /* CVS generated ID string */
 static char ident[] _UNUSED_ = 
@@ -119,6 +123,40 @@ void botCmd_remove( char *command )
         free( item->item );
     }
     BalancedBTreeUnlock( botCmdTree );
+}
+
+void regexpBotCmdAdd( IRCServer_t *server, IRCChannel_t *channel )
+{
+    char           *chanRegexp;
+    char           *nickRegexp;
+
+    chanRegexp = (char *)malloc(256);
+    if( !chanRegexp ) {
+        return;
+    }
+
+    nickRegexp = (char *)malloc(256);
+    if( !nickRegexp ) {
+        free( chanRegexp );
+        return;
+    }
+    
+    snprintf( chanRegexp, 256, "(?i)^%s$", channel->fullspec );
+    snprintf( nickRegexp, 256, "(?i)^\\s*%s[:,]?\\s*(.*)$", server->nick );
+
+    regexp_add( (const char *)chanRegexp, (const char *)nickRegexp, 
+                regexpBotCmdParse );
+}
+
+void regexpBotCmdParse( IRCServer_t *server, IRCChannel_t *channel, char *who, 
+                        char *msg, IRCMsgType_t type, int *ovector, 
+                        int ovecsize )
+{
+    char               *message;
+
+    pcre_get_substring( msg, ovector, ovecsize, 1, (const char **)&message );
+    botCmd_parse( server, channel, who, message );
+    pcre_free_substring( message );
 }
 
 int botCmd_parse( IRCServer_t *server, IRCChannel_t *channel, char *who, 

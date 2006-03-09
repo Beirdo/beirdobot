@@ -259,6 +259,7 @@ void db_load_channels(void)
                               false );
             LinkedListAdd( server->channels, (LinkedListItem_t *)channel,
                            LOCKED, AT_TAIL );
+            regexpBotCmdAdd( server, channel );
         }
         mysql_free_result(res);
 

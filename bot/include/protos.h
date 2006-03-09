@@ -76,6 +76,7 @@ IRCChannel_t *FindChannel(IRCServer_t *server, const char *channame);
 void botCmd_initialize( void );
 void botCmd_add( const char **command, BotCmdFunc_t func,
                  BotCmdHelpFunc_t helpFunc );
+void regexpBotCmdAdd( IRCServer_t *server, IRCChannel_t *channel );
 int botCmd_parse( IRCServer_t *server, IRCChannel_t *channel, char *who, 
                   char *msg );
 void botCmd_remove( char *command );
