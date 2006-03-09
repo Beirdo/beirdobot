@@ -407,12 +407,7 @@ void ProcOnJoin(BN_PInfo I, const char Chan[], const char Who[])
 
     if( strcmp( channel->url, "" ) && 
         db_check_nick_notify( channel, nick, channel->notifywindow ) ) {
-        snprintf( string, MAX_STRING_LENGTH, 
-                  "%s :This channel (%s) is logged -- %s", nick, 
-                  channel->channel, channel->url );
-        BN_SendMessage(I, BN_MakeMessage(NULL, "NOTICE", string),
-                       BN_LOW_PRIORITY);
-        db_notify_nick( channel, nick );
+        send_notice( channel, nick );
     }
     free( string );
 }
