@@ -147,7 +147,7 @@ void botCmdSearch( IRCServer_t *server, IRCChannel_t *channel, char *who,
 char *botHelpSearch( void )
 {
     static char *help = "Search for text in a channel's log, "
-                        "returns top 5 matches by privmsg.  "
+                        "returns top 3 matches by privmsg.  "
                         "Syntax: (in channel) search text  "
                         "(in privmsg) search #channel text.";
 
@@ -306,7 +306,7 @@ void db_search_text( IRCServer_t *server, IRCChannel_t *channel, char *who,
                     "AND MATCH(`nick`, `message`) AGAINST ('%s') > 0 "
                     "AND `chanid` = %d "
                     "GROUP BY %d * FLOOR(`timestamp` / %d) "
-                    "ORDER BY score DESC, `msgid` ASC LIMIT 5", SEARCH_WINDOW,
+                    "ORDER BY score DESC, `msgid` ASC LIMIT 3", SEARCH_WINDOW,
                     SEARCH_WINDOW, quotedText, quotedText, channel->channelId,
                     SEARCH_WINDOW, SEARCH_WINDOW );
 
