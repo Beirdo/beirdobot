@@ -142,7 +142,7 @@ void regexpBotCmdAdd( IRCServer_t *server, IRCChannel_t *channel )
     }
     
     snprintf( chanRegexp, 256, "(?i)^%s$", channel->fullspec );
-    snprintf( nickRegexp, 256, "(?i)^\\s*%s[:,]?\\s*(.*)$", server->nick );
+    snprintf( nickRegexp, 256, "(?i)^\\s*%s[:,]?\\s+(.*)$", server->nick );
 
     regexp_add( (const char *)chanRegexp, (const char *)nickRegexp, 
                 regexpBotCmdParse );
