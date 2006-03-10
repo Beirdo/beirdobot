@@ -359,7 +359,7 @@ void authenticate_state_machine( IRCServer_t *server, IRCChannel_t *channel,
          item = item->next ) {
         auth = (AuthData_t *)item;
 
-        if( !strcasecmp(nick, auth->nick) ) {
+        if( auth->server == server && !strcasecmp(nick, auth->nick) ) {
             found = true;
         }
     }
