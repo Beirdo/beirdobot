@@ -128,6 +128,13 @@ typedef struct {
     char               *nick;
 } NotifyItem_t;
 
+typedef struct {
+    char               *digest;
+    char               *seed;
+    int                 count;
+    char               *hash;
+} AuthData_t;
+
 #endif
 
 /*

@@ -69,6 +69,9 @@ char *db_get_setting( char *name );
 void db_set_setting( char *name, char *format, ... );
 void db_check_schema(void);
 void db_nick_history( IRCChannel_t *channel, char *nick, NickHistory_t type ); 
+AuthData_t *db_get_auth( char *nick );
+void db_set_auth( char *nick, AuthData_t *auth );
+void db_free_auth( AuthData_t *auth );
 
 IRCChannel_t *FindChannelNum( IRCServer_t *server, int channum );
 IRCChannel_t *FindChannel(IRCServer_t *server, const char *channame);
@@ -98,6 +101,9 @@ void LoggedChannelMessage( IRCServer_t *server, IRCChannel_t *channel,
                            char *message );
 void LoggedActionMessage( IRCServer_t *server, IRCChannel_t *channel,
                           char *message );
+
+char *auth_user_challenge( char *nick );
+bool auth_user_verify( char *nick, char *response );
 
 #endif
 

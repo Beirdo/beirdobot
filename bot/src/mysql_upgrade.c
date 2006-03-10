@@ -76,6 +76,18 @@ SchemaUpgrade_t schemaUpgrade[CURRENT_SCHEMA] = {
         "ALTER TABLE `irclog` DROP INDEX `messageType` ,\n"
         "ADD INDEX `messageType` ( `msgtype` , `chanid` , `timestamp` )\n",
         NULL
+    },
+    /* 5 -> 6 */
+    {
+        "CREATE TABLE `userauth` (\n"
+        " `username` VARCHAR( 64 ) NOT NULL ,\n"
+        " `digest` ENUM( 'md4', 'md5', 'sha1' ) NOT NULL ,\n"
+        " `seed` VARCHAR( 20 ) NOT NULL ,\n"
+        " `key` VARCHAR( 16 ) NOT NULL ,\n"
+        " `keyIndex` INT NOT NULL ,\n"
+        " PRIMARY KEY ( `username` )\n"
+        ") TYPE = MYISAM ;\n",
+        NULL
     }
 };
 

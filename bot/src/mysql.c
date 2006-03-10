@@ -741,6 +741,101 @@ void db_set_setting( char *name, char *format, ... )
     mysql_free_result(res);
 }
 
+AuthData_t *db_get_auth( char *nick )
+{
+    int             count;
+    MYSQL_RES      *res;
+    MYSQL_ROW       row;
+    AuthData_t     *data;
+    char           *nickQuoted;
+
+    if( !nick ) {
+        return( NULL );
+    }
+
+    nickQuoted = db_quote(nick);
+
+    if( !nickQuoted ) {
+        return( NULL );
+    }
+
+    res = db_query( "SELECT `digest`, `seed`, `key`, `keyIndex` "
+                    "FROM `userauth` WHERE `username` = '%s' LIMIT 1", 
+                    nickQuoted );
+    free( nickQuoted );
+
+    if( !res || !(count = mysql_num_rows(res)) ) {
+        mysql_free_result(res);
+        return( NULL );
+    }
+
+    row = mysql_fetch_row(res);
+
+    data = (AuthData_t *)malloc(sizeof(AuthData_t));
+    if( !data ) {
+        mysql_free_result(res);
+        return( NULL );
+    }
+
+    data->digest = strdup(row[0]);
+    data->seed   = strdup(row[1]);
+    data->hash   = strdup(row[2]);
+    data->count  = atoi(row[3]);
+    mysql_free_result(res);
+
+    return( data );
+}
+
+void db_free_auth( AuthData_t *auth )
+{
+    if( !auth ) {
+        return;
+    }
+
+    free( auth->digest );
+    free( auth->seed );
+    free( auth->hash );
+    free( auth );
+}
+
+void db_set_auth( char *nick, AuthData_t *auth )
+{
+    int             count;
+    MYSQL_RES      *res;
+    char           *nickQuoted;
+
+    if( !nick || !auth ) {
+        return;
+    }
+
+    nickQuoted = db_quote(nick);
+
+    if( !nickQuoted ) {
+        return;
+    }
+
+    res = db_query( "SELECT * FROM `userauth` WHERE `username` = '%s' "
+                    "LIMIT 1", nickQuoted );
+    if( !res || !(count = mysql_num_rows(res)) ) {
+        count = 0;
+    }
+    mysql_free_result(res);
+
+    if( count ) {
+        res = db_query( "UPDATE `userauth` SET `digest` = '%s', `seed` = '%s', "
+                        "`key` = '%s', `keyIndex` = %d "
+                        "WHERE `username` = '%s'", auth->digest, auth->seed,
+                        auth->hash, auth->count, nickQuoted );
+    } else {
+        res = db_query( "INSERT INTO `userauth` (`username`, `digest`, `seed`, "
+                        "`key`, `keyIndex`) "
+                        "VALUES ( '%s', '%s', '%s', '%s', %d )", nickQuoted,
+                        auth->digest, auth->seed, auth->hash, auth->count );
+    }
+    mysql_free_result(res);
+}
+
+
 /*
  * vim:ts=4:sw=4:ai:et:si:sts=4
  */
