@@ -777,10 +777,14 @@ AuthData_t *db_get_auth( char *nick )
         return( NULL );
     }
 
-    data->digest = strdup(row[0]);
-    data->seed   = strdup(row[1]);
-    data->hash   = strdup(row[2]);
-    data->count  = atoi(row[3]);
+    data->server   = NULL;
+    data->nick     = strdup(nick);
+    data->digest   = strdup(row[0]);
+    data->seed     = strdup(row[1]);
+    data->hash     = strdup(row[2]);
+    data->count    = atoi(row[3]);
+    data->state    = AUTH_NONE;
+    data->wakeTime = 0;
     mysql_free_result(res);
 
     return( data );
@@ -792,6 +796,7 @@ void db_free_auth( AuthData_t *auth )
         return;
     }
 
+    free( auth->nick );
     free( auth->digest );
     free( auth->seed );
     free( auth->hash );

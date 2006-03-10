@@ -32,6 +32,9 @@
 #include <stdlib.h>
 #include <string.h>
 #include <opie.h>
+#include <sys/time.h>
+#include <time.h>
+#include <pthread.h>
 #include "protos.h"
 #include "structs.h"
 
@@ -44,6 +47,10 @@ static int changed(AuthData_t *auth, char *nick);
 
 extern int __opieparsechallenge(char *buffer, int *algorithm, int *sequence, 
                                 char **seed, int *exts);
+
+void *authenticate_thread(void *arg);
+char *auth_user_challenge( AuthData_t **pAuth, char *nick );
+bool auth_user_verify( AuthData_t **pAuth, char *nick, char *response );
 
 
 #define RESPONSE_STANDARD  0
@@ -69,11 +76,13 @@ static struct _rtrans rtrans[] = {
 
 static char *algids[] = { NULL, NULL, NULL, "sha1", "md4", "md5" };
 
+LinkedList_t   *AuthList;
+pthread_t       authentThreadId;
 
-char *auth_user_challenge( char *nick )
+char *auth_user_challenge( AuthData_t **pAuth, char *nick )
 {
-    AuthData_t         *auth;
     char               *challenge;
+    AuthData_t         *auth;
 
     challenge = (char *)malloc(256);
     auth = db_get_auth( nick );
@@ -83,13 +92,13 @@ char *auth_user_challenge( char *nick )
         sprintf(challenge, "otp-%s %d %s ext", auth->digest, auth->count - 1,
                 auth->seed);
     }
-    db_free_auth( auth );
+    *pAuth = auth;
 
     return( challenge );
 }
 
 
-bool auth_user_verify( char *nick, char *response )
+bool auth_user_verify( AuthData_t **pAuth, char *nick, char *response )
 {
     int             i,
                     j,
@@ -107,7 +116,7 @@ bool auth_user_verify( char *nick, char *response )
         return( false );
     }
 
-    auth = db_get_auth( nick );
+    auth = *pAuth;
     if( !auth ) {
         return( false );
     }
@@ -120,12 +129,10 @@ bool auth_user_verify( char *nick, char *response )
     }
 
     if( !i ) {
-        db_free_auth( auth );
         return( false );
     }
             
     if (!opieatob8(lastkey, auth->hash)) {
-        db_free_auth(auth);
         return( false );
     }
 
@@ -173,7 +180,6 @@ bool auth_user_verify( char *nick, char *response )
     case RESPONSE_INIT_HEX:
     case RESPONSE_INIT_WORD:
         if (!(c2 = strchr(c, ':'))) {
-            db_free_auth( auth );
             return( false );
         }
 
@@ -181,12 +187,10 @@ bool auth_user_verify( char *nick, char *response )
 
         if (i == RESPONSE_INIT_HEX) {
             if (!opieatob8(key, c)) {
-                db_free_auth( auth );
                 return( false );
             }
         } else {
             if (opieetob(key, c) != 1) {
-                db_free_auth( auth );
                 return( false );
             }
         }
@@ -195,26 +199,23 @@ bool auth_user_verify( char *nick, char *response )
         opiehash(fkey, alg);
 
         if (memcmp(fkey, lastkey, sizeof(key))) {
-            db_free_auth( auth );
             return( false );
         }
 
         if (changed(auth, nick)) {
-            db_free_auth( auth );
             return( false );
         }
 
         auth->count--;
 
         if (!opiebtoa8(auth->hash, key)) {
-            db_free_auth( auth );
             return( false );
         }
 
         db_set_auth(nick, auth);
+        *pAuth = auth;
 
         if (!(c2 = strchr(c = c2, ':'))) {
-            db_free_auth( auth );
             return( false );
         }
 
@@ -222,36 +223,30 @@ bool auth_user_verify( char *nick, char *response )
 
         if (__opieparsechallenge(c, &j, &(auth->count), &(auth->seed), &k) ||
             (j != alg) || k) {
-            db_free_auth( auth );
             return( false );
         }
 
         if (i == RESPONSE_INIT_HEX) {
             if (!opieatob8(key, c2)) {
-                db_free_auth( auth );
                 return( false );
             }
         } else {
             if (opieetob(key, c2) != 1) {
-                db_free_auth( auth );
                 return( false );
             }
         }
         goto verwrt;
     case RESPONSE_UNKNOWN:
     default:
-        db_free_auth( auth );
         return( false );
         break;
     }
 
     if (i) {
-        db_free_auth( auth );
         return( false );
     }
 
     if (changed(auth, nick)) {
-        db_free_auth( auth );
         return( false );
     }
 
@@ -259,12 +254,12 @@ bool auth_user_verify( char *nick, char *response )
 
   verwrt:
     if (!opiebtoa8(auth->hash, key)) {
-        db_free_auth( auth );
         return( false );
     }
 
     db_set_auth( nick, auth );
-    db_free_auth( auth );
+    *pAuth = auth;
+
     return( true );
 }
 
@@ -286,6 +281,140 @@ static int changed(AuthData_t *auth, char *nick)
     db_free_auth( newAuth );
 
     return 0;
+}
+
+
+void authenticate_start(void)
+{
+    pthread_create( &authentThreadId, NULL, authenticate_thread, NULL );
+}
+
+void *authenticate_thread(void *arg)
+{
+    LinkedListItem_t   *item;
+    LinkedListItem_t   *prev;
+    AuthData_t         *auth;
+    struct timespec     ts;
+    struct timeval      now;
+    char                timedout[] = "Authentication timed out";
+    static char        *command = "authenticate";
+
+    AuthList = LinkedListCreate();
+
+    ts.tv_sec = 1;
+    ts.tv_nsec = 0L;
+
+    botCmd_add( (const char **)&command, authenticate_state_machine, NULL );
+
+    printf("Starting authenticate thread\n");
+
+    while( true ) {
+        gettimeofday( &now, NULL );
+        LinkedListLock( AuthList );
+        for( item = AuthList->head, prev = NULL; item; 
+             item = (prev == NULL ? AuthList->head : item->next) ) {
+            auth = (AuthData_t *)item;
+
+            if( auth->wakeTime != 0 && auth->wakeTime <= now.tv_sec ) {
+                auth->state = AUTH_TIMEDOUT;
+                BN_SendPrivateMessage( &auth->server->ircInfo, 
+                                       (const char *)auth->nick, timedout );
+                printf( "Authentication timeout for %s\n", auth->nick );
+            }
+
+            if( auth->state == AUTH_REJECTED || 
+                auth->state == AUTH_TIMEDOUT ||
+                auth->state == AUTH_DISCONNECT ) {
+                prev = item->prev;
+                LinkedListRemove( AuthList, item, LOCKED );
+                db_free_auth( auth );
+                item = prev;
+            } else {
+                prev = item;
+            }
+        }
+        LinkedListUnlock( AuthList );
+
+        nanosleep( &ts, NULL );
+    }
+
+    return(NULL);
+}
+
+void authenticate_state_machine( IRCServer_t *server, IRCChannel_t *channel,
+                                 char *nick, char *msg )
+{
+    LinkedListItem_t   *item;
+    AuthData_t         *auth;
+    struct timeval      now;
+    bool                found;
+    char               *string;
+
+    if( channel ) {
+        return;
+    }
+
+    LinkedListLock( AuthList );
+    for( item = AuthList->head, found = false; item && !found; 
+         item = item->next ) {
+        auth = (AuthData_t *)item;
+
+        if( !strcasecmp(nick, auth->nick) ) {
+            found = true;
+        }
+    }
+
+    LinkedListUnlock( AuthList );
+
+    gettimeofday( &now, NULL );
+
+    if( !found ) {
+        string = auth_user_challenge( &auth, nick );
+        if( auth ) {
+            auth->server = server;
+            auth->state = AUTH_CHALLENGE;
+            auth->wakeTime = now.tv_sec + 30;
+            LinkedListAdd( AuthList, (LinkedListItem_t *)auth, UNLOCKED, 
+                           AT_HEAD );
+        }
+
+        BN_SendPrivateMessage( &server->ircInfo, (const char *)nick, string );
+        free( string );
+        return;
+    }
+
+    switch( auth->state ) {
+    case AUTH_CHALLENGE:
+        if( auth_user_verify( &auth, nick, msg ) ) {
+            auth->state = AUTH_ACCEPTED;
+            auth->wakeTime = now.tv_sec + (30 * 60);
+            string = strdup( "Authentication accepted for 30min" );
+            printf( "Authenticated accepted for %s\n", nick );
+        } else {
+            auth->state = AUTH_REJECTED;
+            auth->wakeTime = now.tv_sec;
+            string = strdup( "Authentication rejected" );
+            printf( "Authenticated rejected for %s\n", nick );
+        }
+
+        BN_SendPrivateMessage( &server->ircInfo, (const char *)nick, string );
+        free( string );
+        break;
+    case AUTH_ACCEPTED:
+        if( !strcasecmp(msg, "logoff") ) {
+            auth->state = AUTH_DISCONNECT;
+            auth->wakeTime = now.tv_sec + 5;
+            string = strdup( "Logged off" );
+            printf( "Logoff by %s\n", nick );
+
+            BN_SendPrivateMessage( &server->ircInfo, (const char *)nick, 
+                                   string );
+            free( string );
+        }
+        break;
+    default:
+        break;
+    }
 }
 
 

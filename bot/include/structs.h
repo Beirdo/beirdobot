@@ -128,11 +128,25 @@ typedef struct {
     char               *nick;
 } NotifyItem_t;
 
+typedef enum {
+    AUTH_NONE,
+    AUTH_CHALLENGE,
+    AUTH_ACCEPTED,
+    AUTH_REJECTED,
+    AUTH_TIMEDOUT,
+    AUTH_DISCONNECT
+} AuthState_t;
+
 typedef struct {
+    LinkedListItem_t    item;
+    IRCServer_t        *server;
+    char               *nick;
     char               *digest;
     char               *seed;
     int                 count;
     char               *hash;
+    AuthState_t         state;
+    unsigned int        wakeTime;
 } AuthData_t;
 
 #endif

@@ -102,8 +102,9 @@ void LoggedChannelMessage( IRCServer_t *server, IRCChannel_t *channel,
 void LoggedActionMessage( IRCServer_t *server, IRCChannel_t *channel,
                           char *message );
 
-char *auth_user_challenge( char *nick );
-bool auth_user_verify( char *nick, char *response );
+void authenticate_start(void);
+void authenticate_state_machine( IRCServer_t *server, IRCChannel_t *channel,
+                                 char *nick, char *msg );
 
 #endif
 

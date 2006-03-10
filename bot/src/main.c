@@ -79,6 +79,9 @@ int main ( int argc, char **argv )
     /* Start the notifier thread */
     notify_start();
 
+    /* Start the authenticate thread */
+    authenticate_start();
+
     /* Start the bot */
     bot_start();
 
