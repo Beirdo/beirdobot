@@ -88,6 +88,15 @@ SchemaUpgrade_t schemaUpgrade[CURRENT_SCHEMA] = {
         " PRIMARY KEY ( `username` )\n"
         ") TYPE = MYISAM ;\n",
         NULL
+    },
+    /* 6 -> 7 */
+    {
+        "CREATE TABLE `plugin_trac` (\n"
+        " `chanid` INT NOT NULL ,\n"
+        " `url` VARCHAR( 255 ) NOT NULL ,\n"
+        " PRIMARY KEY ( `chanid` )\n"
+        ") TYPE = MYISAM ;\n",
+        NULL
     }
 };
 
