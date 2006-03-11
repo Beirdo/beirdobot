@@ -100,9 +100,14 @@ void botCmdSearch( IRCServer_t *server, IRCChannel_t *channel, char *who,
 
         len = message - msg;
         chan = strndup(msg, len);
+        chan[len] = '\0';
+
         msg += (len + 1);
         while( *msg == ' ' ) {
             msg++;
+        }
+        if( *msg == '\0' ) {
+            msg = NULL;
         }
 
         channel = FindChannel(server, chan);
