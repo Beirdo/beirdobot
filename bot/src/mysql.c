@@ -664,8 +664,9 @@ char *db_get_seen( IRCChannel_t *channel, char *nick, bool privmsg )
     len = strlen(nick) + strlen(idle) + 
           (privmsg ? strlen(channel->channel) : 0);
 
+    result = (char *)malloc(len + 64);
+
     if( present ) {
-        result = (char *)malloc(len + 34);
         if( privmsg ) {
             sprintf( result, "%s is in %s and has been idle for%s", nick, 
                      channel->channel, idle );
@@ -673,7 +674,6 @@ char *db_get_seen( IRCChannel_t *channel, char *nick, bool privmsg )
             sprintf( result, "%s is here and has been idle for%s", nick, idle );
         }
     } else {
-        result = (char *)malloc(len + 25);
         if( privmsg ) {
             sprintf( result, "%s was last seen in %s%s ago", nick, 
                      channel->channel, idle );
