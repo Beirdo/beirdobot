@@ -83,13 +83,15 @@ void regexpBotCmdAdd( IRCServer_t *server, IRCChannel_t *channel );
 int botCmd_parse( IRCServer_t *server, IRCChannel_t *channel, char *who, 
                   char *msg );
 void botCmd_remove( char *command );
+char *botCmdDepthFirst( BalancedBTreeItem_t *item, bool filterPlugins );
 void send_notice( IRCChannel_t *channel, char *nick );
 void notify_start(void);
 
 BalancedBTree_t *db_get_plugins( void );
 void plugins_initialize( void );
-void pluginLoad( char *name );
-void pluginUnload( char *name );
+bool pluginLoad( char *name );
+bool pluginUnload( char *name );
+
 void regexp_initialize( void );
 void regexp_add( const char *channelRegexp, const char *contentRegexp, 
                  RegexpFunc_t func );
@@ -105,6 +107,7 @@ void LoggedActionMessage( IRCServer_t *server, IRCChannel_t *channel,
 void authenticate_start(void);
 void authenticate_state_machine( IRCServer_t *server, IRCChannel_t *channel,
                                  char *nick, char *msg );
+bool authenticate_check( IRCServer_t *server, char *nick );
 
 #endif
 

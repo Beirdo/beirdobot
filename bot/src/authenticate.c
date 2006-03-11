@@ -341,6 +341,32 @@ void *authenticate_thread(void *arg)
     return(NULL);
 }
 
+bool authenticate_check( IRCServer_t *server, char *nick )
+{
+    LinkedListItem_t   *item;
+    AuthData_t         *auth = NULL;
+    bool                found;
+
+    LinkedListLock( AuthList );
+    for( item = AuthList->head, found = false; item && !found; 
+         item = item->next ) {
+        auth = (AuthData_t *)item;
+
+        if( auth->server == server && !strcasecmp(nick, auth->nick) ) {
+            found = true;
+        }
+    }
+
+    LinkedListUnlock( AuthList );
+
+    if( !found || !auth || auth->state != AUTH_ACCEPTED ) {
+        return( false );
+    } else {
+        return( true );
+    }
+}
+
+
 void authenticate_state_machine( IRCServer_t *server, IRCChannel_t *channel,
                                  char *nick, char *msg )
 {

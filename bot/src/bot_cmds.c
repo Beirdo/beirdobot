@@ -43,7 +43,6 @@ void botCmdList( IRCServer_t *server, IRCChannel_t *channel, char *who,
 char *botHelpHelp( void );
 char *botHelpList( void );
 
-static char *botCmdDepthFirst( BalancedBTreeItem_t *item );
 void regexpBotCmdParse( IRCServer_t *server, IRCChannel_t *channel, char *who, 
                         char *msg, IRCMsgType_t type, int *ovector, 
                         int ovecsize );
@@ -275,12 +274,13 @@ char *botHelpHelp( void )
     return( help );
 }
 
-static char *botCmdDepthFirst( BalancedBTreeItem_t *item )
+char *botCmdDepthFirst( BalancedBTreeItem_t *item, bool filterPlugins )
 {
     char       *message;
     char       *oldmsg;
     char       *submsg;
     int         len;
+    Plugin_t   *plugin;
 
     message = NULL;
 
@@ -288,7 +288,7 @@ static char *botCmdDepthFirst( BalancedBTreeItem_t *item )
         return( message );
     }
 
-    submsg = botCmdDepthFirst( item->left );
+    submsg = botCmdDepthFirst( item->left, filterPlugins );
     message = submsg;
     oldmsg  = message;
     if( message ) {
@@ -297,17 +297,20 @@ static char *botCmdDepthFirst( BalancedBTreeItem_t *item )
         len = -2;
     }
     
-    submsg = strdup(*((char **)item->key));
-    message = (char *)realloc(message, len + 2 + strlen(submsg) + 2);
-    if( oldmsg ) {
-        strcat( message, ", " );
-    } else {
-        message[0] = '\0';
+    plugin = (Plugin_t *)item->item;
+    if( !filterPlugins || plugin->loaded ) {
+        submsg = strdup(*((char **)item->key));
+        message = (char *)realloc(message, len + 2 + strlen(submsg) + 2);
+        if( oldmsg ) {
+            strcat( message, ", " );
+        } else {
+            message[0] = '\0';
+        }
+        strcat( message, submsg );
+        free( submsg );
     }
-    strcat( message, submsg );
-    free( submsg );
 
-    submsg = botCmdDepthFirst( item->right );
+    submsg = botCmdDepthFirst( item->right, filterPlugins );
     if( submsg ) {
         len = strlen( message );
 
@@ -326,7 +329,7 @@ void botCmdList( IRCServer_t *server, IRCChannel_t *channel, char *who,
     char       *message;
 
     BalancedBTreeLock( botCmdTree );
-    message = botCmdDepthFirst( botCmdTree->root );
+    message = botCmdDepthFirst( botCmdTree->root, false );
     BalancedBTreeUnlock( botCmdTree );
 
     if( server ) {

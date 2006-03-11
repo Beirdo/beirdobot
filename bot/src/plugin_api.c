@@ -25,12 +25,12 @@
 */
 
 /* INCLUDE FILES */
+#include "environment.h"
 #include <pthread.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <dlfcn.h>
-#include "environment.h"
 #include "structs.h"
 #include "protos.h"
 #include "balanced_btree.h"
@@ -42,6 +42,8 @@
 void pluginInitializeTree( BalancedBTreeItem_t *item );
 void pluginLoadItem( Plugin_t *plugin );
 void pluginUnloadItem( Plugin_t *plugin );
+void botCmdPlugin( IRCServer_t *server, IRCChannel_t *channel, char *who, 
+                   char *msg );
 
 BalancedBTree_t *pluginTree;
 
@@ -51,6 +53,8 @@ static char ident[] _UNUSED_ =
 
 void plugins_initialize( void )
 {
+    static char        *command = "plugin";
+
     pluginTree = db_get_plugins();
     if( !pluginTree ) {
         return;
@@ -59,6 +63,8 @@ void plugins_initialize( void )
     BalancedBTreeLock( pluginTree );
     pluginInitializeTree( pluginTree->root );
     BalancedBTreeUnlock( pluginTree );
+
+    botCmd_add( (const char **)&command, botCmdPlugin, NULL );
 }
 
 void pluginInitializeTree( BalancedBTreeItem_t *item )
@@ -79,46 +85,58 @@ void pluginInitializeTree( BalancedBTreeItem_t *item )
     pluginInitializeTree( item->right );
 }
 
-void pluginLoad( char *name )
+bool pluginLoad( char *name )
 {
     BalancedBTreeItem_t    *item;
     Plugin_t               *plugin;
 
     if( !name ) {
-        return;
+        return( false );
     }
 
     item = BalancedBTreeFind( pluginTree, (void *)&name, UNLOCKED );
     if( !item ) {
-        return;
+        return( false );
     }
 
     plugin = (Plugin_t *)item->item;
+
+    if( plugin->loaded ) {
+        return( false );
+    }
+
     pluginLoadItem( plugin );
+    return( true );
 }
 
-void pluginUnload( char *name )
+bool pluginUnload( char *name )
 {
     BalancedBTreeItem_t    *item;
     Plugin_t               *plugin;
 
     if( !name ) {
-        return;
+        return( false );
     }
 
     item = BalancedBTreeFind( pluginTree, (void *)&name, UNLOCKED );
     if( !item ) {
-        return;
+        return( false );
     }
 
     plugin = (Plugin_t *)item->item;
+
+    if( !plugin->loaded ) {
+        return( false );
+    }
+
     pluginUnloadItem( plugin );
+    return( true );
 }
 
 void pluginLoadItem( Plugin_t *plugin )
 {
-    char       *libfile;
-    char       *error;
+    char                   *libfile;
+    char                   *error;
 
     libfile = (char *)malloc(strlen(PLUGIN_PATH) + 
                              strlen(plugin->libName) + 3 );
@@ -148,6 +166,7 @@ void pluginLoadItem( Plugin_t *plugin )
     }
 
     plugin->init(plugin->args);
+    plugin->loaded = true;
 }
 
 void pluginUnloadItem( Plugin_t *plugin )
@@ -167,6 +186,88 @@ void pluginUnloadItem( Plugin_t *plugin )
         fprintf( stderr, "%s\n", error );
         return;
     }
+    plugin->loaded = false;
+}
+
+void botCmdPlugin( IRCServer_t *server, IRCChannel_t *channel, char *who, 
+                   char *msg )
+{
+    int             len;
+    char           *line;
+    char           *command;
+    char           *message;
+    bool            ret;
+    static char    *notauth = "You are not authorized, you can't do that!";
+
+    if( !server || channel ) {
+        return;
+    }
+
+    if( !authenticate_check( server, who ) ) {
+        BN_SendPrivateMessage(&server->ircInfo, (const char *)who, notauth);
+        return;
+    }
+
+    line = strstr( msg, " " );
+    if( line ) {
+        /* Command has trailing text, skip the space */
+        len = line - msg;
+        line++;
+
+        command = (char *)malloc( len + 2 );
+        strncpy( command, msg, len );
+        command[len] = '\0';
+    } else {
+        /* Command is the whole line */
+        command = strdup( msg );
+    }
+
+    /* Strip trailing spaces */
+    if( line ) {
+        for( len = strlen(line); len && line[len-1] == ' ';
+             len = strlen(line) ) {
+            line[len-1] = '\0';
+        }
+
+        if( *line == '\0' ) {
+            line = NULL;
+        }
+    }
+
+    if( !strcmp( command, "list" ) ) {
+        BalancedBTreeLock( pluginTree );
+        if( line && !strcmp( line, "all" ) ) {
+            message = botCmdDepthFirst( pluginTree->root, false );
+        } else {
+            message = botCmdDepthFirst( pluginTree->root, true );
+        }
+        BalancedBTreeUnlock( pluginTree );
+    } else if( !strcmp( command, "load" ) && line ) {
+        ret = pluginLoad( line );
+        message = (char *)malloc(strlen(line) + 32);
+        if( ret ) {
+            sprintf( message, "Loaded module %s", line );
+        } else {
+            sprintf( message, "Module %s already loaded", line );
+        }
+    } else if( !strcmp( command, "unload" ) && line ) {
+        ret = pluginUnload( line );
+        message = (char *)malloc(strlen(line) + 32);
+        if( ret ) {
+            sprintf( message, "Unloaded module %s", line );
+        } else {
+            sprintf( message, "Module %s already unloaded", line );
+        }
+    } else {
+        message = NULL;
+        free( command );
+        return;
+    }
+
+    BN_SendPrivateMessage(&server->ircInfo, (const char *)who, message);
+
+    free( message );
+    free( command );
 }
 
 

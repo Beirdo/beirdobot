@@ -95,6 +95,7 @@ typedef struct {
     char           *name;
     char           *libName;
     int             preload;
+    int             loaded;
     char           *args;
     void           *handle;
     void          (*init)(char *args);
