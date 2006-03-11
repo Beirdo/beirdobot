@@ -61,8 +61,6 @@ void regexpFuncFart( IRCServer_t *server, IRCChannel_t *channel, char *who,
 {
     char       *message;
 
-    printf( "Bot Regexp: fart by %s\n", who );
-
     if( !channel ) {
         return;
     }
