@@ -32,7 +32,7 @@
 static char db_schema_h_ident[] _UNUSED_ = 
     "$Id$";
 
-#define CURRENT_SCHEMA  7
+#define CURRENT_SCHEMA  8
 
 
 char *defSchema[] = {
@@ -82,6 +82,7 @@ char *defSchema[] = {
 "  `serverid` int(11) NOT NULL auto_increment,\n"
 "  `server` varchar(255) NOT NULL default '',\n"
 "  `port` int(11) NOT NULL default '0',\n"
+"  `password` varchar(255) NOT NULL default '',\n"
 "  `nick` varchar(64) NOT NULL default '',\n"
 "  `username` varchar(16) NOT NULL default '',\n"
 "  `realname` varchar(255) NOT NULL default '',\n"

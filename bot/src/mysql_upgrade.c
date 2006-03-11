@@ -97,6 +97,12 @@ SchemaUpgrade_t schemaUpgrade[CURRENT_SCHEMA] = {
         " PRIMARY KEY ( `chanid` )\n"
         ") TYPE = MYISAM ;\n",
         NULL
+    },
+    /* 7 -> 8 */
+    {
+        "ALTER TABLE `servers` ADD `password` VARCHAR( 255 ) NOT NULL "
+        "AFTER `port` ;\n",
+        NULL
     }
 };
 

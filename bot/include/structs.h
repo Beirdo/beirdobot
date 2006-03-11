@@ -46,6 +46,7 @@ typedef struct {
     int                 serverId;
     char               *server;
     uint16              port;
+    char               *password;
     char               *nick;
     char               *username;
     char               *realname;

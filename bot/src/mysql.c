@@ -157,9 +157,9 @@ void db_load_servers(void)
     MYSQL_RES      *res;
     MYSQL_ROW       row;
 
-    res = db_query( "SELECT `serverid`, `server`, `port`, `nick`, `username`, "
-                    "`realname`, `nickserv`, `nickservmsg` FROM `servers` "
-                    "ORDER BY `serverid`" );
+    res = db_query( "SELECT `serverid`, `server`, `port`, `password`, `nick`, "
+                    "`username`, `realname`, `nickserv`, `nickservmsg` "
+                    "FROM `servers` ORDER BY `serverid`" );
 
     if( !res || !(count = mysql_num_rows(res)) ) {
         mysql_free_result(res);
@@ -179,11 +179,12 @@ void db_load_servers(void)
         server->serverId        = atoi(row[0]);
         server->server          = strdup(row[1]);
         server->port            = (uint16)atoi(row[2]);
-        server->nick            = strdup(row[3]);
-        server->username        = strdup(row[4]);
-        server->realname        = strdup(row[5]);
-        server->nickserv        = strdup(row[6]);
-        server->nickservmsg     = strdup(row[7]);
+        server->password        = strdup(row[3]);
+        server->nick            = strdup(row[4]);
+        server->username        = strdup(row[5]);
+        server->realname        = strdup(row[6]);
+        server->nickserv        = strdup(row[7]);
+        server->nickservmsg     = strdup(row[8]);
 
         LinkedListAdd( ServerList, (LinkedListItem_t *)server, UNLOCKED,
                        AT_TAIL );

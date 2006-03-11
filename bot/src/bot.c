@@ -63,7 +63,10 @@ void ProcOnConnected(BN_PInfo I, const char HostName[])
     if( verbose ) {
         printf("Event Connected : (%s)\n", HostName);
     }
-    BN_EnableFloodProtection(I, 100, 1000, 60);
+    BN_EnableFloodProtection(I, 10000, 1000, 60);
+    if( strcmp( server->password, "" ) ) {
+        BN_SendPassword(I, server->password);
+    }
     BN_Register(I, server->nick, server->username, server->realname);
 }
 
