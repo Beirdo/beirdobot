@@ -71,7 +71,7 @@ void *notify_thread(void *arg)
     while( true ) {
         item = (NotifyItem_t *)QueueDequeueItem( NotifyQ, -1 );
 
-        LogPrint( LOG_INFO, "Notifying %s from %s\n", item->nick, 
+        LogPrint( LOG_INFO, "Notifying %s from %s", item->nick, 
                   item->channel->fullspec );
 
         snprintf( string, MAX_STRING_LENGTH,
