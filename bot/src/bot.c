@@ -24,7 +24,7 @@
  * Copyright 2006 Gavin Hurlbut 
  * All rights reserved 
  * 
- * Bot Net Example file 
+ * based on Bot Net Example file 
  * (c) Christophe CALMEJANE - 1999'01 
  * aka Ze KiLleR / SkyTech 
  */
@@ -44,6 +44,7 @@
 #include "structs.h"
 #include "linked_list.h"
 #include "balanced_btree.h"
+#include "logging.h"
 
 
 /* CVS generated ID string */
@@ -61,7 +62,7 @@ void ProcOnConnected(BN_PInfo I, const char HostName[])
 
     server = (IRCServer_t *)I->User;
     if( verbose ) {
-        printf("Event Connected : (%s)\n", HostName);
+        LogPrint( LOG_DEBUG, "Event Connected : (%s)", HostName);
     }
     BN_EnableFloodProtection(I, 10000, 1000, 60);
     if( strcmp( server->password, "" ) ) {
@@ -73,7 +74,7 @@ void ProcOnConnected(BN_PInfo I, const char HostName[])
 void ProcOnStatus(BN_PInfo I, const char Msg[], int Code)
 {
     if( verbose ) {
-        printf("Event Status : (%s)\n", Msg);
+        LogPrint( LOG_DEBUG, "Event Status : (%s)", Msg);
     }
 }
 
@@ -87,7 +88,7 @@ void ProcOnRegistered(BN_PInfo I)
     server = (IRCServer_t *)I->User;
 
     if( verbose ) {
-        printf("Event Registered\n");
+        LogPrintNoArg( LOG_DEBUG, "Event Registered");
     }
 
     if( strcmp(server->nickserv, "") ) {
@@ -115,21 +116,22 @@ void ProcOnUnknown(BN_PInfo I, const char Who[], const char Command[],
                    const char Msg[])
 {
     if( verbose ) {
-        printf("Unknown event from %s : %s %s\n", Who, Command, Msg);
+        LogPrint( LOG_DEBUG, "Unknown event from %s : %s %s", Who, Command, 
+                  Msg);
     }
 }
 
 void ProcOnError(BN_PInfo I, int err)
 {
     if( verbose ) {
-        printf("Event Error : (%d)\n", err);
+        LogPrint( LOG_DEBUG, "Event Error : (%d)", err);
     }
 }
 
 void ProcOnDisconnected(BN_PInfo I, const char Msg[])
 {
     if( verbose ) {
-        printf("Event Disconnected : (%s)\n", Msg);
+        LogPrint( LOG_DEBUG, "Event Disconnected : (%s)", Msg);
     }
 }
 
@@ -137,7 +139,8 @@ void ProcOnNotice(BN_PInfo I, const char Who[], const char Whom[],
                   const char Msg[])
 {
     if( verbose ) {
-        printf("You (%s) have notice by %s (%s)\n", Whom, Who, Msg);
+        LogPrint( LOG_DEBUG, "You (%s) have notice by %s (%s)\n", Whom, Who,
+                  Msg);
     }
 }
 
@@ -147,8 +150,8 @@ char *ProcOnCTCP(BN_PInfo I, const char Who[], const char Whom[],
     char           *S;
 
     if( verbose ) {
-        printf("You (%s) have received a CTCP request from %s (%s)\n", Whom,
-               Who, Type);
+        LogPrint( LOG_DEBUG, "You (%s) have received a CTCP request from %s "
+                             "(%s)", Whom, Who, Type);
     }
 
     S = NULL;
@@ -164,7 +167,8 @@ void ProcOnCTCPReply(BN_PInfo I, const char Who[], const char Whom[],
                      const char Msg[])
 {
     if( verbose ) {
-        printf("%s has replied to your (%s) CTCP request (%s)\n", Who, Whom,
+        LogPrint( LOG_DEBUG, "%s has replied to your (%s) CTCP request (%s)", 
+                  Who, Whom,
                Msg);
     }
 }
@@ -174,11 +178,11 @@ void ProcOnWhois(BN_PInfo I, const char *Chans[])
     int             i;
 
     if( verbose ) {
-        printf("Whois Infos:\n");
+        LogPrintNoArg( LOG_DEBUG, "Whois Infos:");
         for (i = 0; i < WHOIS_INFO_COUNT; i++) {
-            printf("\t(%s)\n", Chans[i]);
+            LogPrint( LOG_DEBUG, "\t(%s)", Chans[i]);
         }
-        printf("End of list\n");
+        LogPrintNoArg( LOG_DEBUG, "End of list");
     }
 }
 
@@ -200,7 +204,7 @@ void ProcOnMode(BN_PInfo I, const char Channel[], const char Who[],
 void ProcOnModeIs(BN_PInfo I, const char Channel[], const char Msg[])
 {
     if( verbose ) {
-        printf("Mode for %s : %s\n", Channel, Msg);
+        LogPrint( LOG_DEBUG, "Mode for %s : %s", Channel, Msg);
     }
 }
 
@@ -210,11 +214,11 @@ void ProcOnNames(BN_PInfo I, const char Channel[], const char *Names[],
     int             i;
 
     if( verbose ) {
-        printf("Names for channel (%s) :\n", Channel);
+        LogPrint( LOG_DEBUG, "Names for channel (%s) :", Channel);
         for (i = 0; i < Count; i++) {
-            printf("\t(%s)\n", Names[i]);
+            LogPrint( LOG_DEBUG, "\t(%s)", Names[i]);
         }
-        printf("End of names for (%s)\n", Channel);
+        LogPrint( LOG_DEBUG, "End of names for (%s)", Channel);
     }
 
     BN_SendMessage(I, BN_MakeMessage(NULL, "WHO", Channel), BN_LOW_PRIORITY);
@@ -231,14 +235,15 @@ void ProcOnWho(BN_PInfo I, const char Channel[], const char *Info[],
     channel = FindChannel((IRCServer_t *)I->User, Channel);
 
     if( verbose ) {
-        printf("Who infos for channel (%s)\n", Channel);
+        LogPrint( LOG_DEBUG, "Who infos for channel (%s)", Channel);
     }
 
     db_nick_history( channel, NULL, HIST_START );
     for (i = 0; i < (Count * WHO_INFO_COUNT); i += WHO_INFO_COUNT) {
         if( verbose ) {
-            printf("\t%s,%s,%s,%s,%s,%s\n", Info[i + 0], Info[i + 1],
-                   Info[i + 2], Info[i + 3], Info[i + 4], Info[i + 5]);
+            LogPrint( LOG_DEBUG, "\t%s,%s,%s,%s,%s,%s", Info[i + 0], 
+                      Info[i + 1], Info[i + 2], Info[i + 3], Info[i + 4],
+                      Info[i + 5]);
         }
 
         nick = (char *)Info[i + 0];
@@ -251,7 +256,7 @@ void ProcOnWho(BN_PInfo I, const char Channel[], const char *Info[],
     }
 
     if( verbose ) {
-        printf("End of Who for (%s)\n", Channel);
+        LogPrint( LOG_DEBUG, "End of Who for (%s)", Channel);
     }
 }
 
@@ -261,11 +266,11 @@ void ProcOnBanList(BN_PInfo I, const char Channel[], const char *BanList[],
     int             i;
 
     if( verbose ) {
-        printf("Ban list for channel %s\n", Channel);
+        LogPrint( LOG_DEBUG, "Ban list for channel %s", Channel);
         for (i = 0; i < Count; i++) {
-            printf("\t%s\n", BanList[i]);
+            LogPrint( LOG_DEBUG, "\t%s", BanList[i]);
         }
-        printf("End of ban list for %s\n", Channel);
+        LogPrint( LOG_DEBUG, "End of ban list for %s", Channel);
     }
 }
 
@@ -276,7 +281,8 @@ void ProcOnList(BN_PInfo I, const char *Channels[], const char *Counts[],
 
     if( verbose ) {
         for (i = 0; i < Count; i++) {
-            printf("%s (%s) : %s\n", Channels[i], Counts[i], Topics[i]);
+            LogPrint( LOG_DEBUG, "%s (%s) : %s", Channels[i], Counts[i], 
+                      Topics[i]);
         }
     }
 }
@@ -285,7 +291,7 @@ void ProcOnKill(BN_PInfo I, const char Who[], const char Whom[],
                 const char Msg[])
 {
     if( verbose ) {
-        printf("%s has been killed by %s (%s)\n", Whom, Who, Msg);
+        LogPrint( LOG_DEBUG, "%s has been killed by %s (%s)", Whom, Who, Msg);
     }
 }
 
@@ -293,7 +299,8 @@ void ProcOnInvite(BN_PInfo I, const char Chan[], const char Who[],
                   const char Whom[])
 {
     if( verbose ) {
-        printf("You (%s) have been invited to %s by %s\n", Whom, Chan, Who);
+        LogPrint( LOG_DEBUG, "You (%s) have been invited to %s by %s", Whom, 
+                  Chan, Who);
     }
 }
 
@@ -337,7 +344,8 @@ void ProcOnPrivateTalk(BN_PInfo I, const char Who[], const char Whom[],
     char            nick[256];
 
     if( verbose ) {
-        printf("%s sent you (%s) a private message (%s)\n", Who, Whom, Msg);
+        LogPrint( LOG_DEBUG, "%s sent you (%s) a private message (%s)", Who, 
+                  Whom, Msg);
     }
     BN_ExtractNick(Who, nick, 256);
     botCmd_parse( (IRCServer_t *)I->User, NULL, nick, (char *)Msg );
@@ -454,7 +462,8 @@ void ProcOnJoinChannel(BN_PInfo I, const char Chan[])
     IRCChannel_t       *channel;
 
     server = (IRCServer_t *)I->User;
-    printf("Joined channel %s on server %s\n", Chan, server->server);
+    LogPrint( LOG_NOTICE, "Joined channel %s on server %s", Chan, 
+              server->server);
 
     if( server->channels ) {
         LinkedListLock( server->channels );
@@ -556,11 +565,13 @@ void *bot_server_thread(void *arg)
     Info->CB.OnPart = ProcOnPart;
     Info->CB.OnQuit = ProcOnQuit;
 
-    printf("Connecting to %s:%d...\n", server->server, server->port);
+    LogPrint( LOG_NOTICE, "Connecting to %s:%d as %s...", server->server, 
+              server->port, server->nick);
 
     while (BN_Connect(Info, server->server, server->port, 0) != true)
     {
-        printf("Disconnected from %s:%d.\n", server->server, server->port);
+        LogPrint( LOG_NOTICE, "Disconnected from %s:%d as %s.", server->server, 
+                  server->port, server->nick);
         sleep(10);
 
         /* Clear the joined flags so we will rejoin on reconnect */
@@ -573,7 +584,8 @@ void *bot_server_thread(void *arg)
             LinkedListUnlock( server->channels );
         }
 
-        printf("Reconnecting to %s:%d...\n", server->server, server->port);
+        LogPrint( LOG_NOTICE, "Reconnecting to %s:%d as %s...", server->server,
+                  server->port, server->nick);
     }
 
     return(NULL);

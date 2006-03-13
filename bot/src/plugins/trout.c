@@ -33,6 +33,7 @@
 #include <string.h>
 #include "structs.h"
 #include "protos.h"
+#include "logging.h"
 
 /* INTERNAL FUNCTION PROTOTYPES */
 void botCmdTrout( IRCServer_t *server, IRCChannel_t *channel, char *who, 
@@ -48,13 +49,13 @@ void plugin_initialize( char *args )
 {
     static char    *command = "trout";
 
-    printf( "Initializing trout...\n" );
+    LogPrintNoArg( LOG_NOTICE, "Initializing trout..." );
     botCmd_add( (const char **)&command, botCmdTrout, botHelpTrout );
 }
 
 void plugin_shutdown( void )
 {
-    printf( "Removing trout...\n" );
+    LogPrintNoArg( LOG_NOTICE, "Removing trout..." );
     botCmd_remove( "trout" );
 }
 

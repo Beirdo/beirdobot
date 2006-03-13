@@ -36,6 +36,7 @@
 #include "protos.h"
 #include "structs.h"
 #include "queue.h"
+#include "logging.h"
 
 
 /* CVS generated ID string */
@@ -65,12 +66,13 @@ void *notify_thread(void *arg)
     ts.tv_sec = 0;
     ts.tv_nsec = 500000000L;
 
-    printf("Starting notify thread\n");
+    LogPrintNoArg( LOG_NOTICE, "Starting notify thread" );
 
     while( true ) {
         item = (NotifyItem_t *)QueueDequeueItem( NotifyQ, -1 );
 
-        printf( "Notifying %s from %s\n", item->nick, item->channel->fullspec );
+        LogPrint( LOG_INFO, "Notifying %s from %s\n", item->nick, 
+                  item->channel->fullspec );
 
         snprintf( string, MAX_STRING_LENGTH,
                   "%s :This channel (%s) is logged -- %s", item->nick, 

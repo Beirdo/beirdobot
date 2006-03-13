@@ -35,6 +35,7 @@
 #include "structs.h"
 #include "protos.h"
 #include "db_schema.h"
+#include "logging.h"
 
 static char ident[] _UNUSED_ =
     "$Id$";
@@ -129,8 +130,8 @@ void db_check_schema(void)
         }
 
         if( !printed ) {
-            fprintf( stderr, "Current database schema version %d\n", ver );
-            fprintf( stderr, "Code supports version %d\n", CURRENT_SCHEMA );
+            LogPrint( LOG_CRIT, "Current database schema version %d", ver );
+            LogPrint( LOG_CRIT, "Code supports version %d", CURRENT_SCHEMA );
             printed = TRUE;
         }
 
@@ -153,8 +154,8 @@ int db_upgrade_schema( int current, int goal )
         /* There is no dbSchema, assume that it is an empty database, populate
          * with the default schema
          */
-        fprintf( stderr, "Initializing database to schema version %d\n",
-                 CURRENT_SCHEMA );
+        LogPrint( LOG_ERR, "Initializing database to schema version %d",
+                  CURRENT_SCHEMA );
         for( i = 0; i < defSchemaCount; i++ ) {
             res = db_query( defSchema[i] );
             mysql_free_result(res);
@@ -163,8 +164,8 @@ int db_upgrade_schema( int current, int goal )
         return( CURRENT_SCHEMA );
     }
 
-    fprintf( stderr, "Upgrading database from schema version %d to %d\n",
-             current, current+1 );
+    LogPrint( LOG_ERR, "Upgrading database from schema version %d to %d",
+              current, current+1 );
     for( i = 0; schemaUpgrade[current][i]; i++ ) {
         res = db_query( schemaUpgrade[current][i] );
         mysql_free_result(res);

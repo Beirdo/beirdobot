@@ -25,11 +25,13 @@
 */
 
 /* INCLUDE FILES */
+#define ___ARGH
 #include "environment.h"
 #include <pthread.h>
 #include <stdio.h>
 #include "linked_list.h"
 #include <stdlib.h>
+#include "logging.h"
 
 /* INTERNAL CONSTANT DEFINITIONS */
 
@@ -72,7 +74,7 @@ LinkedList_t *LinkedListCreate( void )
     list = (LinkedList_t *)malloc(sizeof(LinkedList_t));
     if( list == NULL )
     {
-        fprintf( stderr, "Couldn't create linked list\n" );
+        LogPrintNoArg( LOG_CRIT, "Couldn't create linked list" );
         return( NULL );
     }
 
@@ -161,8 +163,8 @@ void LinkedListRemove( LinkedList_t *list, LinkedListItem_t *item,
 
     if( item->list != list )
     {
-        fprintf( stderr, "Item %p not on list %p! (on %p)\n", (void *)item, 
-                 (void *)list, (void *)item->list );
+        LogPrint( LOG_CRIT, "Item %p not on list %p! (on %p)\n", (void *)item, 
+                  (void *)list, (void *)item->list );
         return;
     }
 

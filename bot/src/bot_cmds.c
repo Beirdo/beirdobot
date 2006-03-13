@@ -34,6 +34,7 @@
 #include "botnet.h"
 #include "structs.h"
 #include "protos.h"
+#include "logging.h"
 
 /* INTERNAL FUNCTION PROTOTYPES */
 void botCmdHelp( IRCServer_t *server, IRCChannel_t *channel, char *who, 
@@ -263,7 +264,7 @@ void botCmdHelp( IRCServer_t *server, IRCChannel_t *channel, char *who,
         }
     } else {
         /* Used for debugging purposes */
-        printf( "help: %s\n", helpMsg );
+        LogPrint( LOG_DEBUG, "help: %s", helpMsg );
     }
 }
 
@@ -342,7 +343,7 @@ void botCmdList( IRCServer_t *server, IRCChannel_t *channel, char *who,
         }
     } else {
         /* Used for debugging purposes */
-        printf( "command list: %s\n", message );
+        LogPrint( LOG_DEBUG, "command list: %s", message );
     }
 
     free( message );

@@ -32,6 +32,7 @@
 #include "balanced_btree.h"
 #include <stdlib.h>
 #include <string.h>
+#include "logging.h"
 
 /* INTERNAL CONSTANT DEFINITIONS */
 
@@ -85,7 +86,7 @@ BalancedBTree_t *BalancedBTreeCreate( BalancedBTreeKeyType_t type )
     btree = (BalancedBTree_t *)malloc(sizeof(BalancedBTree_t));
     if( btree == NULL )
     {
-        fprintf( stderr, "Couldn't create btree\n" );
+        LogPrintNoArg( LOG_CRIT, "Couldn't create btree" );
         return( NULL );
     }
 
@@ -161,7 +162,7 @@ void BalancedBTreeAdd( BalancedBTree_t *btree, BalancedBTreeItem_t *item,
             /* item less than parent */
             item->parent->left  = item;
         } else {
-            printf( "Duplicate key\n" );
+            LogPrintNoArg( LOG_CRIT, "Duplicate key" );
         }
     }
 
@@ -188,8 +189,8 @@ void BalancedBTreeRemove( BalancedBTree_t *btree, BalancedBTreeItem_t *item,
 
     if( item != NULL && item->btree != btree )
     {
-        fprintf( stderr, "Item %p not on btree %p! (on %p)\n", (void *)item, 
-                 (void *)btree, (void *)item->btree );
+        LogPrint( LOG_CRIT, "Item %p not on btree %p! (on %p)", (void *)item, 
+                  (void *)btree, (void *)item->btree );
         return;
     }
 

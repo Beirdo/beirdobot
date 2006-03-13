@@ -34,6 +34,7 @@
 #include "structs.h"
 #include "protos.h"
 #include "balanced_btree.h"
+#include "logging.h"
 
 
 #define PLUGIN_PATH "./plugins"
@@ -142,12 +143,12 @@ void pluginLoadItem( Plugin_t *plugin )
                              strlen(plugin->libName) + 3 );
     sprintf( libfile, "%s/%s", PLUGIN_PATH, plugin->libName );
 
-    printf( "Loading plugin %s from %s\n", plugin->name, libfile );
+    LogPrint( LOG_NOTICE, "Loading plugin %s from %s", plugin->name, libfile );
     plugin->handle = dlopen( (const char *)libfile, RTLD_LAZY );
     free( libfile );
 
     if( !plugin->handle ) {
-        fprintf( stderr, "%s\n", dlerror() );
+        LogPrint( LOG_CRIT, "%s", dlerror() );
         return;
     }
 
@@ -155,13 +156,13 @@ void pluginLoadItem( Plugin_t *plugin )
     dlerror();
     *(void **)(&plugin->init) = dlsym( plugin->handle, "plugin_initialize" );
     if( (error = dlerror()) != NULL ) {
-        fprintf( stderr, "%s\n", error );
+        LogPrint( LOG_CRIT, "%s", error );
         return;
     }
 
     *(void **)(&plugin->shutdown) = dlsym( plugin->handle, "plugin_shutdown" );
     if( (error = dlerror()) != NULL ) {
-        fprintf( stderr, "%s\n", error );
+        LogPrint( LOG_CRIT, "%s", error );
         return;
     }
 
@@ -179,11 +180,11 @@ void pluginUnloadItem( Plugin_t *plugin )
 
     plugin->shutdown();
 
-    printf( "Unloading plugin %s\n", plugin->name );
+    LogPrint( LOG_NOTICE, "Unloading plugin %s", plugin->name );
     dlclose( plugin->handle );
     plugin->handle = NULL;
     if( (error = dlerror()) != NULL ) {
-        fprintf( stderr, "%s\n", error );
+        LogPrint( LOG_CRIT, "%s", error );
         return;
     }
     plugin->loaded = false;

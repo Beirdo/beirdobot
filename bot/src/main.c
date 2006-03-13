@@ -38,6 +38,7 @@
 #include "botnet.h"
 #include "protos.h"
 #include "release.h"
+#include "logging.h"
 
 
 static char ident[] _UNUSED_= 
@@ -94,8 +95,8 @@ int main ( int argc, char **argv )
 
 void LogBanner( void )
 {
-    printf( "\nbeirdobot  (c) 2006 Gavin Hurlbut\n" );
-    printf( "%s\n", svn_version() );
+    LogPrintNoArg( LOG_CRIT, "beirdobot  (c) 2006 Gavin Hurlbut" );
+    LogPrint( LOG_CRIT, "%s", svn_version() );
 }
 
 

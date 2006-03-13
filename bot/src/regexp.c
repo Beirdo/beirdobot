@@ -34,6 +34,7 @@
 #include "environment.h"
 #include "structs.h"
 #include "linked_list.h"
+#include "logging.h"
 
 /* INTERNAL FUNCTION PROTOTYPES */
 
@@ -71,13 +72,13 @@ void regexp_add( const char *channelRegexp, const char *contentRegexp,
     item->reChannel = pcre_compile( channelRegexp, 0, &error, &erroffset, 
                                     NULL );
     if( error ) {
-        printf( "%s\n", error );
+        LogPrint( LOG_CRIT, "%s", error );
         return;
     }
 
     item->peChannel = pcre_study( item->reChannel, 0, &error );
     if( error ) {
-        printf( "%s\n", error );
+        LogPrint( LOG_CRIT, "%s", error );
         free( item->reChannel );
         return;
     }
@@ -85,7 +86,7 @@ void regexp_add( const char *channelRegexp, const char *contentRegexp,
     item->reContent = pcre_compile( contentRegexp, 0, &error, &erroffset,
                                     NULL );
     if( error ) {
-        printf( "%s\n", error );
+        LogPrint( LOG_CRIT, "%s", error );
         free( item->reChannel );
         free( item->peChannel );
         return;
@@ -93,7 +94,7 @@ void regexp_add( const char *channelRegexp, const char *contentRegexp,
 
     item->peContent = pcre_study( item->reContent, 0, &error );
     if( error ) {
-        printf( "%s\n", error );
+        LogPrint( LOG_CRIT, "%s", error );
         free( item->reChannel );
         free( item->peChannel );
         free( item->reContent );

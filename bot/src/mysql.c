@@ -36,6 +36,7 @@
 #include "structs.h"
 #include "protos.h"
 #include "protected_data.h"
+#include "logging.h"
 
 static char ident[] _UNUSED_ =
     "$Id$";
@@ -59,13 +60,14 @@ void db_setup(void)
 
     item = (MysqlData_t *)malloc(sizeof(MysqlData_t));
     if( !item ) {
-        fprintf(stderr, "Unable to create a MySQL structure||\n");
+        LogPrintNoArg( LOG_CRIT, "Unable to create a MySQL structure!!");
         exit(1);
     }
 
     sql = ProtectedDataCreate();
     if( !sql ) {
-        fprintf(stderr, "Unable to create a MySQL protected structure||\n");
+        LogPrintNoArg( LOG_CRIT, "Unable to create a MySQL protected "
+                                 "structure!!");
         exit(1);
     }
 
@@ -74,15 +76,16 @@ void db_setup(void)
     item->buflen = MAX_STRING_LENGTH;
 
     if( !(item->sql = mysql_init(NULL)) ) {
-        fprintf(stderr, "Unable to initialize a MySQL structure!!\n");
+        LogPrintNoArg( LOG_CRIT, "Unable to initialize a MySQL structure!!");
         exit(1);
     }
 
-    printf("Using database %s at %s:%d\n", mysql_db, mysql_host, mysql_portnum);
+    LogPrint( LOG_CRIT, "Using database %s at %s:%d", mysql_db, mysql_host, 
+              mysql_portnum);
 
     if( !mysql_real_connect(item->sql, mysql_host, mysql_user, mysql_password, 
                             mysql_db, mysql_port, NULL, 0) ) {
-        fprintf(stderr, "Unable to connect to the database\n");
+        LogPrintNoArg(LOG_CRIT, "Unable to connect to the database");
         mysql_error(item->sql);
         exit(1);
     }
@@ -247,7 +250,7 @@ void db_load_channels(void)
                                                      strlen(channel->channel));
             sprintf( channel->fullspec, "%s@%s:%d/%s", server->nick,
                      server->server, server->port, channel->channel );
-            printf( "%s\n", channel->fullspec );
+            LogPrint( LOG_NOTICE, "%s", channel->fullspec );
 
             channel->itemName.item  = (void *)channel;
             channel->itemName.key   = (void *)&channel->channel;

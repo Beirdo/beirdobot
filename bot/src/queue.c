@@ -36,6 +36,7 @@
 #include <sys/time.h>
 #include <string.h>
 #include <stdio.h>
+#include "logging.h"
 
 
 /* CVS generated ID string */
@@ -61,16 +62,16 @@ QueueObject_t * QueueCreate( uint32 numElements )
 
     if( i == 32 )
     {
-        fprintf( stderr, "Queue too large.  Rounded from %d to %d\n",
-                 numElements, 1 << 31 );
+        LogPrint( LOG_CRIT, "Queue too large.  Rounded from %d to %d",
+                  numElements, 1 << 31 );
         i = 31;
     }
     else
     {
         if( numElements != (1<<i) )
         {
-            fprintf( stderr, "Queue item count rounded from %d to %d\n",
-                     numElements, (1 << i) );
+            LogPrint( LOG_CRIT, "Queue item count rounded from %d to %d",
+                      numElements, (1 << i) );
         }
     }
     numElements = 1 << i;
@@ -176,7 +177,7 @@ static void QueueConditionUpdate( QueueObject_t *queue )
         queue->empty = FALSE;
         queue->full = TRUE;
 #ifdef VERBOSE_QUEUE_DEBUGGING
-        fprintf( stderr, "Queue %p is full\n", queue );
+        LogPrint( LOG_DEBUG, "Queue %p is full", queue );
 #endif
     }
     else

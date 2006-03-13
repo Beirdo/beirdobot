@@ -36,6 +36,7 @@
 #include "botnet.h"
 #include "structs.h"
 #include "protos.h"
+#include "logging.h"
 
 char *db_quote(char *string);
 MYSQL_RES *db_query( char *format, ... );
@@ -61,7 +62,7 @@ void plugin_initialize( char *args )
 {
     static char    *commands[] = { "search", "seen", "notice" };
 
-    printf( "Initializing core plugin...\n" );
+    LogPrintNoArg( LOG_NOTICE, "Initializing core plugin..." );
     botCmd_add( (const char **)&commands[0], botCmdSearch, botHelpSearch );
     botCmd_add( (const char **)&commands[1], botCmdSeen,   botHelpSeen );
     botCmd_add( (const char **)&commands[2], botCmdNotice, botHelpNotice );
@@ -69,7 +70,7 @@ void plugin_initialize( char *args )
 
 void plugin_shutdown( void )
 {
-    printf( "Removing core plugin...\n" );
+    LogPrintNoArg( LOG_NOTICE, "Removing core plugin..." );
     botCmd_remove( "search" );
     botCmd_remove( "seen" );
     botCmd_remove( "notice" );

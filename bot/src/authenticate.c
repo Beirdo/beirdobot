@@ -37,6 +37,7 @@
 #include <pthread.h>
 #include "protos.h"
 #include "structs.h"
+#include "logging.h"
 
 
 /* CVS generated ID string */
@@ -306,7 +307,7 @@ void *authenticate_thread(void *arg)
 
     botCmd_add( (const char **)&command, authenticate_state_machine, NULL );
 
-    printf("Starting authenticate thread\n");
+    LogPrintNoArg(LOG_NOTICE, "Starting authenticate thread");
 
     while( true ) {
         gettimeofday( &now, NULL );
@@ -319,7 +320,8 @@ void *authenticate_thread(void *arg)
                 auth->state = AUTH_TIMEDOUT;
                 BN_SendPrivateMessage( &auth->server->ircInfo, 
                                        (const char *)auth->nick, timedout );
-                printf( "Authentication timeout for %s\n", auth->nick );
+                LogPrint( LOG_NOTICE, "Authentication timeout for %s", 
+                          auth->nick );
             }
 
             if( auth->state == AUTH_REJECTED || 
@@ -415,12 +417,12 @@ void authenticate_state_machine( IRCServer_t *server, IRCChannel_t *channel,
             auth->state = AUTH_ACCEPTED;
             auth->wakeTime = now.tv_sec + (30 * 60);
             string = strdup( "Authentication accepted for 30min" );
-            printf( "Authenticated accepted for %s\n", nick );
+            LogPrint( LOG_NOTICE, "Authenticated accepted for %s", nick );
         } else {
             auth->state = AUTH_REJECTED;
             auth->wakeTime = now.tv_sec;
             string = strdup( "Authentication rejected" );
-            printf( "Authenticated rejected for %s\n", nick );
+            LogPrint( LOG_NOTICE, "Authenticated rejected for %s", nick );
         }
 
         BN_SendPrivateMessage( &server->ircInfo, (const char *)nick, string );
@@ -431,7 +433,7 @@ void authenticate_state_machine( IRCServer_t *server, IRCChannel_t *channel,
             auth->state = AUTH_DISCONNECT;
             auth->wakeTime = now.tv_sec + 5;
             string = strdup( "Logged off" );
-            printf( "Logoff by %s\n", nick );
+            LogPrint( LOG_NOTICE, "Logoff by %s", nick );
 
             BN_SendPrivateMessage( &server->ircInfo, (const char *)nick, 
                                    string );

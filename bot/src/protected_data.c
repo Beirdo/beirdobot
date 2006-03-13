@@ -28,11 +28,13 @@
 *--------------------------------------------------------*/
 
 /* INCLUDE FILES */
+#define ___ARGH
 #include "environment.h"
 #include <pthread.h>
 #include "protected_data.h"
 #include <stdlib.h>
 #include <stdio.h>
+#include "logging.h"
 
 /* INTERNAL CONSTANT DEFINITIONS */
 
@@ -75,7 +77,7 @@ ProtectedData_t *ProtectedDataCreate( void )
     blob = (ProtectedData_t *)malloc(sizeof(ProtectedData_t));
     if( blob == NULL )
     {
-        fprintf(stderr, "Couldn't create protected data blob\n" );
+        LogPrintNoArg(LOG_CRIT, "Couldn't create protected data blob" );
         return( NULL );
     }
 

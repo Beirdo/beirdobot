@@ -33,6 +33,7 @@
 #include "environment.h"
 #include "structs.h"
 #include "protos.h"
+#include "logging.h"
 
 /* INTERNAL FUNCTION PROTOTYPES */
 void regexpFuncFart( IRCServer_t *server, IRCChannel_t *channel, char *who, 
@@ -46,13 +47,13 @@ static char    *contentRegexp = "(?i)(\\s|^)farts?(\\s|\\.|$)";
 
 void plugin_initialize( char *args )
 {
-    printf( "Initializing fart...\n" );
+    LogPrintNoArg( LOG_NOTICE, "Initializing fart..." );
     regexp_add( NULL, (const char *)contentRegexp, regexpFuncFart );
 }
 
 void plugin_shutdown( void )
 {
-    printf( "Removing fart...\n" );
+    LogPrintNoArg( LOG_NOTICE, "Removing fart..." );
     regexp_remove( NULL, contentRegexp );
 }
 
