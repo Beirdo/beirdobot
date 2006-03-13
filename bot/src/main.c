@@ -60,6 +60,9 @@ int main ( int argc, char **argv )
     /* Parse the command line options */
     MainParseArgs( argc, argv );
 
+    /* Start up the Logging thread */
+    logging_initialize();
+
     /* Print the startup log messages */
     LogBanner();
 

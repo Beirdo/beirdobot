@@ -151,6 +151,7 @@ typedef struct {
     unsigned int        wakeTime;
 } AuthData_t;
 
+
 #endif
 
 /*

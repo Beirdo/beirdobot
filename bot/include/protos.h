@@ -109,6 +109,8 @@ void authenticate_state_machine( IRCServer_t *server, IRCChannel_t *channel,
                                  char *nick, char *msg );
 bool authenticate_check( IRCServer_t *server, char *nick );
 
+void logging_initialize( void );
+
 #endif
 
 /*
