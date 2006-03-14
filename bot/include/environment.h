@@ -98,6 +98,8 @@ typedef unsigned long long int uint64;
 #define FORCE_UINT32(x)             (*(uint32 *)&(x))
 
 #define MAX_STRING_LENGTH           1024
+#define TIMESTAMP_MAX               128
+
 
 typedef enum
 {

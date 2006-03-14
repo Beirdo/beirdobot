@@ -151,6 +151,26 @@ typedef struct {
     unsigned int        wakeTime;
 } AuthData_t;
 
+typedef enum
+{
+    LT_CONSOLE,
+    LT_FILE,
+    LT_SYSLOG
+} LogFileType_t;
+
+/* Log File Descriptor Chain */
+typedef struct
+{
+    LinkedListItem_t linkage;
+    int fd;
+    LogFileType_t type;
+    bool aborted;
+    union 
+    {
+        char *filename;
+    } identifier;
+} LogFileChain_t;
+
 
 #endif
 

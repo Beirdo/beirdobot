@@ -49,19 +49,6 @@ typedef enum
     LOG_UNKNOWN
 } LogLevel_t;
 
-
-typedef struct
-{
-    LogLevel_t          level;
-    pthread_t           threadId;
-    char               *file;
-    int                 line;
-    char               *function;
-    uint32              time_sec;
-    uint32              time_usec;
-    char               *message;
-} LoggingItem_t;
-
 #ifdef _LogLevelNames_
 char *LogLevelNames[] =
 {
