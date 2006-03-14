@@ -100,12 +100,12 @@ void LogPrintLine( LogLevel_t level, char *file, int line, char *function,
     LoggingItem_t *item;
     va_list arguments;
 
-    item = (LoggingItem_t *)malloc(sizeof(LoggingItem_t));
-    if( !item ) {
+    if( level > LogLevel ) {
         return;
     }
 
-    if( item->level > LogLevel ) {
+    item = (LoggingItem_t *)malloc(sizeof(LoggingItem_t));
+    if( !item ) {
         return;
     }
 
