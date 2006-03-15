@@ -65,6 +65,9 @@ int main ( int argc, char **argv )
     /* Start up the Logging thread */
     logging_initialize();
 
+    /* Setup signal handler for SIGUSR1 (toggles Debug) */
+    signal( SIGUSR1, logging_toggle_debug );
+
     /* Print the startup log messages */
     LogBanner();
 

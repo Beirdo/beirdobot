@@ -111,6 +111,7 @@ void authenticate_state_machine( IRCServer_t *server, IRCChannel_t *channel,
 bool authenticate_check( IRCServer_t *server, char *nick );
 
 void logging_initialize( void );
+void logging_toggle_debug( int signum );
 void LogOutputAdd( int fd, LogFileType_t type, void *identifier );
 bool LogOutputRemove( LogFileChain_t *logfile );
 bool LogSyslogAdd( int facility );

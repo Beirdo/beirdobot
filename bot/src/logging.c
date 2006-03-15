@@ -69,6 +69,7 @@ typedef struct
 
 /* INTERNAL MACRO DEFINITIONS */
 #define LOGLINE_MAX 256
+#define DEBUG_FILE "/var/log/beirdobot/debug.log"
 
 /* INTERNAL FUNCTION PROTOTYPES */
 void *LoggingThread( void *arg );
@@ -134,7 +135,6 @@ void LogPrintLine( LogLevel_t level, char *file, int line, char *function,
 
 void logging_initialize( void )
 {
-    static char    *debugFile = "/var/log/beirdobot/debug.log";
 
     LoggingQ = QueueCreate(1024);
     LogList = LinkedListCreate();
@@ -142,12 +142,26 @@ void logging_initialize( void )
     LogStdoutAdd();
     LogSyslogAdd( LOG_LOCAL7 );
     if( Debug ) {
-        LogFileAdd( debugFile );
+        LogFileAdd( DEBUG_FILE );
     }
 
     pthread_create( &loggingThreadId, NULL, LoggingThread, NULL );
 }
-    
+
+void logging_toggle_debug( int signum )
+{
+    if( Debug ) {
+        /* We are turning OFF debug logging */
+        LogPrintNoArg( LOG_CRIT, "Received SIGUSR1, disabling debug logging" );
+        LogFileRemove( DEBUG_FILE );
+        Debug = false;
+    } else {
+        /* We are turning ON debug logging */
+        LogPrintNoArg( LOG_CRIT, "Received SIGUSR1, enabling debug logging" );
+        LogFileAdd( DEBUG_FILE );
+        Debug = true;
+    }
+}
 
 /**
  * @brief Prints the log messages to the console (and logfile)
@@ -378,6 +392,7 @@ bool LogFileRemove( char *filename )
             strcmp( filename, logfile->identifier.filename ) == 0 )
         {
             LogOutputRemove( logfile );
+            LogPrint( LOG_INFO, "Removed log file: %s", filename );
             found = TRUE;
             /* Take an early exit from the loop */
             break;
