@@ -43,6 +43,10 @@
 #include <string.h>
 #include <syslog.h>
 #include <time.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <fcntl.h>
+#include <errno.h>
 #include <unistd.h>
 #include "protos.h"
 #include "queue.h"
@@ -130,11 +134,16 @@ void LogPrintLine( LogLevel_t level, char *file, int line, char *function,
 
 void logging_initialize( void )
 {
+    static char    *debugFile = "/var/log/beirdobot/debug.log";
+
     LoggingQ = QueueCreate(1024);
     LogList = LinkedListCreate();
 
     LogStdoutAdd();
     LogSyslogAdd( LOG_LOCAL7 );
+    if( Debug ) {
+        LogFileAdd( debugFile );
+    }
 
     pthread_create( &loggingThreadId, NULL, LoggingThread, NULL );
 }
@@ -222,6 +231,7 @@ bool LogStdoutAdd( void )
     }
 
     LogOutputAdd( 1, LT_CONSOLE, NULL );
+    LogPrintNoArg( LOG_INFO, "Added console logging" );
     return( TRUE );
 }
 
@@ -230,6 +240,7 @@ bool LogSyslogAdd( int facility )
 {
     openlog( "beirdobot", LOG_NDELAY | LOG_PID, facility );
     LogOutputAdd( -1, LT_SYSLOG, NULL );
+    LogPrintNoArg( LOG_INFO, "Added syslog logging" );
     return( TRUE );
 }
 
@@ -320,6 +331,67 @@ void LogWrite( LogFileChain_t *logfile, char *text, int length )
     }
 }
 
+
+bool LogFileAdd( char * filename )
+{
+    int fd;
+
+    if( filename == NULL )
+    {
+        return( FALSE );
+    }
+
+    fd = open( filename, O_WRONLY | O_CREAT | O_APPEND | O_NONBLOCK,
+               S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP | S_IROTH );
+    if( fd == -1 )
+    {
+        /* Couldn't open the log file.  Gak! */
+        perror( "debug: " );
+        return( FALSE );
+    }
+
+    LogOutputAdd( fd, LT_FILE, filename );
+    LogPrint( LOG_INFO, "Added log file: %s", filename );
+
+    return( TRUE );
+}
+
+bool LogFileRemove( char *filename )
+{
+    LogFileChain_t *logfile;
+    LinkedListItem_t *listItem;
+    bool found;
+
+    if( filename == NULL )
+    {
+        return( FALSE );
+    }
+
+    LinkedListLock( LogList );
+
+    for( listItem = LogList->head, found = FALSE; 
+         listItem != NULL;
+         listItem = listItem->next )
+    {
+        logfile = (LogFileChain_t *)listItem;
+        if( logfile->type == LT_FILE && 
+            strcmp( filename, logfile->identifier.filename ) == 0 )
+        {
+            LogOutputRemove( logfile );
+            found = TRUE;
+            /* Take an early exit from the loop */
+            break;
+        }
+    }
+
+    if( found == FALSE )
+    {
+        LogPrint( LOG_UNKNOWN, "Can't find log file: %s", filename );
+    }
+
+    LinkedListUnlock( LogList );
+    return( found );
+}
 
 /*
  * vim:ts=4:sw=4:ai:et:si:sts=4

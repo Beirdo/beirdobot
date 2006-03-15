@@ -44,6 +44,7 @@ extern char   *mysql_password;
 extern char   *mysql_db;
 extern LinkedList_t   *ServerList;
 extern bool verbose;
+extern bool Debug;
 extern bool Daemon;
 
 
@@ -114,6 +115,8 @@ void LogOutputAdd( int fd, LogFileType_t type, void *identifier );
 bool LogOutputRemove( LogFileChain_t *logfile );
 bool LogSyslogAdd( int facility );
 bool LogStdoutAdd( void );
+bool LogFileAdd( char * filename );
+bool LogFileRemove( char *filename );
 
 #endif
 

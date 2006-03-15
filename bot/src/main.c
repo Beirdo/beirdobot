@@ -51,6 +51,7 @@ char   *mysql_password;
 char   *mysql_db;
 bool    verbose;
 bool    Daemon;
+bool    Debug;
 
 void LogBanner( void );
 void MainParseArgs( int argc, char **argv );
@@ -116,6 +117,7 @@ void MainParseArgs( int argc, char **argv )
         {"database", 1, 0, 'd'},
         {"daemon", 0, 0, 'D'},
         {"verbose", 0, 0, 'v'},
+        {"debug", 0, 0, 'g'},
         {0, 0, 0, 0}
     };
 
@@ -125,9 +127,10 @@ void MainParseArgs( int argc, char **argv )
     mysql_password = NULL;
     mysql_db = NULL;
     verbose = false;
+    Debug = false;
     Daemon = false;
 
-    while( (opt = getopt_long( argc, argv, "hVH:P:u:p:d:Dv", longOpts, 
+    while( (opt = getopt_long( argc, argv, "hVH:P:u:p:d:Dgv", longOpts, 
                                &optIndex )) != -1 )
     {
         switch( opt )
@@ -138,6 +141,9 @@ void MainParseArgs( int argc, char **argv )
                 break;
             case 'D':
                 Daemon = true;
+                break;
+            case 'g':
+                Debug = true;
                 break;
             case 'v':
                 verbose = true;
@@ -243,6 +249,7 @@ void MainDisplayUsage( char *program, char *errorMsg )
                "\t-d or --database\tMySQL database to use (default beirdobot)\n"
                "\t-D or --daemon\tRun solely in daemon mode, detached\n"
                "\t-v or --verbose\tShow verbose information while running\n"
+               "\t-g or --debug\tWrite a debugging logfile\n"
                "\t-V or --version\tshow the version number and quit\n"
                "\t-h or --help\tshow this help text\n\n" );
 }
