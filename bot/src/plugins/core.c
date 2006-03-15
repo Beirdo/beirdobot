@@ -146,6 +146,9 @@ void botCmdSearch( IRCServer_t *server, IRCChannel_t *channel, char *who,
     message = (char *)malloc(32);
     sprintf( message, "Search took %ld.%06lds", end.tv_sec, end.tv_usec );
     BN_SendPrivateMessage(&server->ircInfo, (const char *)who, message);
+
+    LogPrint( LOG_INFO, "Search for \"%s\" by %s in %s, duration %ld.%06lds", 
+              msg, who, channel->fullspec, end.tv_sec, end.tv_usec );
     
     free( message );
 }

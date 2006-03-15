@@ -316,12 +316,14 @@ void *authenticate_thread(void *arg)
              item = (prev == NULL ? AuthList->head : item->next) ) {
             auth = (AuthData_t *)item;
 
-            if( auth->wakeTime != 0 && auth->wakeTime <= now.tv_sec ) {
+            if( auth->wakeTime != 0 && auth->wakeTime <= now.tv_sec &&
+                auth->state != AUTH_REJECTED ) {
                 auth->state = AUTH_TIMEDOUT;
                 BN_SendPrivateMessage( &auth->server->ircInfo, 
                                        (const char *)auth->nick, timedout );
-                LogPrint( LOG_NOTICE, "Authentication timeout for %s", 
-                          auth->nick );
+                LogPrint( LOG_NOTICE, "Authentication timeout for %s@%s:%d", 
+                          auth->nick, auth->server->server, 
+                          auth->server->port );
             }
 
             if( auth->state == AUTH_REJECTED || 
@@ -417,12 +419,14 @@ void authenticate_state_machine( IRCServer_t *server, IRCChannel_t *channel,
             auth->state = AUTH_ACCEPTED;
             auth->wakeTime = now.tv_sec + (30 * 60);
             string = strdup( "Authentication accepted for 30min" );
-            LogPrint( LOG_NOTICE, "Authenticated accepted for %s", nick );
+            LogPrint( LOG_NOTICE, "Authentication accepted for %s@%s:%d", nick,
+                      server->server, server->port );
         } else {
             auth->state = AUTH_REJECTED;
             auth->wakeTime = now.tv_sec;
             string = strdup( "Authentication rejected" );
-            LogPrint( LOG_NOTICE, "Authenticated rejected for %s", nick );
+            LogPrint( LOG_NOTICE, "Authentication rejected for %s@%s:%d", nick,
+                      server->server, server->port );
         }
 
         BN_SendPrivateMessage( &server->ircInfo, (const char *)nick, string );
@@ -433,7 +437,8 @@ void authenticate_state_machine( IRCServer_t *server, IRCChannel_t *channel,
             auth->state = AUTH_DISCONNECT;
             auth->wakeTime = now.tv_sec + 5;
             string = strdup( "Logged off" );
-            LogPrint( LOG_NOTICE, "Logoff by %s", nick );
+            LogPrint( LOG_NOTICE, "Authentication logoff by %s@%s:%d", nick, 
+                      server->server, server->port );
 
             BN_SendPrivateMessage( &server->ircInfo, (const char *)nick, 
                                    string );
