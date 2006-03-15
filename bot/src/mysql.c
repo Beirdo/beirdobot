@@ -844,7 +844,6 @@ void db_set_auth( char *nick, AuthData_t *auth )
     mysql_free_result(res);
 }
 
-
 /*
  * vim:ts=4:sw=4:ai:et:si:sts=4
  */

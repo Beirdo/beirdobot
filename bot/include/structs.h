@@ -118,8 +118,9 @@ typedef struct {
 } Regexp_t;
 
 typedef enum {
+    HIST_END = -2,
     HIST_START = -1,
-    HIST_INITIAL,
+    HIST_INITIAL = 0,
     HIST_JOIN,
     HIST_LEAVE
 } NickHistory_t;

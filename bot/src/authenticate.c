@@ -309,7 +309,7 @@ void *authenticate_thread(void *arg)
 
     LogPrintNoArg(LOG_NOTICE, "Starting authenticate thread");
 
-    while( true ) {
+    while( !GlobalAbort ) {
         gettimeofday( &now, NULL );
         LinkedListLock( AuthList );
         for( item = AuthList->head, prev = NULL; item; 

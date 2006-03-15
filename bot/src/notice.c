@@ -68,8 +68,11 @@ void *notify_thread(void *arg)
 
     LogPrintNoArg( LOG_NOTICE, "Starting notify thread" );
 
-    while( true ) {
+    while( !GlobalAbort ) {
         item = (NotifyItem_t *)QueueDequeueItem( NotifyQ, -1 );
+        if( !item ) {
+            continue;
+        }
 
         LogPrint( LOG_INFO, "Notifying %s from %s", item->nick, 
                   item->channel->fullspec );

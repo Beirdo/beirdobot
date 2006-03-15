@@ -511,11 +511,30 @@ void bot_start(void)
     server = (IRCServer_t *)ServerList->head;
     LinkedListUnlock( ServerList );
 
-    /* Wait for one thread to return -- should likely wait for all of em */
-    if( server ) {
+    /* Wait for all the threads to return */
+    while( server ) {
         pthread_join( server->threadId, NULL );
+        LinkedListLock( ServerList );
+        LinkedListRemove( ServerList, (LinkedListItem_t *)server, LOCKED );
+        server = (IRCServer_t *)ServerList->head;
+        LinkedListUnlock( ServerList );
     }
 }
+
+void bot_shutdown( void )
+{
+    LinkedListItem_t *item;
+    IRCServer_t      *server;
+    static char      *quitMsg = "Received SIGINT, shutting down";
+
+    LinkedListLock( ServerList );
+    for( item = ServerList->head; item; item = item->next ) {
+        server = (IRCServer_t *)item;
+        BN_SendQuitMessage(&server->ircInfo, (const char *)quitMsg);
+    }
+    LinkedListUnlock( ServerList );
+}
+
 
 void *bot_server_thread(void *arg)
 {
@@ -572,6 +591,19 @@ void *bot_server_thread(void *arg)
     {
         LogPrint( LOG_NOTICE, "Disconnected from %s:%d as %s.", server->server, 
                   server->port, server->nick);
+
+        if( GlobalAbort ) {
+            if( server->channels ) {
+                LinkedListLock( server->channels );
+                for( item = server->channels->head; item ; item = item->next ) {
+                    channel = (IRCChannel_t *)item;
+                    db_nick_history( channel, NULL, HIST_END );
+                }
+                LinkedListUnlock( server->channels );
+            }
+            return( NULL );
+        }
+
         sleep(10);
 
         /* Clear the joined flags so we will rejoin on reconnect */

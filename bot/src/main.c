@@ -38,27 +38,35 @@
 #include "botnet.h"
 #include "protos.h"
 #include "release.h"
+#include "queue.h"
 #include "logging.h"
 
 
 static char ident[] _UNUSED_= 
     "$Id$";
 
-char   *mysql_host;
-uint16  mysql_portnum;
-char   *mysql_user;
-char   *mysql_password;
-char   *mysql_db;
-bool    verbose;
-bool    Daemon;
-bool    Debug;
+char       *mysql_host;
+uint16      mysql_portnum;
+char       *mysql_user;
+char       *mysql_password;
+char       *mysql_db;
+bool        verbose;
+bool        Daemon;
+bool        Debug;
+bool        GlobalAbort;
+pthread_t   mainThreadId;
 
 void LogBanner( void );
 void MainParseArgs( int argc, char **argv );
 void MainDisplayUsage( char *program, char *errorMsg );
+void signal_interrupt( int signum );
+void MainDelayExit( void );
 
 int main ( int argc, char **argv )
 {
+    GlobalAbort = false;
+    mainThreadId = pthread_self();
+
     /* Parse the command line options */
     MainParseArgs( argc, argv );
 
@@ -67,6 +75,12 @@ int main ( int argc, char **argv )
 
     /* Setup signal handler for SIGUSR1 (toggles Debug) */
     signal( SIGUSR1, logging_toggle_debug );
+
+    /* Setup the exit handler */
+    atexit( MainDelayExit );
+
+    /* Setup signal handler for SIGINT (shut down cleanly */
+    signal( SIGINT, signal_interrupt );
 
     /* Print the startup log messages */
     LogBanner();
@@ -257,6 +271,37 @@ void MainDisplayUsage( char *program, char *errorMsg )
                "\t-h or --help\tshow this help text\n\n" );
 }
 
+void signal_interrupt( int signum )
+{
+    extern const char *const sys_siglist[];
+
+    if( pthread_equal( pthread_self(), mainThreadId ) ) {
+        LogPrint( LOG_CRIT, "Received signal: %s", sys_siglist[signum] );
+        exit( 0 );
+    }
+}
+
+void MainDelayExit( void )
+{
+    LogPrintNoArg( LOG_CRIT, "Shutting down" );
+
+    /* Signal to all that we are aborting */
+    GlobalAbort = true;
+
+    /* Send out signals from all queues waking up anything waiting on them so
+     * the listeners can unblock and die
+     */
+    QueueKillAll();
+
+    /* Shut down IRC connections */
+    bot_shutdown();
+
+    /* Delay to allow all the other tasks to finish (esp. logging!) */
+    sleep( 5 );
+
+    /* And finally... die */
+    _exit( 0 );
+}
 
 /*
  * vim:ts=4:sw=4:ai:et:si:sts=4

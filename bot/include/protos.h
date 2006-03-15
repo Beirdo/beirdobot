@@ -46,11 +46,13 @@ extern LinkedList_t   *ServerList;
 extern bool verbose;
 extern bool Debug;
 extern bool Daemon;
+extern bool GlobalAbort;
 
 
 /* Prototypes */
 const char *svn_version(void);
 void bot_start(void);
+void bot_shutdown(void);
 
 void db_setup(void);
 void db_thread_init( void );
