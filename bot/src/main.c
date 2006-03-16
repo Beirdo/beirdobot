@@ -54,6 +54,7 @@ bool        verbose;
 bool        Daemon;
 bool        Debug;
 bool        GlobalAbort;
+bool        BotDone;
 pthread_t   mainThreadId;
 
 void LogBanner( void );
@@ -64,6 +65,8 @@ void MainDelayExit( void );
 
 int main ( int argc, char **argv )
 {
+    pthread_mutex_t     spinLockMutex;
+
     GlobalAbort = false;
     mainThreadId = pthread_self();
 
@@ -106,6 +109,13 @@ int main ( int argc, char **argv )
 
     /* Start the bot */
     bot_start();
+
+    /* Sit on this and rotate - this causes an intentional deadlock, this
+     * thread should stop dead in its tracks
+     */
+    pthread_mutex_init( &spinLockMutex, NULL );
+    pthread_mutex_lock( &spinLockMutex );
+    pthread_mutex_lock( &spinLockMutex );
 
     return(0);
 }
@@ -283,9 +293,13 @@ void signal_interrupt( int signum )
 
 void MainDelayExit( void )
 {
+    int         i;
+    pthread_t   shutdownThreadId;
+
     LogPrintNoArg( LOG_CRIT, "Shutting down" );
 
     /* Signal to all that we are aborting */
+    BotDone = false;
     GlobalAbort = true;
 
     /* Send out signals from all queues waking up anything waiting on them so
@@ -294,10 +308,12 @@ void MainDelayExit( void )
     QueueKillAll();
 
     /* Shut down IRC connections */
-    bot_shutdown();
+    pthread_create( &shutdownThreadId, NULL, bot_shutdown, NULL );
 
     /* Delay to allow all the other tasks to finish (esp. logging!) */
-    sleep( 2 );
+    for( i = 15; i && !BotDone; i-- ) {
+        sleep(1);
+    }
 
     /* And finally... die */
     _exit( 0 );

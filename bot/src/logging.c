@@ -184,12 +184,18 @@ void *LoggingThread( void *arg )
     int                 length;
     LinkedListItem_t   *listItem, *next;
     LogFileChain_t     *logFile;
+    struct timespec     delay;
+
+    /* 100ms delay */
+    delay.tv_sec = 0;
+    delay.tv_nsec = 100000L;
 
     LogPrintNoArg( LOG_NOTICE, "Started LoggingThread" );
 
     while( 1 ) {
         item = (LoggingItem_t *)QueueDequeueItem( LoggingQ, -1 );
         if( !item ) {
+            nanosleep( &delay, NULL );
             continue;
         }
 

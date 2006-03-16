@@ -137,8 +137,28 @@ void ProcOnError(BN_PInfo I, int err)
 
 void ProcOnDisconnected(BN_PInfo I, const char Msg[])
 {
+    LinkedListItem_t   *item;
+    IRCServer_t        *server;
+    IRCChannel_t       *channel;
+
+    server = (IRCServer_t *)I->User;
+
     if( verbose ) {
         LogPrint( LOG_DEBUG, "Event Disconnected : (%s)", Msg);
+    }
+
+    if( GlobalAbort ) {
+        if( server->channels ) {
+            LinkedListLock( server->channels );
+            for( item = server->channels->head; item ; item = item->next ) {
+                channel = (IRCChannel_t *)item;
+                db_nick_history( channel, NULL, HIST_END );
+            }
+            LinkedListUnlock( server->channels );
+        }
+        LogPrint( LOG_NOTICE, "Killing thread for %s@%s:%d", server->nick, 
+                  server->server, server->port );
+        pthread_exit( NULL );
     }
 }
 
@@ -515,20 +535,10 @@ void bot_start(void)
         pthread_create( &server->threadId, NULL, bot_server_thread, 
                         (void *)server );
     }
-    server = (IRCServer_t *)ServerList->head;
     LinkedListUnlock( ServerList );
-
-    /* Wait for all the threads to return */
-    while( server ) {
-        pthread_join( server->threadId, NULL );
-        LinkedListLock( ServerList );
-        LinkedListRemove( ServerList, (LinkedListItem_t *)server, LOCKED );
-        server = (IRCServer_t *)ServerList->head;
-        LinkedListUnlock( ServerList );
-    }
 }
 
-void bot_shutdown( void )
+void *bot_shutdown(void *arg)
 {
     LinkedListItem_t *item;
     IRCServer_t      *server;
@@ -538,9 +548,13 @@ void bot_shutdown( void )
     for( item = ServerList->head; item; item = item->next ) {
         server = (IRCServer_t *)item;
         BN_SendQuitMessage(&server->ircInfo, (const char *)quitMsg);
+        pthread_join( server->threadId, NULL );
     }
     LinkedListUnlock( ServerList );
     LogPrintNoArg( LOG_NOTICE, "Shutdown all bot threads" );
+    BotDone = true;
+
+    return( NULL );
 }
 
 

@@ -47,12 +47,13 @@ extern bool verbose;
 extern bool Debug;
 extern bool Daemon;
 extern bool GlobalAbort;
+extern bool BotDone;
 
 
 /* Prototypes */
 const char *svn_version(void);
 void bot_start(void);
-void bot_shutdown(void);
+void *bot_shutdown(void *arg);
 
 void db_setup(void);
 void db_thread_init( void );
