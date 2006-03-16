@@ -297,7 +297,7 @@ void MainDelayExit( void )
     bot_shutdown();
 
     /* Delay to allow all the other tasks to finish (esp. logging!) */
-    sleep( 5 );
+    sleep( 2 );
 
     /* And finally... die */
     _exit( 0 );

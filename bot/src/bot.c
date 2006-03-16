@@ -540,6 +540,7 @@ void bot_shutdown( void )
         BN_SendQuitMessage(&server->ircInfo, (const char *)quitMsg);
     }
     LinkedListUnlock( ServerList );
+    LogPrintNoArg( LOG_NOTICE, "Shutdown all bot threads" );
 }
 
 
@@ -609,6 +610,8 @@ void *bot_server_thread(void *arg)
                 }
                 LinkedListUnlock( server->channels );
             }
+            LogPrint( LOG_NOTICE, "Killing thread for %s@%s:%d", server->nick,
+                      server->server, server->port );
             return( NULL );
         }
 

@@ -342,6 +342,7 @@ void *authenticate_thread(void *arg)
         nanosleep( &ts, NULL );
     }
 
+    LogPrintNoArg(LOG_NOTICE, "Ending authenticate thread");
     return(NULL);
 }
 
