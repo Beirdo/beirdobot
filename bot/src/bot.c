@@ -78,6 +78,13 @@ void ProcOnStatus(BN_PInfo I, const char Msg[], int Code)
     }
 }
 
+void ProcOnExcessFlood(BN_PInfo I, const char Msg[])
+{
+    if( verbose || 1 ) {
+        LogPrint( LOG_DEBUG, "Would Excess Flood: (%s)", Msg);
+    }
+}
+
 void ProcOnRegistered(BN_PInfo I)
 {
     bool                found;
@@ -583,6 +590,7 @@ void *bot_server_thread(void *arg)
     Info->CB.OnJoin = ProcOnJoin;
     Info->CB.OnPart = ProcOnPart;
     Info->CB.OnQuit = ProcOnQuit;
+    Info->CB.OnExcessFlood = ProcOnExcessFlood;
 
     LogPrint( LOG_NOTICE, "Connecting to %s:%d as %s...", server->server, 
               server->port, server->nick);
