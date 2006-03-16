@@ -35,6 +35,7 @@
 #include <sys/time.h>
 #include <errno.h>
 #include <getopt.h>
+#include <sys/types.h>
 #include "botnet.h"
 #include "protos.h"
 #include "release.h"
@@ -66,12 +67,31 @@ void MainDelayExit( void );
 int main ( int argc, char **argv )
 {
     pthread_mutex_t     spinLockMutex;
+    pid_t               childPid;
 
     GlobalAbort = false;
-    mainThreadId = pthread_self();
 
     /* Parse the command line options */
     MainParseArgs( argc, argv );
+
+    /* Do we need to detach? */
+    if( Daemon ) {
+        childPid = fork();
+        if( childPid < 0 ) {
+            perror( "Couldn't detach in daemon mode" );
+            _exit( 1 );
+        }
+
+        if( childPid != 0 ) {
+            /* This is still the parent, report the child's pid and exit */
+            printf( "[Detached as PID %d]\n", childPid );
+            _exit( 0 );
+        }
+
+        /* After this is in the detached child */
+    }
+
+    mainThreadId = pthread_self();
 
     /* Start up the Logging thread */
     logging_initialize();
