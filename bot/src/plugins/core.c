@@ -130,7 +130,9 @@ void botCmdSearch( IRCServer_t *server, IRCChannel_t *channel, char *who,
         return;
     }
 
-    BN_SendPrivateMessage(&server->ircInfo, (const char *)who, "Searching..." );
+    message = (char *)malloc(32 + strlen(msg) + strlen(channel->channel) );
+    sprintf( message, "Searching %s for \"%s\"...", channel->channel, msg );
+    BN_SendPrivateMessage(&server->ircInfo, (const char *)who, message );
 
     gettimeofday( &start, NULL );
     db_search_text( server, channel, who, msg );
@@ -143,7 +145,6 @@ void botCmdSearch( IRCServer_t *server, IRCChannel_t *channel, char *who,
         end.tv_sec  -= 1;
     }
 
-    message = (char *)malloc(32);
     sprintf( message, "Search took %ld.%06lds", end.tv_sec, end.tv_usec );
     BN_SendPrivateMessage(&server->ircInfo, (const char *)who, message);
 
