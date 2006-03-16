@@ -62,9 +62,9 @@ void *notify_thread(void *arg)
 
     NotifyQ = QueueCreate(2048);
 
-    /* Half second delay */
-    ts.tv_sec = 0;
-    ts.tv_nsec = 500000000L;
+    /* One second delay */
+    ts.tv_sec = 1;
+    ts.tv_nsec = 0L;
 
     LogPrintNoArg( LOG_NOTICE, "Starting notify thread" );
 
