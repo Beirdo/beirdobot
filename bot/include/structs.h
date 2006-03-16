@@ -54,6 +54,7 @@ typedef struct {
     char               *nickservmsg;
     BN_TInfo            ircInfo;
     pthread_t           threadId;
+    char               *threadName;
 } IRCServer_t;
 
 typedef struct {

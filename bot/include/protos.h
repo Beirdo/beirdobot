@@ -122,6 +122,11 @@ bool LogStdoutAdd( void );
 bool LogFileAdd( char * filename );
 bool LogFileRemove( char *filename );
 
+void thread_create( pthread_t *pthreadId, void * (*routine)(void *), 
+                    void *arg, char *name );
+void thread_register( pthread_t *pthreadId, char *name );
+char *thread_name( pthread_t pthreadId );
+
 #endif
 
 /*

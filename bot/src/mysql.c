@@ -157,6 +157,7 @@ void db_load_servers(void)
     IRCServer_t    *server;
     int             count;
     int             i;
+    int             len;
     MYSQL_RES      *res;
     MYSQL_ROW       row;
 
@@ -188,6 +189,11 @@ void db_load_servers(void)
         server->realname        = strdup(row[6]);
         server->nickserv        = strdup(row[7]);
         server->nickservmsg     = strdup(row[8]);
+
+        len = strlen(server->server) + strlen(server->nick) + 15;
+        server->threadName      = (char *)malloc(len) ;
+        sprintf( server->threadName, "thread_%s@%s:%d", server->nick,
+                 server->server, server->port );
 
         LinkedListAdd( ServerList, (LinkedListItem_t *)server, UNLOCKED,
                        AT_TAIL );

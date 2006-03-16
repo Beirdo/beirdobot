@@ -96,6 +96,8 @@ int main ( int argc, char **argv )
     /* Start up the Logging thread */
     logging_initialize();
 
+    thread_register( &mainThreadId, "thread_main" );
+
     /* Setup signal handler for SIGUSR1 (toggles Debug) */
     signal( SIGUSR1, logging_toggle_debug );
 
@@ -328,7 +330,7 @@ void MainDelayExit( void )
     QueueKillAll();
 
     /* Shut down IRC connections */
-    pthread_create( &shutdownThreadId, NULL, bot_shutdown, NULL );
+    thread_create( &shutdownThreadId, bot_shutdown, NULL, "thread_shutdown" );
 
     /* Delay to allow all the other tasks to finish (esp. logging!) */
     for( i = 15; i && !BotDone; i-- ) {

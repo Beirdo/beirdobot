@@ -287,7 +287,8 @@ static int changed(AuthData_t *auth, char *nick)
 
 void authenticate_start(void)
 {
-    pthread_create( &authentThreadId, NULL, authenticate_thread, NULL );
+    thread_create( &authentThreadId, authenticate_thread, NULL, 
+                   "thread_authenticate" );
 }
 
 void *authenticate_thread(void *arg)

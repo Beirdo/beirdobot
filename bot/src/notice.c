@@ -51,7 +51,7 @@ void *notify_thread(void *arg);
 
 void notify_start(void)
 {
-    pthread_create( &notifyThreadId, NULL, notify_thread, NULL );
+    thread_create( &notifyThreadId, notify_thread, NULL, "thread_notify" );
 }
 
 void *notify_thread(void *arg)

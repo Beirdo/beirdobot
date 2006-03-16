@@ -145,7 +145,7 @@ void logging_initialize( void )
         LogFileAdd( DEBUG_FILE );
     }
 
-    pthread_create( &loggingThreadId, NULL, LoggingThread, NULL );
+    thread_create( &loggingThreadId, LoggingThread, NULL, "thread_logging" );
 }
 
 void logging_toggle_debug( int signum )
@@ -185,6 +185,8 @@ void *LoggingThread( void *arg )
     LinkedListItem_t   *listItem, *next;
     LogFileChain_t     *logFile;
     struct timespec     delay;
+    static char        *unknown = "thread_unknown";
+    char               *threadName;
 
     /* 100ms delay */
     delay.tv_sec = 0;
@@ -221,8 +223,13 @@ void *LoggingThread( void *arg )
                 LogWrite( logFile, line, strlen(line) );
                 break;
             case LT_FILE:
-                sprintf( line, "%s %s:%d (%s) - %s\n", timestamp, item->file,
-                         item->line, item->function, item->message );
+                threadName = thread_name( item->threadId );
+                if( !threadName ) {
+                    threadName = unknown;
+                }
+                sprintf( line, "%s %s %s:%d (%s) - %s\n", timestamp, threadName,
+                         item->file, item->line, item->function, 
+                         item->message );
                 LogWrite( logFile, line, strlen(line) );
                 break;
             default:
