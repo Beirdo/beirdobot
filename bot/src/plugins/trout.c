@@ -63,6 +63,7 @@ void plugin_shutdown( void )
 void botCmdTrout( IRCServer_t *server, IRCChannel_t *channel, char *who, 
                   char *msg )
 {
+    char           *origmsg;
     char           *message;
     char           *chan;
     bool            privmsg = false;
@@ -76,6 +77,7 @@ void botCmdTrout( IRCServer_t *server, IRCChannel_t *channel, char *who,
             return;
         }
 
+        origmsg = msg;
         message = strstr( msg, " " );
         if( message ) {
             len = message - msg;
@@ -99,13 +101,13 @@ void botCmdTrout( IRCServer_t *server, IRCChannel_t *channel, char *who,
                 free( message );
             }
 
-            if( chan != msg ) {
+            if( chan != origmsg ) {
                 free( chan );
             }
             return;
         }
 
-        if( chan != msg ) {
+        if( chan != origmsg ) {
             free( chan );
         }
     }
