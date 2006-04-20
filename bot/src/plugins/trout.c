@@ -70,6 +70,12 @@ void botCmdTrout( IRCServer_t *server, IRCChannel_t *channel, char *who,
 
     if( !channel ) {
         privmsg = true;
+        if( !msg ) {
+            BN_SendPrivateMessage(&server->ircInfo, (const char *)who,
+                                  "Try \"help trout\"" );
+            return;
+        }
+
         message = strstr( msg, " " );
         if( message ) {
             len = message - msg;

@@ -92,7 +92,12 @@ void botCmdSearch( IRCServer_t *server, IRCChannel_t *channel, char *who,
 
     if( !channel ) {
         privmsg = true;
-        message = strstr( msg, " " );
+        if( msg ) {
+            message = strstr( msg, " " );
+        } else {
+            message = NULL;
+        }
+
         if( !message ) {
             BN_SendPrivateMessage(&server->ircInfo, (const char *)who, 
                                   "You must specify \"search #channel text\"");
@@ -179,7 +184,13 @@ void botCmdSeen( IRCServer_t *server, IRCChannel_t *channel, char *who,
 
     if( !channel ) {
         privmsg = true;
-        message = strstr( msg, " " );
+
+        if( msg ) {
+            message = strstr( msg, " " );
+        } else {
+            message = NULL;
+        }
+
         if( !message ) {
             BN_SendPrivateMessage(&server->ircInfo, (const char *)who, 
                                   "You must specify \"seen #channel nick\"");
@@ -251,6 +262,13 @@ void botCmdNotice( IRCServer_t *server, IRCChannel_t *channel, char *who,
     message = (char *)malloc(MAX_STRING_LENGTH);
     if( !channel ) {
         privmsg = true;
+
+        if( !msg ) {
+            BN_SendPrivateMessage(&server->ircInfo, (const char *)who,
+                                  "Try \"help notice\"" );
+            return;
+        }
+
         channel = FindChannel(server, msg);
         if( !channel ) {
             snprintf( message, MAX_STRING_LENGTH, "Can't find channel %s", 
