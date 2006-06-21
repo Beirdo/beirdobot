@@ -616,7 +616,7 @@ char           *findRR(char *domain, int requested_type)
 
 
 /*
- * BEGIN code from query-loc-0.3.0
+ * END code from query-loc-0.3.0
  */
 
 /*
