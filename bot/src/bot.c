@@ -61,6 +61,9 @@ void ProcOnConnected(BN_PInfo I, const char HostName[])
     IRCServer_t *server;
 
     server = (IRCServer_t *)I->User;
+    LogPrint( LOG_NOTICE, "Connected to %s:%d as %s...", server->server, 
+
+              server->port, server->nick);
     if( verbose ) {
         LogPrint( LOG_DEBUG, "Event Connected : (%s)", HostName);
     }
@@ -325,10 +328,27 @@ void ProcOnKill(BN_PInfo I, const char Who[], const char Whom[],
 void ProcOnInvite(BN_PInfo I, const char Chan[], const char Who[],
                   const char Whom[])
 {
+    IRCChannel_t   *channel;
+    IRCServer_t    *server;
+
     if( verbose ) {
         LogPrint( LOG_DEBUG, "You (%s) have been invited to %s by %s", Whom, 
                   Chan, Who);
     }
+
+    server = (IRCServer_t *)I->User;
+    channel = FindChannel(server, Chan);
+    if( !channel ) {
+        return;
+    }
+
+    /*
+     * We are configured for this channel, rejoin
+     */
+    LogPrint( LOG_NOTICE, "Invited to channel %s on server %s by %s", 
+              channel->channel, server->server, Who);
+    channel->joined = false;
+    BN_SendJoinMessage(I, channel->channel, NULL);
 }
 
 void ProcOnTopic(BN_PInfo I, const char Chan[], const char Who[],
@@ -351,6 +371,7 @@ void ProcOnKick(BN_PInfo I, const char Chan[], const char Who[],
 {
     char           *string;
     IRCChannel_t   *channel;
+    IRCServer_t    *server;
     char            nick[256];
 
     string = (char *)malloc(MAX_STRING_LENGTH);
@@ -358,11 +379,24 @@ void ProcOnKick(BN_PInfo I, const char Chan[], const char Who[],
     sprintf(string, "%s has been kicked from %s by %s (%s)\n", Whom, Chan, Who,
                     Msg);
 
-    channel = FindChannel((IRCServer_t *)I->User, Chan);
+    server = (IRCServer_t *)I->User;
+    channel = FindChannel(server, Chan);
     db_add_logentry( channel, (char *)Who, TYPE_KICK, string, true );
     db_update_nick( channel, nick, false, false );
     db_nick_history( channel, nick, HIST_LEAVE );
     free( string );
+
+    if( !strcasecmp( Whom, server->nick ) ) {
+#ifdef REJOIN_ON_KICK
+        /*
+         * We just got kicked.  The NERVE!  Join again.
+         */
+        channel->joined = false;
+        BN_SendJoinMessage(I, channel->channel, NULL);
+#endif
+        LogPrint( LOG_NOTICE, "Kicked from channel %s on server %s by %s (%s)", 
+                  channel->channel, server->server, Who, Msg);
+    }
 }
 
 void ProcOnPrivateTalk(BN_PInfo I, const char Who[], const char Whom[],
