@@ -246,9 +246,9 @@ void *dns_thread(void *arg)
 #endif
 
         response = findRR( host, dnsType->type );
-
         if( !response ) {
-            response = strdup( "No results" );
+            response = (char *)malloc(strlen(host)+strlen(dnsType->name)+15);
+            sprintf(response, "%s %s: No results", host, dnsType->name);
         }
 
         LogPrint( LOG_NOTICE, "%s", response );
@@ -436,7 +436,8 @@ int skipToData(unsigned char *cp, unsigned short *type, unsigned short *class,
 char           *findRR(char *domain, int requested_type)
 {
     char           *result,
-                   *message;
+                   *message,
+                   *temp;
 
     union {
         HEADER          hdr;    /* defined in resolv.h */
@@ -452,18 +453,17 @@ char           *findRR(char *domain, int requested_type)
     u_int32_t       ttl;        /* resource record time to live */
     u_short         dlen;       /* size of resource record data */
 
-    int             i,
-                    count,
-                    dup;        /* misc variables */
+    int             count;
+    int             i;
 
-    char                   *ptrList[1];
-    int                     ptrNum = 0;
     struct in_addr          addr;
     BalancedBTreeItem_t    *item;
     DNSType_t              *dnsType;
+    unsigned char          *temp_cp;
 
     result = (char *) malloc(512);
     message = (char *) malloc(256);
+    temp = (char *) malloc(MAXDNAME);
 
     item = BalancedBTreeFind( dnsTypeNumTree, (void *)&requested_type, 
                               UNLOCKED );
@@ -527,37 +527,17 @@ char           *findRR(char *domain, int requested_type)
 
         if (type == requested_type) {
             switch (requested_type) {
+            case (T_NS):
+            case (T_CNAME):
             case (T_PTR):
-                ptrList[ptrNum] = (char *) malloc(MAXDNAME);
-                if (ptrList[ptrNum] == NULL) {
+                if (dn_expand(response.buf, endOfMsg, cp, (char *)temp, 
+                              MAXDNAME) <0) {
                     return NULL;
                 }
 
-                if (dn_expand(response.buf,     /* Start of the packet */
-                              endOfMsg, /* End of the packet */
-                              cp,       /* Position in the packet */
-                              (char *) ptrList[ptrNum],       /* Result */
-                              MAXDNAME) /* size of ptrList buffer */
-                    <0) {       /* Negative: error */
-                    return NULL;
-                }
-
-                /*
-                 * Check the name we've just unpacked and add it to 
-                 * the list if it is not a duplicate.
-                 * If it is a duplicate, just ignore it.
-                 */
-                for (i = 0, dup = 0; (i < ptrNum) && !dup; i++) {
-                    dup = !strcasecmp(ptrList[i], ptrList[ptrNum]);
-                }
-
-                if (dup) {
-                    free(ptrList[ptrNum]);
-                } else {
-                    ptrNum++;
-                }
-                strcat(result, ptrList[0]);
-                return result;
+                strcat(result, temp);
+                strcat(result, " ");
+                found = 1;
                 break;
             case (T_A):
                 bcopy((char *) cp, (char *) &addr, INADDRSZ);
@@ -565,8 +545,57 @@ char           *findRR(char *domain, int requested_type)
                 strcat(result, " ");
                 found = 1;
                 break;
+            case (T_MX):
+                temp_cp = cp;
+                GETSHORT(class, temp_cp);
+
+                if (dn_expand(response.buf, endOfMsg, temp_cp, (char *)temp, 
+                              MAXDNAME) <0) {
+                    return NULL;
+                }
+
+                sprintf(message, "(%d) %s ", class, temp);
+                strcat(result, message);
+                found = 1;
+                break;
+            case (T_TXT):
+                strncat(result, (char *)cp, dlen);
+                strcat(result, " ");
+                found = 1;
+                break;
+            case (T_SOA):
+                temp_cp = cp;
+
+                if ((count = dn_expand(response.buf, endOfMsg, temp_cp,
+                                       (char *)temp, MAXDNAME)) <0) {
+                    return NULL;
+                }
+
+                strcat(result, temp);
+                strcat(result, ". ");
+
+                temp_cp += count;
+
+                if ((count = dn_expand(response.buf, endOfMsg, temp_cp,
+                                       (char *)temp, MAXDNAME)) <0) {
+                    return NULL;
+                }
+
+                strcat(result, temp);
+                strcat(result, ". ");
+
+                temp_cp += count;
+
+                for( i=0; i<5; i++) {
+                    GETLONG(ttl, temp_cp);
+                    sprintf(message, "%d ", ttl);
+                    strcat(result, message);
+                }
+
+                found = 1;
+                break;
             default:
-                sprintf(message, "Unexpected type %u", requested_type);
+                LogPrint(LOG_NOTICE, "Unexpected type %u", requested_type);
                 return NULL;
             }
         }
