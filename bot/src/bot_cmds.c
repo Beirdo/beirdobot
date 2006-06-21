@@ -34,6 +34,7 @@
 #include "botnet.h"
 #include "structs.h"
 #include "protos.h"
+#include "balanced_btree.h"
 #include "logging.h"
 
 /* INTERNAL FUNCTION PROTOTYPES */

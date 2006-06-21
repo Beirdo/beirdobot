@@ -53,6 +53,7 @@ void BalancedBTreeReplace( BalancedBTree_t *btree, BalancedBTreeItem_t *item,
                            BalancedBTreeItem_t *replace );
 void BalancedBTreeRebalance( BalancedBTree_t *btree, 
                              BalancedBTreeItem_t *root );
+void BalancedBTreePrune( BalancedBTreeItem_t *item );
 
 /* CVS generated ID string */
 static char ident[] _UNUSED_ = 
@@ -116,6 +117,8 @@ BalancedBTree_t *BalancedBTreeCreate( BalancedBTreeKeyType_t type )
 void BalancedBTreeDestroy( BalancedBTree_t *btree )
 {
     /* Assumes the btree is locked by the caller */
+    BalancedBTreePrune( btree->root );
+
     pthread_mutex_unlock( &btree->mutex );
     pthread_mutex_destroy( &btree->mutex );
 
@@ -178,6 +181,26 @@ void BalancedBTreeAdd( BalancedBTree_t *btree, BalancedBTreeItem_t *item,
     {
         BalancedBTreeUnlock( btree );
     }
+}
+
+
+void BalancedBTreePrune( BalancedBTreeItem_t *item )
+{
+    if( !item ) {
+        return;
+    }
+
+    /* Assumes a locked tree */
+    if( item->left ) {
+        BalancedBTreePrune( item->left );
+    }
+
+    if( item->right ) {
+        BalancedBTreePrune( item->right );
+    }
+
+    BalancedBTreeRemove( item->btree, item, LOCKED, FALSE );
+    free( item );
 }
 
 
