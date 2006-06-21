@@ -12,7 +12,9 @@ LDFLAGS = -g
 LIBS	= $(shell ${MYSQLCFG} --libs_r)
 LIBS	+= $(shell ${BOTNETCFG} --libs-static)
 
-SRCS	= trout.c fart.c core.c
+DLLIBS_dns	= -lresolv
+
+SRCS	= trout.c fart.c core.c dns.c
 OBJS	= ${SRCS:%.c=plugin_%.so}
 DEPS	= ${SRCS:.c=.d}
 
@@ -21,7 +23,7 @@ DEPS	= ${SRCS:.c=.d}
 all:	${OBJS}
 
 plugin_%.so:	%.c
-	${CC} ${CFLAGS} -fPIC -shared -o $@ $<
+	${CC} ${CFLAGS} -fPIC -shared -o $@ $< ${DLLIBS_${<:%.c=%}}
 
 depend:		${DEPS}
 ${DEPS}:	Makefile

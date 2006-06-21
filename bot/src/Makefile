@@ -14,7 +14,7 @@ LDFLAGS = -g -rdynamic
 LIBS	= $(shell ${MYSQLCFG} --libs_r)
 LIBS	+= $(shell ${BOTNETCFG} --libs-static)
 LIBS	+= $(shell ${PCRECFG} --libs)
-LIBS    += -ldl -lopie
+LIBS    += -ldl -lopie -lresolv
 
 SRCS	= main.c plugin_api.c bot.c bot_cmds.c mysql.c linked_list.c regexp.c
 SRCS    += balanced_btree.c protected_data.c mysql_upgrade.c queue.c notice.c
