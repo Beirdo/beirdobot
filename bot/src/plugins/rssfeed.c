@@ -269,7 +269,7 @@ void *rssfeed_thread(void *arg)
                 LogPrint( LOG_DEBUG, "ret: %d  pub: %s  pubTime: %ld", 
                                      retval, rssItem->pubDate, pubTime );
 
-                if( pubTime > feed->lastPost ) {
+                if( retval == 0 && pubTime > feed->lastPost ) {
                     itemData = (RssItem_t *)malloc(sizeof(RssItem_t));
                     itemData->feed    = feed;
                     itemData->pubTime = pubTime;
@@ -278,12 +278,12 @@ void *rssfeed_thread(void *arg)
                     itemData->link    = (rssItem->link ? 
                                          strdup(rssItem->link) : NULL);
 
-                    for( item = 
-                            BalancedBTreeFind( rssItemTree, &itemData->pubTime,
-                                               LOCKED) ; item ;
-                         item = 
-                            BalancedBTreeFind( rssItemTree, &itemData->pubTime,
-                                               LOCKED) ) {
+                    for( item = BalancedBTreeFind( rssItemTree, 
+                                                   &itemData->pubTime,
+                                                   LOCKED) ; item ;
+                         item = BalancedBTreeFind( rssItemTree, 
+                                                   &itemData->pubTime,
+                                                   LOCKED) ) {
                         itemData->pubTime++;
                     }
 
@@ -345,9 +345,9 @@ void *rssfeed_thread(void *arg)
                 free( itemData->title );
             }
 
-            free( itemData );
 
             BalancedBTreeRemove( rssItemTree, item, LOCKED, FALSE );
+            free( itemData );
             free( item );
         }
         BalancedBTreeUnlock( rssItemTree );
