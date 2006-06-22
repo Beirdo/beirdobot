@@ -189,7 +189,7 @@ void *rssfeed_thread(void *arg)
 
         gettimeofday( &now, NULL );
 
-        delta = 900;
+        delta = 60;
         if( !item ) {
             /* Nothing configured to be active, check in 15min */
             delta = 900;
@@ -206,14 +206,14 @@ void *rssfeed_thread(void *arg)
         /* Trigger all feeds expired or to expire in <= 15s */
         BalancedBTreeLock( rssfeedActiveTree );
         BalancedBTreeLock( rssItemTree );
-        for( ; item ; item = BalancedBTreeFindLeast( rssfeedActiveTree->root ) )
-        {
+        for( found = FALSE; item && !found ; 
+             item = BalancedBTreeFindLeast( rssfeedActiveTree->root ) ) {
             gettimeofday( &now, NULL );
             feed = (RssFeed_t *)item->item;
             if( feed->nextpoll > now.tv_sec + 15 ) {
                 delta = feed->nextpoll - now.tv_sec;
-                item = NULL;
-                goto DelayPoll;
+                found = TRUE;
+                continue;
             }
 
             if( (!feed->server || !feed->channel) && ServerList ) {
@@ -236,6 +236,14 @@ void *rssfeed_thread(void *arg)
              */
             LogPrint( LOG_NOTICE, "RSS: polling feed %d in %s", feed->feedId,
                                   feed->channel->fullspec );
+
+            if( !feed->channel->joined ) {
+                LogPrint( LOG_NOTICE, "RSS: feed %d: delaying 60s, not "
+                                      "joined yet", feed->feedId );
+                feed->nextpoll = now.tv_sec + 60;
+                continue;
+            }
+
             feed->nextpoll = now.tv_sec + feed->timeout;
             BalancedBTreeRemove( rssfeedActiveTree, item, LOCKED, FALSE );
             BalancedBTreeAdd( rssfeedActiveTree, item, LOCKED, FALSE );
