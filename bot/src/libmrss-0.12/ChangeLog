@@ -1,0 +1,39 @@
+2006-06-12	libmrss		0.12
+	mrss.pc updated
+
+2006-03-21	libmrss		0.11
+	copyright updates
+	enclouse with only argoments support for podcast
+
+2006-03-07	libmrss		0.10
+	some memory leaks
+
+2006-02-27	libmrss		0.9
+	mrss_write_url php bug fixes
+
+2006-02-06	libmrss		0.8
+	encoding in mrss_t
+
+2005-01-20	libmrss		0.7
+	mrss_get_last_modified
+	a new test (time.c)
+	doxygen mainpage
+
+2005-01-14	libmrss		0.6
+	bug fixes in the write function
+
+2006-01-04	libmrss		0.5
+	GPL -> LGPL
+
+2005-12-15	libmrss		0.4
+	mrss_set_timeout
+	mrss_get_timeout
+
+2005-11-01	libmrss		0.3
+	libxml2 -> libnxml
+	rss 1.0
+	
+
+2005-07-27	libmrss		0.2
+	phpsupport
+	doxygen

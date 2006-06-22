@@ -1,0 +1,89 @@
+/*!\mainpage mRss Library
+ *
+ * \section Author
+ * Andrea Marchesini <bakunin@autistici.org>
+ *
+ * \section Description
+ *
+ * mRss is a C library for parsing, writing and creating RSS files or
+ * streams. This library can be also used not only in C or C++, but also
+ * in PHP with a PHP extension.
+ *
+ * \section License
+ *
+ * mRss is a FreeSoftware project released under license LGPL.
+ *
+ * \section Required
+ *
+ * - libnxml http://www.autistici.org/bakunin/libnxml/
+ * - libcurl http://curl.haxx.se/
+ *
+ * For the PHP extension:
+ * - php http://www.php.net/
+ *
+ * \section Download
+ *
+ * - libmrss http://www.autistici.org/bakunin/libmrss/
+ *
+ * \section install1 Installation from source
+ *
+ * \code
+ * tar xvfz libmrss-<version>.tar.gz
+ * cd libmrss-<version>
+ * ./configure --prefix=/usr
+ * make
+ * make install
+ * \endcode
+ *
+ * If you want the PHP extension:
+ *
+ * \code
+ * cd phpmrss
+ * ./phpmrss_install.sh
+ * \endcode
+ *
+ * \section install2 Installation from CVS
+ * Run the following commands in a directory that you have write access to
+ * (such as your home dirctory):
+ *
+ * \code
+ * cvs -d:pserver:anonymous@ippolita.net:/home/cvs login
+ * \endcode
+ * (Just hit enter for the password)
+ * \code
+ * cvs -z3 -d:pserver:anonymous@ippolita.net:/home/cvs co libmrss
+ * \endcode
+ *
+ * Once you have checked the source of libmrss, run the following commands:
+ *
+ * \code
+ * cd libmrss
+ * ./configure --prefix=/usr
+ * make
+ * make install
+ * \endcode
+ *
+ * When there are changes to libmrss's code, you will want to update you local
+ * copy. Run from the directory libmrss:
+ *
+ * \code
+ * cvs update -dP
+ * ./configure --prefix=/usr
+ * make
+ * make install
+ * \endcode
+ *
+ * \section Support
+ *
+ * Support for mRss is available to all via email: bakunin@autistici.org.
+ *
+ * \section support1 Commercial Support
+ * Commercial users of mRss are strongly encouraged to purchase a commercial
+ * support contract, please contact me for a quotation. I will always
+ * prioritise support requests from those with support contracts.
+ *
+ * \section Donations
+ * Users not purchasing commercial support are encouraged (but not obliged) to
+ * make a donation. By donating you are supporting the principle of open
+ * source software and you will help ensure continued development of mRss.
+ */

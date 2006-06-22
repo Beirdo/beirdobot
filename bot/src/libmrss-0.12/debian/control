@@ -1,0 +1,13 @@
+Source: libmrss
+Priority: optional
+Maintainer: Andrea Marchesini <bakunin@autistici.rog>
+Build-Depends: debhelper (>> 4.0.0)
+Standards-Version: 3.6.1
+
+Package: libmrss
+Section: libs
+Architecture: any
+Depends: libcurl3
+Description: mRSS is a C library for parsing, writing and creating RSS (0.91, 0.92, 1.0, 2.0) files or streams
+ .                                                                               
+

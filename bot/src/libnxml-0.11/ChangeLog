@@ -1,0 +1,32 @@
+20060612	libnxml		0.11
+	nxml.pc updates
+
+20060607	libnxml		0.10
+	copyright uodates
+	entities in attributes
+
+20060307	libnxml		0.9
+	no memory leaks
+
+20060210	libnxml		0.8
+	conversion in utf8 of a integer only if the encoding IS utff8
+
+20060207	libnxml		0.7
+	a bugfixes in &#numb; utf8
+
+20060203	libnxml		0.6
+	litle bug fixes
+
+20060122	libnxml		0.5
+	doxygen
+
+20060104	libnxml		0.4
+	GPL -> LGPL
+
+20051215	libnxml		0.3
+	dtd
+	some bug fixes
+
+20050806	libnxml		0.2
+	Some defines
+	easy functions

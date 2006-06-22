@@ -1,0 +1,78 @@
+/*!\mainpage nXml Library
+ *
+ * \section Author
+ * Andrea Marchesini <bakunin@autistici.org>
+ *
+ * \section description Description
+ *
+ * nXML is a C library for parsing, writing and creating XML 1.0 and 1.1 files
+ * or streams. It supports utf-8, utf-16be and utf-16le, ucs-4 (1234, 4321,
+ * 2143, 2312).
+ *
+ * \section License
+ *
+ * nXml is a FreeSoftware project released under license LGPL.
+ *
+ * \section Required
+ *
+ * - libcurl http://curl.haxx.se/
+ *
+ * \section Download
+ *
+ * - libnxml http://www.autistici.org/bakunin/libnxml/
+ *
+ * \section install1 Installation from source
+ *
+ * \code
+ * tar xvfz libnxml-<version>.tar.gz
+ * cd libnxml-<version>
+ * ./configure --prefix=/usr
+ * make
+ * make install
+ * \endcode
+ *
+ * \section install2 Installation from CVS
+ * Run the following commands in a directory that you have write access to
+ * (such as your home dirctory):
+ *
+ * \code
+ * cvs -d:pserver:anonymous@ippolita.net:/home/cvs login
+ * \endcode
+ * (Just hit enter for the password)
+ * \code
+ * cvs -z3 -d:pserver:anonymous@ippolita.net:/home/cvs co libnxml
+ * \endcode
+ *
+ * Once you have checked the source of libnxml, run the following commands:
+ *
+ * \code
+ * cd libnxml
+ * ./configure --prefix=/usr
+ * make
+ * make install
+ * \endcode
+ *
+ * When there are changes to libnxml's code, you will want to update you local
+ * copy. Run from the directory libnxml:
+ *
+ * \code
+ * cvs update -dP
+ * ./configure --prefix=/usr
+ * make
+ * make install
+ * \endcode
+ *
+ * \section Support
+ *
+ * Support for nXml is available to all via email: bakunin@autistici.org.
+ *
+ * \section support1 Commercial Support
+ * Commercial users of nXml are strongly encouraged to purchase a commercial
+ * support contract, please contact me for a quotation. I will always
+ * prioritise support requests from those with support contracts.
+ *
+ * \section Donations
+ * Users not purchasing commercial support are encouraged (but not obliged) to
+ * make a donation. By donating you are supporting the principle of open
+ * source software and you will help ensure continued development of nXml.
+ */
