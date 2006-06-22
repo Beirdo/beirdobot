@@ -3,7 +3,7 @@
 all:	../../lib/libnxml.a
 
 ../../lib/libnxml.a:
-	./configure --prefix=`cd ../.. ; pwd` --disable-shared
+	./configure --prefix=`cd ../.. ; pwd` --disable-shared --with-pic
 	${MAKE}
 	${MAKE} install
 
