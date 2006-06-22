@@ -43,7 +43,7 @@ static char ident[] _UNUSED_ =
 #define MAX_SCHEMA_QUERY 100
 typedef char *SchemaUpgrade_t[MAX_SCHEMA_QUERY];
 
-SchemaUpgrade_t schemaUpgrade[CURRENT_SCHEMA] = {
+static SchemaUpgrade_t schemaUpgrade[CURRENT_SCHEMA] = {
     /* 0 -> 1 */
     { NULL },
     /* 1 -> 2 */
@@ -109,7 +109,7 @@ SchemaUpgrade_t schemaUpgrade[CURRENT_SCHEMA] = {
 
 /* Internal protos */
 extern MYSQL_RES *db_query( char *format, ... );
-int db_upgrade_schema( int current, int goal );
+static int db_upgrade_schema( int current, int goal );
 
 
 void db_check_schema(void)
@@ -141,7 +141,7 @@ void db_check_schema(void)
     } while( ver < CURRENT_SCHEMA );
 }
 
-int db_upgrade_schema( int current, int goal )
+static int db_upgrade_schema( int current, int goal )
 {
     int                 i;
     MYSQL_RES          *res;
