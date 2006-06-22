@@ -304,8 +304,8 @@ void *rssfeed_thread(void *arg)
                 rssItem = rssItem->next;
             }
 
-            LogPrint( LOG_NOTICE, "RSS: feed %d: %d new posts", feed->feedId,
-                                  count );
+            LogPrint( LOG_NOTICE, "RSS: feed %d: %d new post%s", feed->feedId,
+                                  count, (count == 1 ? "" : "s") );
 
             if( lastPost > feed->lastPost ) {
                 db_update_lastpost( feed->feedId, lastPost );
