@@ -177,6 +177,7 @@ void *rssfeed_thread(void *arg)
     IRCServer_t            *server;
     int                     count;
     int                     retval;
+    bool                    done;
 
     db_thread_init();
 
@@ -208,13 +209,13 @@ void *rssfeed_thread(void *arg)
         /* Trigger all feeds expired or to expire in <= 15s */
         BalancedBTreeLock( rssfeedActiveTree );
         BalancedBTreeLock( rssItemTree );
-        for( found = FALSE; item && !found ; 
+        for( done = FALSE; item && !done ; 
              item = BalancedBTreeFindLeast( rssfeedActiveTree->root ) ) {
             gettimeofday( &now, NULL );
             feed = (RssFeed_t *)item->item;
             if( feed->nextpoll > now.tv_sec + 15 ) {
                 delta = feed->nextpoll - now.tv_sec;
-                found = TRUE;
+                done = TRUE;
                 continue;
             }
 
