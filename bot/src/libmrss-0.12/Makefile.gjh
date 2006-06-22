@@ -1,0 +1,14 @@
+.PHONY:	all clean
+
+all:	../../lib/libmrss.a
+
+../../lib/libmrss.a:
+	PKG_CONFIG_PATH=../../lib/pkgconfig \
+		./configure --prefix=`cd ../.. ; pwd` --disable-shared
+	${MAKE}
+	${MAKE} install
+
+clean:
+	${MAKE} uninstall
+	${MAKE} distclean
+

@@ -1,4 +1,4 @@
-prefix=/usr
+prefix=/home/gjhurlbu/beirdobot/trunk/bot
 exec_prefix=${prefix}
 libdir=${exec_prefix}/lib
 includedir=${prefix}/include

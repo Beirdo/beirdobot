@@ -1,8 +1,8 @@
 .PHONY:	all clean
 
-all:	../../lib/libbotnet.a
+all:	../../lib/libnxml.a
 
-../../lib/libbotnet.a:
+../../lib/libnxml.a:
 	./configure --prefix=`cd ../.. ; pwd` --disable-shared
 	${MAKE}
 	${MAKE} install

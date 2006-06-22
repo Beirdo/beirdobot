@@ -1,6 +1,7 @@
-BOTNETCFG	=../bin/botnet-config
+BOTNETCFG	= ../bin/botnet-config
 MYSQLCFG	= mysql_config
 PCRECFG		= pcre-config
+PKGCONFIGPATH	= ../lib/pkgconfig
 
 CC	= gcc
 
@@ -9,11 +10,15 @@ CFLAGS	= -O6 -g -Wall -Werror -I../include -std=c99 -pedantic
 CFLAGS	+= $(shell ${MYSQLCFG} --cflags)
 CFLAGS  += $(shell ${BOTNETCFG} --cflags)
 CFLAGS  += $(shell ${PCRECFG} --cflags)
+CFLAGS  += $(shell PKG_CONFIG_PATH=${PKGCONFIGPATH} pkg-config --cflags nxml)
+CFLAGS  += $(shell PKG_CONFIG_PATH=${PKGCONFIGPATH} pkg-config --cflags mrss)
 
 LDFLAGS = -g -rdynamic
 LIBS	= $(shell ${MYSQLCFG} --libs_r)
 LIBS	+= $(shell ${BOTNETCFG} --libs-static)
 LIBS	+= $(shell ${PCRECFG} --libs)
+LIBS	+= $(shell PKG_CONFIG_PATH=${PKGCONFIGPATH} pkg-config --libs nxml)
+LIBS	+= $(shell PKG_CONFIG_PATH=${PKGCONFIGPATH} pkg-config --libs mrss)
 LIBS    += -ldl -lopie -lresolv
 
 SRCS	= main.c plugin_api.c bot.c bot_cmds.c mysql.c linked_list.c regexp.c
