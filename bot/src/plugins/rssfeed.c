@@ -266,8 +266,11 @@ void *rssfeed_thread(void *arg)
             while( rssItem ) {
                 retval = getdate_r( rssItem->pubDate, &tm );
                 pubTime = mktime( &tm );
-                LogPrint( LOG_DEBUG, "ret: %d  pub: %s  pubTime: %ld", 
-                                     retval, rssItem->pubDate, pubTime );
+
+                if( retval ) {
+                    LogPrint( LOG_DEBUG, "ret: %d  pub: %s  pubTime: %ld", 
+                                         retval, rssItem->pubDate, pubTime );
+                }
 
                 if( retval == 0 && pubTime > feed->lastPost ) {
                     itemData = (RssItem_t *)malloc(sizeof(RssItem_t));
@@ -320,7 +323,6 @@ void *rssfeed_thread(void *arg)
         for( item = BalancedBTreeFindLeast( rssItemTree->root ) ;
              item ; item = BalancedBTreeFindLeast( rssItemTree->root ) ) {
 
-            LogPrint( LOG_DEBUG, "item: %p", item );
             itemData = (RssItem_t *)item->item;
             feed    = itemData->feed;
             pubTime = itemData->pubTime;
