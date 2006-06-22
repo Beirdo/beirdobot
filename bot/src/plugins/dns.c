@@ -18,7 +18,7 @@
  */
 
 /*HEADER---------------------------------------------------
-* $Id: trout.c 142 2006-04-20 20:15:23Z gjhurlbu $
+* $Id$
 *
 * Copyright 2006 Gavin Hurlbut
 * All rights reserved
