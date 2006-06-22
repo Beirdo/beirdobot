@@ -158,6 +158,7 @@ void *dns_thread(void *arg)
     char                   *command;
     int                     len;
     char                   *response;
+    static char            *type_ptr = "PTR";
 
     pthread_mutex_lock( &shutdownMutex );
     DnsQ = QueueCreate(256);
@@ -172,7 +173,7 @@ void *dns_thread(void *arg)
 
         command = qItem->command;
         dnsserver = NULL;
-        type = NULL;
+        type = "A";
         host = NULL;
         dnsType = NULL;
 
@@ -185,7 +186,6 @@ void *dns_thread(void *arg)
                 } else if( !host ) {
                     /* Only the host */
                     dnsserver = NULL;
-                    type = "A";
                     host = command;
                 } else {
                     type = command;
@@ -205,6 +205,8 @@ void *dns_thread(void *arg)
                 command++;
                 len--;
                 dnsserver = command;
+            } else if ( !strcasecmp( command, "-x" ) ) {
+                type = command;
             } else if ( !host ) {
                 host = command;
             } else {
@@ -217,33 +219,44 @@ void *dns_thread(void *arg)
             }
         }
 
+        if( !strcasecmp( type, "-x" ) ) {
+            type = type_ptr;
+            response = in_addr_arpa( host );
+            if( !response ) {
+                response = (char *)malloc(strlen(host)+22);
+                sprintf(response, "%s: Invalid Reverse", host);
+                goto ShowResponse;
+            }
+            host = response;
+        }
+
         if( type ) {
             item = BalancedBTreeFind( dnsTypeTree, (void *)&type, UNLOCKED );
             if( !item ) {
                 /* WTF is this type?  Punt the request */
-                free( qItem );
-                continue;
+                response = (char *)malloc(strlen(host)+strlen(type)+22);
+                sprintf(response, "%s %s: Unknown RR Type", host, type);
+                goto ShowResponse;
             }
             dnsType = (DNSType_t *)item->item;
         }
 
         res_init();
 
-#ifdef FUCKED
         if( dnsserver ) {
             struct hostent  he_addr;
             struct hostent *result;
             int             lErrno;
+            char            results[PACKETSZ];
 
-            gethostbyname_r( dnsserver, &he_addr, response.buf, 
+            gethostbyname_r( dnsserver, &he_addr, results, 
                              PACKETSZ, &result, &lErrno );
             _res.nscount = 1;
-            memcpy( &_res.nsaddr_list[0].sin_addr, &he_addr.h_addr_list[0],
+            memcpy( &_res.nsaddr_list[0].sin_addr, he_addr.h_addr_list[0],
                     sizeof( _res.nsaddr_list[0].sin_addr ) );
             _res.nsaddr_list[0].sin_family = AF_INET;
             _res.nsaddr_list[0].sin_port = htons(53);
         }
-#endif
 
         response = findRR( host, dnsType->type );
         if( !response ) {
@@ -251,6 +264,7 @@ void *dns_thread(void *arg)
             sprintf(response, "%s %s: No results", host, dnsType->name);
         }
 
+    ShowResponse:
         LogPrint( LOG_NOTICE, "%s", response );
 
         if( qItem->channel ) {
@@ -461,10 +475,6 @@ char           *findRR(char *domain, int requested_type)
     DNSType_t              *dnsType;
     unsigned char          *temp_cp;
 
-    result = (char *) malloc(512);
-    message = (char *) malloc(256);
-    temp = (char *) malloc(MAXDNAME);
-
     item = BalancedBTreeFind( dnsTypeNumTree, (void *)&requested_type, 
                               UNLOCKED );
     if( !item ) {
@@ -472,6 +482,10 @@ char           *findRR(char *domain, int requested_type)
         return( NULL );
     }
     dnsType = (DNSType_t *)item->item;
+
+    result = (char *) malloc(512);
+    message = (char *) malloc(256);
+    temp = (char *) malloc(MAXDNAME);
 
     sprintf( result, "%s %s: ", domain, dnsType->name );
 
@@ -481,13 +495,11 @@ char           *findRR(char *domain, int requested_type)
      * we use res_query().  If we wanted the resolver search 
      * algorithm, we would have used res_search() instead.
      */
-    if ((responseLen = res_query(domain,        /* the domain we care about */
-                                 C_IN,  /* Internet class records */
-                                 requested_type,        /* Look up name
-                                                         * server records */
-                                 (u_char *) & response, /* response buffer */
-                                 sizeof(response)))     /* buffer size */
-        <0) {                   /* If negative */
+    if ((responseLen = res_query(domain, C_IN, requested_type, 
+                                 (u_char *)&response, sizeof(response))) <0) {
+        free( result );
+        free( message );
+        free( temp );
         return NULL;
     }
 
@@ -517,9 +529,7 @@ char           *findRR(char *domain, int requested_type)
     cp += skipName(cp, endOfMsg) + QFIXEDSZ;
 
     count = ntohs(response.hdr.ancount) + ntohs(response.hdr.nscount);
-    while ((--count >= 0)       /* still more records */
-           &&(cp < endOfMsg)) { /* still inside the packet */
-
+    while ((--count >= 0) && (cp < endOfMsg)) {
         /*
          * Skip to the data portion of the resource record 
          */
@@ -532,6 +542,9 @@ char           *findRR(char *domain, int requested_type)
             case (T_PTR):
                 if (dn_expand(response.buf, endOfMsg, cp, (char *)temp, 
                               MAXDNAME) <0) {
+                    free( result );
+                    free( message );
+                    free( temp );
                     return NULL;
                 }
 
@@ -551,6 +564,9 @@ char           *findRR(char *domain, int requested_type)
 
                 if (dn_expand(response.buf, endOfMsg, temp_cp, (char *)temp, 
                               MAXDNAME) <0) {
+                    free( result );
+                    free( message );
+                    free( temp );
                     return NULL;
                 }
 
@@ -568,6 +584,9 @@ char           *findRR(char *domain, int requested_type)
 
                 if ((count = dn_expand(response.buf, endOfMsg, temp_cp,
                                        (char *)temp, MAXDNAME)) <0) {
+                    free( result );
+                    free( message );
+                    free( temp );
                     return NULL;
                 }
 
@@ -578,6 +597,9 @@ char           *findRR(char *domain, int requested_type)
 
                 if ((count = dn_expand(response.buf, endOfMsg, temp_cp,
                                        (char *)temp, MAXDNAME)) <0) {
+                    free( result );
+                    free( message );
+                    free( temp );
                     return NULL;
                 }
 
@@ -596,6 +618,9 @@ char           *findRR(char *domain, int requested_type)
                 break;
             default:
                 LogPrint(LOG_NOTICE, "Unexpected type %u", requested_type);
+                free( result );
+                free( message );
+                free( temp );
                 return NULL;
             }
         }
@@ -607,10 +632,14 @@ char           *findRR(char *domain, int requested_type)
 
     }
 
+    free( message );
+    free( temp );
+
     if (found) {
-        return result;
+        return( result );
     } else {
-        return NULL;
+        free( result );
+        return( NULL );
     }
 }
 
