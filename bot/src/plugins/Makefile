@@ -19,6 +19,7 @@ LIBS	+= $(shell ${BOTNETCFG} --libs-static)
 DLLIBS_dns	= -lresolv
 DLLIBS_rssfeed	= $(shell PKG_CONFIG_PATH=${PKGCONFIGPATH} pkg-config --libs nxml)
 DLLIBS_rssfeed += $(shell PKG_CONFIG_PATH=${PKGCONFIGPATH} pkg-config --libs mrss)
+DLLIBS_rssfeed += -lcurl
 
 SRCS	= trout.c fart.c core.c dns.c rssfeed.c
 OBJS	= ${SRCS:%.c=plugin_%.so}

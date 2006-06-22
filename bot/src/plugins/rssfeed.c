@@ -171,6 +171,16 @@ void *rssfeed_thread(void *arg)
     time_t                  lastPost;
     static char             buf[255];
     static char             message[1024];
+    LinkedListItem_t       *listItem;
+    bool                    found;
+    IRCServer_t            *server;
+    int                     count;
+
+    db_thread_init();
+
+    LogPrintNoArg( LOG_NOTICE, "Starting RSSfeed thread..." );
+
+    sleep(5);
 
     while( !GlobalAbort ) {
         BalancedBTreeLock( rssfeedActiveTree );
@@ -188,7 +198,7 @@ void *rssfeed_thread(void *arg)
         
         feed = (RssFeed_t *)item->item;
         nextpoll = feed->nextpoll;
-        if( nextpoll > now.tv_sec + 15 ) {
+        if( nextpoll > now.tv_sec + 15 || !ServerList ) {
             delta = nextpoll - now.tv_sec;
             goto DelayPoll;
         }
@@ -203,12 +213,29 @@ void *rssfeed_thread(void *arg)
             if( feed->nextpoll > now.tv_sec + 15 ) {
                 delta = feed->nextpoll - now.tv_sec;
                 item = NULL;
-                continue;
+                goto DelayPoll;
+            }
+
+            if( (!feed->server || !feed->channel) && ServerList ) {
+                LinkedListLock( ServerList );
+                for( listItem = ServerList->head, found = FALSE; 
+                     listItem && !found; listItem = listItem->next ) {
+                    server = (IRCServer_t *)listItem;
+                    if( server->serverId == feed->serverId ) {
+                        found = TRUE;
+                        feed->server = server;
+                    }
+                }
+                LinkedListUnlock( ServerList );
+
+                feed->channel = FindChannelNum( feed->server, feed->chanId );
             }
 
             /* This feed needs to be polled now!   Remove it, and requeue it
              * in the tree, then poll it
              */
+            LogPrint( LOG_NOTICE, "RSS: polling feed %d in %s", feed->feedId,
+                                  feed->channel->fullspec );
             feed->nextpoll = now.tv_sec + feed->timeout;
             BalancedBTreeRemove( rssfeedActiveTree, item, LOCKED, FALSE );
             BalancedBTreeAdd( rssfeedActiveTree, item, LOCKED, FALSE );
@@ -217,11 +244,14 @@ void *rssfeed_thread(void *arg)
 
             ret = mrss_parse_url( feed->url, &data );
             if( ret ) {
-                LogPrint( LOG_NOTICE, "RSSfeed %d: error %s", feed->feedId,
+                LogPrint( LOG_NOTICE, "RSS feed %d: error %s", feed->feedId,
                                       mrss_strerror(ret) );
                 continue;
             }
 
+            LogPrint( LOG_NOTICE, "RSS: feed %d: parsing", feed->feedId,
+                                  feed->channel->fullspec );
+            count = 0;
             rssItem = data->item;
             while( rssItem ) {
                 strptime( rssItem->pubDate, "%Y-%m-%dT%H:%M:%S", &tm );
@@ -236,8 +266,17 @@ void *rssfeed_thread(void *arg)
                     itemData->link    = (rssItem->link ? 
                                          strdup(rssItem->link) : NULL);
 
+                    for( item = 
+                            BalancedBTreeFind( rssItemTree, &itemData->pubTime,
+                                               LOCKED) ; item ;
+                         item = 
+                            BalancedBTreeFind( rssItemTree, &itemData->pubTime,
+                                               LOCKED) ) {
+                        itemData->pubTime++;
+                    }
+
                     item = (BalancedBTreeItem_t *)
-                               malloc(sizeof(BalancedBTreeItem_t *));
+                               malloc(sizeof(BalancedBTreeItem_t));
                     item->item = (void *)itemData;
                     item->key  = (void *)&itemData->pubTime;
                     BalancedBTreeAdd( rssItemTree, item, LOCKED, FALSE );
@@ -245,8 +284,13 @@ void *rssfeed_thread(void *arg)
                     if( pubTime > lastPost ) {
                         lastPost = pubTime;
                     }
+                    count++;
                 }
+                rssItem = rssItem->next;
             }
+
+            LogPrint( LOG_NOTICE, "RSS: feed %d: %d new posts", feed->feedId,
+                                  count );
 
             if( lastPost > feed->lastPost ) {
                 db_update_lastpost( feed->feedId, lastPost );
@@ -264,6 +308,7 @@ void *rssfeed_thread(void *arg)
         for( item = BalancedBTreeFindLeast( rssItemTree->root ) ;
              item ; item = BalancedBTreeFindLeast( rssItemTree->root ) ) {
 
+            LogPrint( LOG_DEBUG, "item: %p", item );
             itemData = (RssItem_t *)item->item;
             feed    = itemData->feed;
             pubTime = itemData->pubTime;
@@ -278,6 +323,7 @@ void *rssfeed_thread(void *arg)
             }
 
             LoggedChannelMessage( feed->server, feed->channel, message );
+            LogPrint( LOG_NOTICE, "RSS: feed %d: %s", feed->feedId, message );
 
             if( itemData->link ) {
                 free( itemData->link );
@@ -290,10 +336,12 @@ void *rssfeed_thread(void *arg)
             free( itemData );
 
             BalancedBTreeRemove( rssItemTree, item, LOCKED, FALSE );
+            free( item );
         }
         BalancedBTreeUnlock( rssItemTree );
 
     DelayPoll:
+        LogPrint( LOG_NOTICE, "RSS: sleeping for %ds", delta );
         sleep( delta );
     }
 
@@ -362,21 +410,23 @@ static void db_load_rssfeeds( void )
     RssFeed_t              *data;
     BalancedBTreeItem_t    *item;
     struct timeval          tv;
-    LinkedListItem_t       *listItem;
-    bool                    found;
-    IRCServer_t            *server;
+    time_t                  nextpoll;
 
     rssfeedTree = BalancedBTreeCreate( BTREE_KEY_INT );
     rssfeedActiveTree = BalancedBTreeCreate( BTREE_KEY_INT );
 
     res = db_query( "SELECT a.`feedid`, a.`chanid`, b.`serverid`, a.`url`, "
                     "a.`prefix`, a.`timeout`, a.`lastpost` "
-                    "FROM `plugin_rssfeed` AS a NATURAL JOIN `channels` AS b "
+                    "FROM `plugin_rssfeed` AS a, `channels` AS b "
+                    "WHERE a.`chanid` = b.`chanid` "
                     "ORDER BY a.`feedid` ASC" );
     if( !res || !(count = mysql_num_rows(res)) ) {
         mysql_free_result(res);
         return;
     }
+
+    gettimeofday( &tv, NULL );
+    nextpoll = tv.tv_sec;
 
     BalancedBTreeLock( rssfeedTree );
     BalancedBTreeLock( rssfeedActiveTree );
@@ -385,6 +435,7 @@ static void db_load_rssfeeds( void )
         row = mysql_fetch_row(res);
 
         data = (RssFeed_t *)malloc(sizeof(RssFeed_t));
+        memset( data, 0x00, sizeof(RssFeed_t) );
 
         data->feedId   = atoi(row[0]);
         data->chanId   = atoi(row[1]);
@@ -393,21 +444,7 @@ static void db_load_rssfeeds( void )
         data->prefix   = strdup(row[4]);
         data->timeout  = atoi(row[5]);
         data->lastPost = atoi(row[6]);
-        gettimeofday( &tv, NULL );
-        data->nextpoll = tv.tv_sec;
-
-        LinkedListLock( ServerList );
-        for( listItem = ServerList->head, found = FALSE; listItem && !found; 
-             listItem = listItem->next ) {
-            server = (IRCServer_t *)listItem;
-            if( server->serverId == data->serverId ) {
-                found = TRUE;
-                data->server = server;
-            }
-        }
-        LinkedListUnlock( ServerList );
-
-        data->channel = FindChannelNum( data->server, data->chanId );
+        data->nextpoll = nextpoll++;
 
         item = (BalancedBTreeItem_t *)malloc(sizeof(BalancedBTreeItem_t));
         item->item = (void *)data;
@@ -418,6 +455,9 @@ static void db_load_rssfeeds( void )
         item->item = (void *)data;
         item->key  = (void *)&data->nextpoll;
         BalancedBTreeAdd( rssfeedActiveTree, item, LOCKED, FALSE );
+        LogPrint( LOG_NOTICE, "RSS: Loaded %d (%s): server %d, channel %d, "
+                              "timeout %d", data->feedId, data->prefix, 
+                              data->serverId, data->chanId, data->timeout );
     }
     mysql_free_result(res);
 
@@ -431,6 +471,8 @@ static void db_load_rssfeeds( void )
 void db_update_lastpost( int feedId, int lastPost ) {
     MYSQL_RES              *res;
 
+    LogPrint( LOG_NOTICE, "RSS: feed %d: updating lastpost to %d", feedId,
+                          lastPost );
     res = db_query( "UPDATE `plugin_rssfeed` SET `lastpost` = %d "
                     "WHERE `feedid` = %d", lastPost, feedId );
     mysql_free_result(res);
