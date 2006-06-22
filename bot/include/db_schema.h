@@ -35,7 +35,7 @@ static char db_schema_h_ident[] _UNUSED_ =
 #define CURRENT_SCHEMA  8
 
 
-char *defSchema[] = {
+static char *defSchema[] = {
 "CREATE TABLE `channels` (\n"
 "  `chanid` int(11) NOT NULL auto_increment,\n"
 "  `serverid` int(11) NOT NULL default '0',\n"
@@ -121,7 +121,7 @@ char *defSchema[] = {
 " PRIMARY KEY ( `chanid` )\n"
 ") TYPE = MYISAM ;\n"
 };
-int defSchemaCount = NELEMENTS(defSchema);
+static int defSchemaCount = NELEMENTS(defSchema);
 
 #endif
 
