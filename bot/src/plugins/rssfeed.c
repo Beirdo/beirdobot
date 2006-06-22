@@ -59,6 +59,7 @@ void db_update_lastpost( int feedId, int lastPost );
 static char ident[] _UNUSED_ = 
     "$Id$";
 
+#define DATEMSK_FILE "../lib/datemsk.txt"
 #define CURRENT_SCHEMA_RSSFEED 1
 #define MAX_SCHEMA_QUERY 100
 typedef char *SchemaUpgrade_t[MAX_SCHEMA_QUERY];
@@ -116,6 +117,7 @@ void plugin_initialize( char *args )
 
     LogPrintNoArg( LOG_NOTICE, "Initializing rssfeed..." );
 
+    setenv( "DATEMSK", DATEMSK_FILE, 1 );
     rssItemTree = BalancedBTreeCreate( BTREE_KEY_INT );
 
     ver = -1;
@@ -165,7 +167,6 @@ void *rssfeed_thread(void *arg)
     BalancedBTreeItem_t    *item;
     RssFeed_t              *feed;
     struct tm               tm;
-    struct tm              *tm2;
     RssItem_t              *itemData;
     time_t                  pubTime;
     time_t                  lastPost;
@@ -175,6 +176,7 @@ void *rssfeed_thread(void *arg)
     bool                    found;
     IRCServer_t            *server;
     int                     count;
+    int                     retval;
 
     db_thread_init();
 
@@ -262,8 +264,10 @@ void *rssfeed_thread(void *arg)
             count = 0;
             rssItem = data->item;
             while( rssItem ) {
-                strptime( rssItem->pubDate, "%Y-%m-%dT%H:%M:%S", &tm );
+                retval = getdate_r( rssItem->pubDate, &tm );
                 pubTime = mktime( &tm );
+                LogPrint( LOG_DEBUG, "ret: %d  pub: %s  pubTime: %ld", 
+                                     retval, rssItem->pubDate, pubTime );
 
                 if( pubTime > feed->lastPost ) {
                     itemData = (RssItem_t *)malloc(sizeof(RssItem_t));
@@ -321,8 +325,8 @@ void *rssfeed_thread(void *arg)
             feed    = itemData->feed;
             pubTime = itemData->pubTime;
 
-            tm2 = gmtime( &pubTime );
-            strftime( buf, sizeof(buf), "%d %b %Y %H:%M %z (%Z)", tm2 );
+            gmtime_r( &pubTime, &tm );
+            strftime( buf, sizeof(buf), "%d %b %Y %H:%M %z (%Z)", &tm );
             sprintf( message, "RSS: [%s] at %s - %s", feed->prefix, buf,
                               itemData->title );
             if( itemData->link ) {
