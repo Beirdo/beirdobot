@@ -47,8 +47,6 @@ int KeyComparePthread( void *left, void *right );
 BalancedBTreeItem_t *BalancedBTreeFindParent( BalancedBTree_t *btree,
                                               BalancedBTreeItem_t *item );
 int BalancedBTreeWeight( BalancedBTreeItem_t *root );
-BalancedBTreeItem_t *BalancedBTreeFindGreatest( BalancedBTreeItem_t *root );
-BalancedBTreeItem_t *BalancedBTreeFindLeast( BalancedBTreeItem_t *root );
 void BalancedBTreeReplace( BalancedBTree_t *btree, BalancedBTreeItem_t *item, 
                            BalancedBTreeItem_t *replace );
 void BalancedBTreeRebalance( BalancedBTree_t *btree, 

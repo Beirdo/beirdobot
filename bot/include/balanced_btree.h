@@ -81,6 +81,8 @@ void BalancedBTreeRemove( BalancedBTree_t *btree, BalancedBTreeItem_t *item,
                        Locked_t locked, bool rebalance );
 void *BalancedBTreeFind( BalancedBTree_t *btree, void *key,
                          Locked_t locked );
+BalancedBTreeItem_t *BalancedBTreeFindGreatest( BalancedBTreeItem_t *root );
+BalancedBTreeItem_t *BalancedBTreeFindLeast( BalancedBTreeItem_t *root );
 
 #ifdef __cplusplus
 }
