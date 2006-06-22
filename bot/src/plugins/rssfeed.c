@@ -107,6 +107,8 @@ pthread_t           rssfeedThreadId;
 BalancedBTree_t    *rssfeedTree;
 BalancedBTree_t    *rssfeedActiveTree;
 BalancedBTree_t    *rssItemTree;
+static bool         threadAbort = FALSE;
+
 
 void plugin_initialize( char *args )
 {
@@ -154,6 +156,8 @@ void plugin_shutdown( void )
 {
     LogPrintNoArg( LOG_NOTICE, "Removing rssfeed..." );
     botCmd_remove( "rssfeed" );
+
+    threadAbort = TRUE;
 }
 
 void *rssfeed_thread(void *arg)
@@ -185,7 +189,7 @@ void *rssfeed_thread(void *arg)
 
     sleep(5);
 
-    while( !GlobalAbort ) {
+    while( !GlobalAbort && !threadAbort ) {
         BalancedBTreeLock( rssfeedActiveTree );
         item = BalancedBTreeFindLeast( rssfeedActiveTree->root );
         BalancedBTreeUnlock( rssfeedActiveTree );
@@ -209,7 +213,7 @@ void *rssfeed_thread(void *arg)
         /* Trigger all feeds expired or to expire in <= 15s */
         BalancedBTreeLock( rssfeedActiveTree );
         BalancedBTreeLock( rssItemTree );
-        for( done = FALSE; item && !done ; 
+        for( done = FALSE; item && !done && !threadAbort ; 
              item = BalancedBTreeFindLeast( rssfeedActiveTree->root ) ) {
             gettimeofday( &now, NULL );
             feed = (RssFeed_t *)item->item;
@@ -322,7 +326,8 @@ void *rssfeed_thread(void *arg)
         BalancedBTreeUnlock( rssfeedActiveTree );
 
         for( item = BalancedBTreeFindLeast( rssItemTree->root ) ;
-             item ; item = BalancedBTreeFindLeast( rssItemTree->root ) ) {
+             item && !threadAbort ; 
+             item = BalancedBTreeFindLeast( rssItemTree->root ) ) {
 
             itemData = (RssItem_t *)item->item;
             feed    = itemData->feed;
