@@ -167,7 +167,25 @@ void BalancedBTreeAdd( BalancedBTree_t *btree, BalancedBTreeItem_t *item,
             /* item less than parent */
             item->parent->left  = item;
         } else {
-            LogPrintNoArg( LOG_CRIT, "Duplicate key" );
+            switch( btree->keyType ) {
+            case BTREE_KEY_INT:
+                LogPrint( LOG_CRIT, "Duplicate key (INT): %d", 
+                                    *(int *)item->key );
+                btree->keyCompare = KeyCompareInt;
+                break;
+            case BTREE_KEY_STRING:
+                LogPrint( LOG_CRIT, "Duplicate key (STRING): %s", 
+                                    *(char **)item->key );
+                btree->keyCompare = KeyCompareString;
+                break;
+            case BTREE_KEY_PTHREAD:
+                LogPrint( LOG_CRIT, "Duplicate key (PTHREAD): %d", 
+                                    *(int *)item->key );
+                break;
+            default:
+                LogPrintNoArg( LOG_CRIT, "Duplicate key" );
+                break;
+            }
         }
     }
 
