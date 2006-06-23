@@ -598,12 +598,12 @@ void botCmdRssfeed( IRCServer_t *server, IRCChannel_t *channel, char *who,
 
 char *botHelpRssfeed( void )
 {
-    static char *help = "Starts and stops rssfeed notification for a channel, "
-                        "per feed.  Must be authenticated for use.  "
-                        "Syntax: (in channel) rssfeed start feed / "
-                        "rssfeed stop feed  "
-                        "(in privmsg) rssfeed start feed channel / "
-                        "rssfeed stop feed channel";
+    static char *help = "Enable/disable/list/show rssfeed notifications for a "
+                        "channel.  Must be authenticated to use "
+                        "enable/disable.  "
+                        "Syntax: (in channel) rssfeed list | rssfeed show num "
+                        " (in privmsg) rssfeed enable num | "
+                        "rssfeed disable num | rssfeed list | rssfeed show num";
     
     return( help );
 }
