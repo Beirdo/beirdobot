@@ -22,14 +22,16 @@
     $Channels = array();
 
 // Load all of the servers
-    $sh = $db->query('SELECT channels.*,
-                             MAX(irclog.timestamp) AS last_entry,
-                             MIN(irclog.timestamp) AS first_entry
+    $sh = $db->query('SELECT *
                         FROM channels
-                             NATURAL LEFT JOIN irclog
-                    GROUP BY chanid');
+                    ORDER BY chanid');
     while ($row = $sh->fetch_assoc()) {
-        $Channels[$row['chanid']] = new irc_channel($row);
+        $sh2 = $db->query('SELECT MAX(timestamp) AS last_entry,
+                                  MIN(timestamp) AS first_entry
+                             FROM irclog 
+                            WHERE chanid = ?', $row['chanid']);
+        $row2 = $sh2->fetch_assoc();
+        $Channels[$row['chanid']] = new irc_channel($row,$row2);
     }
     $sh->finish();
 
@@ -57,7 +59,7 @@ class irc_channel {
  *
  * @param array $channel_vars   Hash of channel vars from the database.
 /**/
-    function __construct($channel_vars) {
+    function __construct($channel_vars, $time_vars) {
         global $Servers;
     // Assign the various channel vars
         $this->chanid       = $channel_vars['chanid'];
@@ -66,8 +68,8 @@ class irc_channel {
         $this->url          = $channel_vars['url'];
         $this->notifywindow = $channel_vars['notifywindow'];
         $this->cmdChar      = $channel_vars['cmdChar'];
-        $this->last_entry   = $channel_vars['last_entry'];
-        $this->first_entry  = $channel_vars['first_entry'];
+        $this->last_entry   = $time_vars['last_entry'];
+        $this->first_entry  = $time_vars['first_entry'];
     // Keep a reference to this channel's server
         $this->server       =& $Servers[$this->serverid];
     // Add this channel to its parent server
@@ -79,8 +81,8 @@ class irc_channel {
  *
  * @param array $channel_vars   Hash of channel vars from the database.
 /**/
-    function &irc_channel($channel_vars) {
-        return $this->__construct($channel_vars);
+    function &irc_channel($channel_vars,$time_vars) {
+        return $this->__construct($channel_vars,$time_vars);
     }
 
 /**
