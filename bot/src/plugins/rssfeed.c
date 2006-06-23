@@ -338,7 +338,7 @@ void *rssfeed_thread(void *arg)
             feed    = itemData->feed;
             pubTime = itemData->pubTime;
 
-            gmtime_r( &pubTime, &tm );
+            localtime_r( &pubTime, &tm );
             strftime( buf, sizeof(buf), "%d %b %Y %H:%M %z (%Z)", &tm );
             sprintf( message, "RSS: [%s] \"%s\" at %s", feed->prefix,
                               itemData->title, buf );
