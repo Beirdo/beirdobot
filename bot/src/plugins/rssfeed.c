@@ -199,6 +199,8 @@ void plugin_shutdown( void )
     
     BalancedBTreeLock( rssItemTree );
     BalancedBTreeDestroy( rssItemTree );
+
+    thread_deregister( rssfeedThreadId );
 }
 
 void *rssfeed_thread(void *arg)
@@ -321,6 +323,11 @@ void *rssfeed_thread(void *arg)
                 retval = getdate_r( rssItem->pubDate, &tm );
                 pubTime = mktime( &tm );
 
+                /* Adjust for the time offset in the feed's timestamp as 
+                 * getdate assumes the date is in local timezone
+                 */
+                pubTime += localoffset - feed->offset;
+
                 if( retval ) {
                     LogPrint( LOG_DEBUG, "ret: %d  pub: %s  pubTime: %ld", 
                                          retval, rssItem->pubDate, pubTime );
@@ -376,10 +383,6 @@ void *rssfeed_thread(void *arg)
             itemData = (RssItem_t *)item->item;
             feed    = itemData->feed;
             pubTime = itemData->pubTime;
-            /* Adjust for the time offset in the feed's timestamp as getdate
-             * assumes the date is in local timezone
-             */
-            pubTime += localoffset - feed->offset;
 
             localtime_r( &pubTime, &tm );
             strftime( buf, sizeof(buf), "%d %b %Y %H:%M %z (%Z)", &tm );
@@ -800,12 +803,14 @@ char *rssfeedShowDetails( RssFeed_t *feed )
 
     localtime_r(&feed->lastPost, &tm);
     strftime(date, 32, "%a, %e %b %Y %H:%M:%S %Z", &tm);
+
     sprintf( buf, "RSS: feed %d%s: prefix [%s], channel %s, URL \"%s\", poll "
                   "interval %lds, offset %lds, last post %s, next poll ", 
                   feed->feedId, (feed->enabled ? "" : " (disabled)"), 
                   feed->prefix, feed->channel->channel, feed->url, 
                   feed->timeout, feed->offset,
                   (feed->lastPost == 0 ? "never" : date) );
+    
     localtime_r(&feed->nextpoll, &tm);
     strftime(date, 32, "%a, %e %b %Y %H:%M:%S %Z", &tm);
     strcat( buf, date );

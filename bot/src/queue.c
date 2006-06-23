@@ -470,7 +470,7 @@ void QueueKillAll( void )
 
         /*
          * To allow all listeners to wake up and hear the GlobalAbort,
-         * signal * both the cNotEmpty and the cNotFull to all 
+         * signal both the cNotEmpty and the cNotFull to all 
          */
         pthread_cond_broadcast(queue->cNotEmpty);
         pthread_cond_broadcast(queue->cNotFull);

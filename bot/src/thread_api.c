@@ -81,6 +81,22 @@ char *thread_name( pthread_t pthreadId )
     return( (char *)item->item );
 }
 
+void thread_deregister( pthread_t pthreadId )
+{
+    BalancedBTreeItem_t    *item;
+
+    item = BalancedBTreeFind( ThreadTree, (void *)&pthreadId, UNLOCKED );
+    if( !item ) {
+        return;
+    }
+
+    BalancedBTreeRemove( ThreadTree, item, UNLOCKED, true );
+    LogPrint( LOG_INFO, "Removed Thread %ld as \"%s\"", pthreadId, 
+                        (char *)item->item );
+    free( item );
+}
+
+
 /*
  * vim:ts=4:sw=4:ai:et:si:sts=4
  */

@@ -144,6 +144,8 @@ void plugin_shutdown( void )
 
     BalancedBTreeLock( dnsTypeNumTree );
     BalancedBTreeDestroy( dnsTypeNumTree );
+
+    thread_deregister( dnsThreadId );
 }
 
 void *dns_thread(void *arg)
