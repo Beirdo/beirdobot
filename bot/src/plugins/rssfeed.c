@@ -25,6 +25,7 @@
 */
 
 /* INCLUDE FILES */
+#define _BSD_SOURCE
 #include "environment.h"
 #include "botnet.h"
 #include <pthread.h>
@@ -50,7 +51,7 @@ static char ident[] _UNUSED_ =
     "$Id$";
 
 #define DATEMSK_FILE "../lib/datemsk.txt"
-#define CURRENT_SCHEMA_RSSFEED 1
+#define CURRENT_SCHEMA_RSSFEED 2
 #define MAX_SCHEMA_QUERY 100
 typedef char *SchemaUpgrade_t[MAX_SCHEMA_QUERY];
 
@@ -62,6 +63,7 @@ static char *defSchema[] = {
 "    `prefix` VARCHAR( 64 ) NOT NULL ,\n"
 "    `timeout` INT NOT NULL ,\n"
 "    `lastpost` INT NOT NULL ,\n"
+"    `feedoffset` INT NOT NULL ,\n"
 "    PRIMARY KEY ( `feedid` )\n"
 ") TYPE = MYISAM ;\n"
 };
@@ -69,7 +71,10 @@ static int defSchemaCount = NELEMENTS(defSchema);
 
 static SchemaUpgrade_t schemaUpgrade[CURRENT_SCHEMA_RSSFEED] = {
     /* 0 -> 1 */
-    { NULL }
+    { NULL },
+    /* 1 -> 2 */
+    { "ALTER TABLE `plugin_rssfeed` ADD `feedoffset` INT NOT NULL ;",
+      NULL }
 };
 
 typedef struct {
@@ -84,6 +89,7 @@ typedef struct {
     IRCServer_t    *server;
     IRCChannel_t   *channel;
     bool            enabled;
+    long            offset;
 } RssFeed_t;
 
 typedef struct {
@@ -187,6 +193,7 @@ void *rssfeed_thread(void *arg)
     int                     count;
     int                     retval;
     bool                    done;
+    long                    localoffset;
 
     db_thread_init();
 
@@ -200,6 +207,8 @@ void *rssfeed_thread(void *arg)
         BalancedBTreeUnlock( rssfeedActiveTree );
 
         gettimeofday( &now, NULL );
+        localtime_r( &now.tv_sec, &tm );
+        localoffset = tm.tm_gmtoff;
 
         delta = 60;
         if( !item ) {
@@ -256,13 +265,11 @@ void *rssfeed_thread(void *arg)
                 continue;
             }
 
-            feed->nextpoll = now.tv_sec + feed->timeout;
             BalancedBTreeRemove( rssfeedActiveTree, item, LOCKED, FALSE );
 
-            itemData = (RssItem_t *)item->item;
             /* Adjust the poll time to avoid conflict */
-            rssfeedFindUnconflictingTime( rssfeedActiveTree, 
-                                          &itemData->pubTime );
+            feed->nextpoll = now.tv_sec + feed->timeout;
+            rssfeedFindUnconflictingTime( rssfeedActiveTree, &feed->nextpoll );
             BalancedBTreeAdd( rssfeedActiveTree, item, LOCKED, FALSE );
 
             lastPost = feed->lastPost;
@@ -337,6 +344,10 @@ void *rssfeed_thread(void *arg)
             itemData = (RssItem_t *)item->item;
             feed    = itemData->feed;
             pubTime = itemData->pubTime;
+            /* Adjust for the time offset in the feed's timestamp as getdate
+             * assumes the date is in local timezone
+             */
+            pubTime += localoffset - feed->offset;
 
             localtime_r( &pubTime, &tm );
             strftime( buf, sizeof(buf), "%d %b %Y %H:%M %z (%Z)", &tm );
@@ -591,7 +602,7 @@ static void db_load_rssfeeds( void )
     rssfeedActiveTree = BalancedBTreeCreate( BTREE_KEY_INT );
 
     res = db_query( "SELECT a.`feedid`, a.`chanid`, b.`serverid`, a.`url`, "
-                    "a.`prefix`, a.`timeout`, a.`lastpost` "
+                    "a.`prefix`, a.`timeout`, a.`lastpost`, a.`feedoffset` "
                     "FROM `plugin_rssfeed` AS a, `channels` AS b "
                     "WHERE a.`chanid` = b.`chanid` "
                     "ORDER BY a.`feedid` ASC" );
@@ -619,6 +630,7 @@ static void db_load_rssfeeds( void )
         data->prefix   = strdup(row[4]);
         data->timeout  = atoi(row[5]);
         data->lastPost = atoi(row[6]);
+        data->offset   = atol(row[7]);
         data->nextpoll = nextpoll++;
         data->enabled  = TRUE;
 
@@ -736,9 +748,10 @@ char *rssfeedShowDetails( RssFeed_t *feed )
     localtime_r(&feed->lastPost, &tm);
     strftime(date, 32, "%a, %e %b %Y %H:%M:%S %Z", &tm);
     sprintf( buf, "RSS: feed %d%s: prefix [%s], channel %s, URL \"%s\", poll "
-                  "interval %lds, last post %s, next poll ", feed->feedId,
-                  (feed->enabled ? "" : " (disabled)"), feed->prefix,
-                  feed->channel->channel, feed->url, feed->timeout,
+                  "interval %lds, offset %lds, last post %s, next poll ", 
+                  feed->feedId, (feed->enabled ? "" : " (disabled)"), 
+                  feed->prefix, feed->channel->channel, feed->url, 
+                  feed->timeout, feed->offset,
                   (feed->lastPost == 0 ? "never" : date) );
     localtime_r(&feed->nextpoll, &tm);
     strftime(date, 32, "%a, %e %b %Y %H:%M:%S %Z", &tm);
