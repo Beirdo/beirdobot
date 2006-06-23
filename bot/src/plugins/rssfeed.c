@@ -114,11 +114,14 @@ char *botRssfeedDepthFirst( BalancedBTreeItem_t *item, IRCServer_t *server,
 char *rssfeedShowDetails( RssFeed_t *feed );
 
 
-pthread_t           rssfeedThreadId;
-BalancedBTree_t    *rssfeedTree;
-BalancedBTree_t    *rssfeedActiveTree;
-BalancedBTree_t    *rssItemTree;
-static bool         threadAbort = FALSE;
+pthread_t               rssfeedThreadId;
+BalancedBTree_t        *rssfeedTree;
+BalancedBTree_t        *rssfeedActiveTree;
+BalancedBTree_t        *rssItemTree;
+static bool             threadAbort = FALSE;
+static pthread_mutex_t  shutdownMutex;
+static pthread_mutex_t  signalMutex;
+static pthread_cond_t   kickCond;
 
 
 void plugin_initialize( char *args )
@@ -159,6 +162,10 @@ void plugin_initialize( char *args )
 
     db_load_rssfeeds();
 
+    pthread_mutex_init( &shutdownMutex, NULL );
+    pthread_mutex_init( &signalMutex, NULL );
+    pthread_cond_init( &kickCond, NULL );
+
     thread_create( &rssfeedThreadId, rssfeed_thread, NULL, "thread_rssfeed" );
     botCmd_add( (const char **)&command, botCmdRssfeed, botHelpRssfeed );
 }
@@ -169,6 +176,29 @@ void plugin_shutdown( void )
     botCmd_remove( "rssfeed" );
 
     threadAbort = TRUE;
+
+    /* Kick the thread to tell it it can quit now */
+    pthread_mutex_lock( &signalMutex );
+    pthread_cond_broadcast( &kickCond );
+    pthread_mutex_unlock( &signalMutex );
+
+    /* Clean up stuff once the thread stops */
+    pthread_mutex_lock( &shutdownMutex );
+    pthread_mutex_destroy( &shutdownMutex );
+
+    pthread_mutex_lock( &signalMutex );
+    pthread_cond_broadcast( &kickCond );
+    pthread_cond_destroy( &kickCond );
+    pthread_mutex_destroy( &signalMutex );
+
+    BalancedBTreeLock( rssfeedTree );
+    BalancedBTreeDestroy( rssfeedTree );
+
+    BalancedBTreeLock( rssfeedActiveTree);
+    BalancedBTreeDestroy( rssfeedActiveTree );
+    
+    BalancedBTreeLock( rssItemTree );
+    BalancedBTreeDestroy( rssItemTree );
 }
 
 void *rssfeed_thread(void *arg)
@@ -194,10 +224,12 @@ void *rssfeed_thread(void *arg)
     int                     retval;
     bool                    done;
     long                    localoffset;
+    struct timespec         ts;
 
+    pthread_mutex_lock( &shutdownMutex );
     db_thread_init();
 
-    LogPrintNoArg( LOG_NOTICE, "Starting RSSfeed thread..." );
+    LogPrintNoArg( LOG_NOTICE, "Starting RSSfeed thread" );
 
     sleep(5);
 
@@ -377,9 +409,22 @@ void *rssfeed_thread(void *arg)
 
     DelayPoll:
         LogPrint( LOG_NOTICE, "RSS: sleeping for %ds", delta );
-        sleep( delta );
+
+        gettimeofday( &now, NULL );
+        ts.tv_sec  = now.tv_sec + delta;
+        ts.tv_nsec = now.tv_usec * 1000;
+
+        pthread_mutex_lock( &signalMutex );
+        retval = pthread_cond_timedwait( &kickCond, &signalMutex, &ts );
+        pthread_mutex_unlock( &signalMutex );
+
+        if( retval != ETIMEDOUT ) {
+            LogPrintNoArg( LOG_NOTICE, "RSS: thread woken up early" );
+        }
     }
 
+    LogPrintNoArg( LOG_NOTICE, "Shutting down RSSfeed thread" );
+    pthread_mutex_unlock( &shutdownMutex );
     return( NULL );
 }
 
@@ -490,6 +535,10 @@ void botCmdRssfeed( IRCServer_t *server, IRCChannel_t *channel, char *who,
                                       feed->feedId, feed->prefix,
                                       feed->channel->channel );
                     LogPrint( LOG_NOTICE, "RSS: %s", message );
+
+                    pthread_mutex_lock( &signalMutex );
+                    pthread_cond_broadcast( &kickCond );
+                    pthread_mutex_unlock( &signalMutex );
                 } else {
                     sprintf( message, "Feed %d already enabled", feed->feedId );
                 }
@@ -517,6 +566,10 @@ void botCmdRssfeed( IRCServer_t *server, IRCChannel_t *channel, char *who,
                                       feed->feedId, feed->prefix,
                                       feed->channel->channel );
                     LogPrint( LOG_NOTICE, "RSS: %s", message );
+
+                    pthread_mutex_lock( &signalMutex );
+                    pthread_cond_broadcast( &kickCond );
+                    pthread_mutex_unlock( &signalMutex );
                 } else {
                     sprintf( message, "Feed %d already disabled", 
                                       feed->feedId );

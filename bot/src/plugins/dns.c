@@ -57,12 +57,12 @@ char           *in_addr_arpa( char *dottedquad );
 static char ident[] _UNUSED_ = 
     "$Id$";
 
-pthread_t           dnsThreadId;
-pthread_mutex_t     shutdownMutex;
-static bool         threadAbort = FALSE;
-QueueObject_t      *DnsQ;
-BalancedBTree_t    *dnsTypeTree;
-BalancedBTree_t    *dnsTypeNumTree;
+pthread_t               dnsThreadId;
+static pthread_mutex_t  shutdownMutex;
+static bool             threadAbort = FALSE;
+QueueObject_t          *DnsQ;
+BalancedBTree_t        *dnsTypeTree;
+BalancedBTree_t        *dnsTypeNumTree;
 
 typedef struct {
     IRCServer_t        *server;
@@ -284,8 +284,8 @@ void *dns_thread(void *arg)
 
     QueueLock( DnsQ );
     QueueDestroy( DnsQ );
+    LogPrintNoArg( LOG_NOTICE, "Shutting down DNS thread" );
     pthread_mutex_unlock( &shutdownMutex );
-
     return( NULL );
 }
 
