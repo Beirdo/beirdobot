@@ -114,7 +114,7 @@ char *botRssfeedDepthFirst( BalancedBTreeItem_t *item, IRCServer_t *server,
 char *rssfeedShowDetails( RssFeed_t *feed );
 
 
-/* INTERNAL VARIABLES */
+/* INTERNAL VARIABLES  */
 pthread_t               rssfeedThreadId;
 BalancedBTree_t        *rssfeedTree;
 BalancedBTree_t        *rssfeedActiveTree;
