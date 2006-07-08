@@ -195,6 +195,11 @@ void db_load_servers(void)
         sprintf( server->threadName, "thread_%s@%s:%d", server->nick,
                  server->server, server->port );
 
+        len = strlen(server->server) + strlen(server->nick) + 18;
+        server->txThreadName    = (char *)malloc(len) ;
+        sprintf( server->txThreadName, "tx_thread_%s@%s:%d", server->nick,
+                 server->server, server->port );
+
         LinkedListAdd( ServerList, (LinkedListItem_t *)server, UNLOCKED,
                        AT_TAIL );
     }
