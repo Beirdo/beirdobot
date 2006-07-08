@@ -472,30 +472,50 @@ void BalancedBTreeReplace( BalancedBTree_t *btree, BalancedBTreeItem_t *item,
 
     if( replace ) {
         /* Relink the replacement's parent to any subtree */
-        if( replace->parent->left == replace ) {
-            /* We must be the least */
-            replace->parent->left = replace->right;
-        } else if( replace->parent->right == replace ) {
-            /* We must be the greatest */
-            replace->parent->right = replace->left;
-        }
-
-        /* Relink the replacement to take the place of the original */
-        replace->left = item->left;
-        if( replace->left != NULL ) {
-            replace->left->parent = replace;
-        }
-
-        replace->right = item->right;
-        if( replace->right != NULL ) {
-            replace->right->parent = replace;
+        if( replace->parent != item ) {
+            if( replace->parent->left == replace ) {
+                /* We must be the least */
+                replace->parent->left = replace->right;
+                if( replace->right ) {
+                    replace->right->parent = replace->parent;
+                }
+            } else if( replace->parent->right == replace ) {
+                /* We must be the greatest */
+                replace->parent->right = replace->left;
+                if( replace->left ) {
+                    replace->left->parent = replace->parent;
+                }
+            }
+            replace->right = item->right;
+            if( replace->right ) {
+                replace->right->parent = replace;
+            }
+            replace->left  = item->left;
+            if( replace->left ) {
+                replace->left->parent = replace;
+            }
+        } else {
+            if( item->right == replace ) {
+                /* We must be the least */
+                replace->left = item->left;
+                if( replace->left ) {
+                    replace->left->parent = replace;
+                }
+            } else if( item->left == replace ) {
+                /* We must be the greatest */
+                replace->right = item->right;
+                if( replace->right ) {
+                    replace->right->parent = replace;
+                }
+            }
         }
 
         replace->parent = item->parent;
-        if( replace->parent != NULL ) {
+
+        if( replace->parent ) {
             if( replace->parent->left == item ) {
                 replace->parent->left = replace;
-            } else if( replace->parent->right == item ) {
+            } else {
                 replace->parent->right = replace;
             }
         } else {
