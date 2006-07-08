@@ -111,6 +111,7 @@ void db_update_lastpost( int feedId, int lastPost );
 void rssfeedFindUnconflictingTime( BalancedBTree_t *tree, time_t *key );
 char *botRssfeedDepthFirst( BalancedBTreeItem_t *item, IRCServer_t *server,
                             IRCChannel_t *channel, bool filter );
+char *botRssfeedDump( BalancedBTreeItem_t *item );
 char *rssfeedShowDetails( RssFeed_t *feed );
 
 
@@ -266,6 +267,8 @@ void *rssfeed_thread(void *arg)
              item = BalancedBTreeFindLeast( rssfeedActiveTree->root ) ) {
             gettimeofday( &now, NULL );
             feed = (RssFeed_t *)item->item;
+            LogPrint( LOG_NOTICE, "RSS: feed %d poll in %lds", feed->feedId,
+                                  feed->nextpoll - now.tv_sec );
             if( feed->nextpoll > now.tv_sec + 15 ) {
                 delta = feed->nextpoll - now.tv_sec;
                 done = TRUE;
@@ -477,6 +480,8 @@ void botCmdRssfeed( IRCServer_t *server, IRCChannel_t *channel, char *who,
         if( line && !strcmp( line, "all" ) ) {
             message = botRssfeedDepthFirst( rssfeedTree->root, server, channel,
                                             false );
+        } else if ( line && !strcmp( line, "timeout" ) ) {
+            message = botRssfeedDump( rssfeedActiveTree->root );
         } else {
             message = botRssfeedDepthFirst( rssfeedTree->root, server, channel,
                                             true );
@@ -654,6 +659,7 @@ static void db_load_rssfeeds( void )
     BalancedBTreeItem_t    *item;
     struct timeval          tv;
     time_t                  nextpoll;
+    char                   *message;
 
     rssfeedTree = BalancedBTreeCreate( BTREE_KEY_INT );
     rssfeedActiveTree = BalancedBTreeCreate( BTREE_KEY_INT );
@@ -709,8 +715,16 @@ static void db_load_rssfeeds( void )
     }
     mysql_free_result(res);
 
+    message = botRssfeedDump( rssfeedActiveTree->root );
+    LogPrint( LOG_NOTICE, "RSS: %s", message );
+    free( message );
+
     BalancedBTreeAdd( rssfeedTree, NULL, LOCKED, TRUE );
     BalancedBTreeAdd( rssfeedActiveTree, NULL, LOCKED, TRUE );
+
+    message = botRssfeedDump( rssfeedActiveTree->root );
+    LogPrint( LOG_NOTICE, "RSS: %s", message );
+    free( message );
 
     BalancedBTreeUnlock( rssfeedTree );
     BalancedBTreeUnlock( rssfeedActiveTree );
@@ -783,6 +797,58 @@ char *botRssfeedDepthFirst( BalancedBTreeItem_t *item, IRCServer_t *server,
     }
 
     submsg = botRssfeedDepthFirst( item->right, server, channel, filter );
+    if( submsg ) {
+        len = strlen( message );
+
+        message = (char *)realloc(message, len + 2 + strlen(submsg) + 2);
+        strcat( message, ", " );
+        strcat( message, submsg );
+        free( submsg );
+    }
+
+    return( message );
+}
+
+char *botRssfeedDump( BalancedBTreeItem_t *item )
+{
+    static char     buf[256];
+    char           *message;
+    char           *oldmsg;
+    char           *submsg;
+    int             len;
+    RssFeed_t      *feed;
+    struct timeval  now;
+
+    message = NULL;
+
+    if( !item ) {
+        return( message );
+    }
+
+    submsg = botRssfeedDump( item->left );
+    message = submsg;
+    oldmsg  = message;
+    if( message ) {
+        len = strlen(message);
+    } else {
+        len = -2;
+    }
+    
+    gettimeofday( &now, NULL );
+    feed = (RssFeed_t *)item->item;
+    sprintf( buf, "%d-%s(%ld/%ld)", feed->feedId, feed->prefix, feed->nextpoll,
+             feed->nextpoll - now.tv_sec );
+
+    submsg = buf;
+    message = (char *)realloc(message, len + 2 + strlen(submsg) + 2);
+    if( oldmsg ) {
+        strcat( message, ", " );
+    } else {
+        message[0] = '\0';
+    }
+    strcat( message, submsg );
+
+    submsg = botRssfeedDump( item->right );
     if( submsg ) {
         len = strlen( message );
 
