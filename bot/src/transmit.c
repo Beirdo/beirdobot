@@ -65,10 +65,6 @@ void *transmit_thread(void *arg)
     server   = (IRCServer_t *)arg;
     sendTime = 0;
 
-    /* One second delay */
-    ts.tv_sec = 1;
-    ts.tv_nsec = 0L;
-
     LogPrint( LOG_NOTICE, "Starting transmit thread - %s", 
                           server->txThreadName );
 
@@ -83,10 +79,12 @@ void *transmit_thread(void *arg)
             sendTime = now.tv_sec;
         }
 
-        if( sendTime - now.tv_sec > 10 ) {
-            LogPrint( LOG_NOTICE, "Delaying %ld seconds", 
-                      sendTime - now.tv_sec - 10 );
-            sleep( sendTime - now.tv_sec - 10 );
+        if( sendTime - now.tv_sec > 9 ) {
+            ts.tv_sec = sendTime - now.tv_sec - 9;
+            ts.tv_nsec = 0L;
+
+            LogPrint( LOG_NOTICE, "Delaying %ld seconds", ts.tv_sec );
+            nanosleep( &ts, NULL );
         }
 
         msg = NULL;
@@ -142,8 +140,8 @@ void *transmit_thread(void *arg)
         }
 
         gettimeofday( &now, NULL );
-        LogPrint( LOG_NOTICE, "Sendtime: %ld/%ld", sendTime, 
-                  sendTime - now.tv_sec );
+        LogPrint( LOG_NOTICE, "Server %d: Sendtime: %ld/%ld", server->serverId,
+                              sendTime, sendTime - now.tv_sec );
 
         if( item->message ) {
             free( item->message );
@@ -161,7 +159,7 @@ void transmitMsg( IRCServer_t *server, TxType_t type, char *channel,
 {
     TransmitItem_t     *item;
 
-    if( !server || !channel ) {
+    if( !server ) {
         return;
     }
 
