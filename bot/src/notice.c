@@ -81,7 +81,7 @@ void *notify_thread(void *arg)
                   "%s :This channel (%s) is logged -- %s", item->nick, 
                   item->channel->channel, item->channel->url );
 
-        transmitMsg( item->server, TX_NOTICE, string, NULL );
+        transmitMsg( item->server, TX_NOTICE, NULL, string );
         db_notify_nick( item->channel, item->nick );
 
         free( item->nick );
