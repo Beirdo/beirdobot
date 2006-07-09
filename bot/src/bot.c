@@ -31,6 +31,9 @@
 
 #include "botnet.h"
 #include "environment.h"
+#define __USE_BSD
+#include <string.h>
+#include <strings.h>
 #include <stdio.h>
 #include <stdlib.h>
 #ifdef __unix__
@@ -38,8 +41,6 @@
 #include <sys/wait.h>
 #endif
 #include <errno.h>
-#include <string.h>
-#include <strings.h>
 #include "protos.h"
 #include "structs.h"
 #include "linked_list.h"
@@ -67,11 +68,15 @@ void ProcOnConnected(BN_PInfo I, const char HostName[])
     if( verbose ) {
         LogPrint( LOG_DEBUG, "Event Connected : (%s)", HostName);
     }
-    BN_EnableFloodProtection(I, 10000, 1000, 60);
+
+    /* We are doing our own, thanks! */
+    BN_DisableFloodProtection(I);
+
     if( strcmp( server->password, "" ) ) {
-        BN_SendPassword(I, server->password);
+        transmitMsg( server, TX_PASSWORD, NULL, server->password );
     }
-    BN_Register(I, server->nick, server->username, server->realname);
+    transmitMsg( server, TX_NICK, NULL, server->nick );
+    transmitMsg( server, TX_REGISTER, server->username, server->realname );
 }
 
 void ProcOnStatus(BN_PInfo I, const char Msg[], int Code)
@@ -103,7 +108,8 @@ void ProcOnRegistered(BN_PInfo I)
 
     if( strcmp(server->nickserv, "") ) {
         /* We need to register with nickserv */
-        BN_SendPrivateMessage(I, server->nickserv, server->nickservmsg);
+        transmitMsg( server, TX_PRIVMSG, server->nickserv, 
+                     server->nickservmsg );
     }
 
     if( server->channels ) {
@@ -115,7 +121,7 @@ void ProcOnRegistered(BN_PInfo I)
                 continue;
             }
 
-            BN_SendJoinMessage(I, channel->channel, NULL);
+            transmitMsg( server, TX_JOIN, channel->channel, NULL );
             found = true;
         }
         LinkedListUnlock( server->channels );
@@ -242,6 +248,9 @@ void ProcOnNames(BN_PInfo I, const char Channel[], const char *Names[],
                  int Count)
 {
     int             i;
+    IRCServer_t    *server;
+
+    server = (IRCServer_t *)I->User;
 
     if( verbose ) {
         LogPrint( LOG_DEBUG, "Names for channel (%s) :", Channel);
@@ -251,7 +260,7 @@ void ProcOnNames(BN_PInfo I, const char Channel[], const char *Names[],
         LogPrint( LOG_DEBUG, "End of names for (%s)", Channel);
     }
 
-    BN_SendMessage(I, BN_MakeMessage(NULL, "WHO", Channel), BN_LOW_PRIORITY);
+    transmitMsg( server, TX_WHO, (char *)Channel, NULL );
 }
 
 
@@ -348,7 +357,7 @@ void ProcOnInvite(BN_PInfo I, const char Chan[], const char Who[],
     LogPrint( LOG_NOTICE, "Invited to channel %s on server %s by %s", 
               channel->channel, server->server, Who);
     channel->joined = false;
-    BN_SendJoinMessage(I, channel->channel, NULL);
+    transmitMsg( server, TX_JOIN, channel->channel, NULL );
 }
 
 void ProcOnTopic(BN_PInfo I, const char Chan[], const char Who[],
@@ -392,7 +401,7 @@ void ProcOnKick(BN_PInfo I, const char Chan[], const char Who[],
          * We just got kicked.  The NERVE!  Join again.
          */
         channel->joined = false;
-        BN_SendJoinMessage(I, channel->channel, NULL);
+        transmitMsg( server, TX_JOIN, channel->channel, NULL );
 #endif
         LogPrint( LOG_NOTICE, "Kicked from channel %s on server %s by %s (%s)", 
                   channel->channel, server->server, Who, Msg);
@@ -541,7 +550,7 @@ void ProcOnJoinChannel(BN_PInfo I, const char Chan[])
                 continue;
             }
 
-            BN_SendJoinMessage(I, channel->channel, NULL);
+            transmitMsg( server, TX_JOIN, channel->channel, NULL );
             found = true;
         }
         LinkedListUnlock( server->channels );
@@ -584,7 +593,7 @@ void *bot_shutdown(void *arg)
     LinkedListLock( ServerList );
     for( item = ServerList->head; item; item = item->next ) {
         server = (IRCServer_t *)item;
-        BN_SendQuitMessage(&server->ircInfo, (const char *)quitMsg);
+        transmitMsg( server, TX_QUIT, NULL, quitMsg );
         pthread_join( server->threadId, NULL );
     }
     LinkedListUnlock( ServerList );
@@ -717,8 +726,7 @@ IRCChannel_t *FindChannelNum( IRCServer_t *server, int channum )
 void LoggedChannelMessage( IRCServer_t *server, IRCChannel_t *channel,
                            char *message )
 {
-    BN_SendChannelMessage(&server->ircInfo, (const char *)channel->channel,
-                          message);
+    transmitMsg( server, TX_MESSAGE, channel->channel, message );
     db_add_logentry( channel, server->nick, TYPE_MESSAGE, message, false );
     db_update_nick( channel, server->nick, true, false );
 }
@@ -726,8 +734,7 @@ void LoggedChannelMessage( IRCServer_t *server, IRCChannel_t *channel,
 void LoggedActionMessage( IRCServer_t *server, IRCChannel_t *channel,
                           char *message )
 {
-    BN_SendActionMessage( &server->ircInfo, (const char *)channel->channel,
-                          (const char *)message );
+    transmitMsg( server, TX_ACTION, channel->channel, message );
     db_add_logentry( channel, server->nick, TYPE_ACTION, message, false );
     db_update_nick( channel, server->nick, true, false );
 }

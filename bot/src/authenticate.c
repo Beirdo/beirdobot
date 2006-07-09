@@ -320,8 +320,7 @@ void *authenticate_thread(void *arg)
             if( auth->wakeTime != 0 && auth->wakeTime <= now.tv_sec &&
                 auth->state != AUTH_REJECTED ) {
                 auth->state = AUTH_TIMEDOUT;
-                BN_SendPrivateMessage( &auth->server->ircInfo, 
-                                       (const char *)auth->nick, timedout );
+                transmitMsg( auth->server, TX_PRIVMSG, auth->nick, timedout );
                 LogPrint( LOG_NOTICE, "Authentication timeout for %s@%s:%d", 
                           auth->nick, auth->server->server, 
                           auth->server->port );
@@ -410,7 +409,7 @@ void authenticate_state_machine( IRCServer_t *server, IRCChannel_t *channel,
                            AT_HEAD );
         }
 
-        BN_SendPrivateMessage( &server->ircInfo, (const char *)nick, string );
+        transmitMsg( server, TX_PRIVMSG, nick, string );
         free( string );
         return;
     }
@@ -431,7 +430,7 @@ void authenticate_state_machine( IRCServer_t *server, IRCChannel_t *channel,
                       server->server, server->port );
         }
 
-        BN_SendPrivateMessage( &server->ircInfo, (const char *)nick, string );
+        transmitMsg( server, TX_PRIVMSG, nick, string );
         free( string );
         break;
     case AUTH_ACCEPTED:
@@ -442,8 +441,7 @@ void authenticate_state_machine( IRCServer_t *server, IRCChannel_t *channel,
             LogPrint( LOG_NOTICE, "Authentication logoff by %s@%s:%d", nick, 
                       server->server, server->port );
 
-            BN_SendPrivateMessage( &server->ircInfo, (const char *)nick, 
-                                   string );
+            transmitMsg( server, TX_PRIVMSG, nick, string );
             free( string );
         }
         break;

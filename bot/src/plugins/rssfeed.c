@@ -509,7 +509,7 @@ void botCmdRssfeed( IRCServer_t *server, IRCChannel_t *channel, char *who,
         }
 
         if( !authenticate_check( server, who ) ) {
-            BN_SendPrivateMessage(&server->ircInfo, (const char *)who, notauth);
+            transmitMsg( server, TX_PRIVMSG, who, notauth);
             free( command );
             return;
         }
@@ -594,7 +594,7 @@ void botCmdRssfeed( IRCServer_t *server, IRCChannel_t *channel, char *who,
     if( channel ) {
         LoggedChannelMessage( server, channel, message );
     } else {
-        BN_SendPrivateMessage(&server->ircInfo, (const char *)who, message);
+        transmitMsg( server, TX_PRIVMSG, who, message);
     }
 
     free( message );

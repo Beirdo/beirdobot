@@ -205,7 +205,7 @@ void botCmdPlugin( IRCServer_t *server, IRCChannel_t *channel, char *who,
     }
 
     if( !authenticate_check( server, who ) ) {
-        BN_SendPrivateMessage(&server->ircInfo, (const char *)who, notauth);
+        transmitMsg( server, TX_PRIVMSG, who, notauth );
         return;
     }
 
@@ -265,7 +265,7 @@ void botCmdPlugin( IRCServer_t *server, IRCChannel_t *channel, char *who,
         return;
     }
 
-    BN_SendPrivateMessage(&server->ircInfo, (const char *)who, message);
+    transmitMsg( server, TX_MESSAGE, who, message );
 
     free( message );
     free( command );

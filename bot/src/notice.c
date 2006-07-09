@@ -81,9 +81,7 @@ void *notify_thread(void *arg)
                   "%s :This channel (%s) is logged -- %s", item->nick, 
                   item->channel->channel, item->channel->url );
 
-        BN_SendMessage( &item->server->ircInfo, 
-                        BN_MakeMessage(NULL, "NOTICE", string),
-                        BN_LOW_PRIORITY);
+        transmitMsg( item->server, TX_NOTICE, string, NULL );
         db_notify_nick( item->channel, item->nick );
 
         free( item->nick );

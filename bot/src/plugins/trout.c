@@ -72,8 +72,7 @@ void botCmdTrout( IRCServer_t *server, IRCChannel_t *channel, char *who,
     if( !channel ) {
         privmsg = true;
         if( !msg ) {
-            BN_SendPrivateMessage(&server->ircInfo, (const char *)who,
-                                  "Try \"help trout\"" );
+            transmitMsg( server, TX_PRIVMSG, who, "Try \"help trout\"" );
             return;
         }
 
@@ -95,8 +94,7 @@ void botCmdTrout( IRCServer_t *server, IRCChannel_t *channel, char *who,
         if( !channel ) {
             message = (char *)malloc(22 + len);
             sprintf( message, "Can't find channel %s", chan );
-            BN_SendPrivateMessage(&server->ircInfo, (const char *)who, 
-                                  message);
+            transmitMsg( server, TX_PRIVMSG, who, message);
             if( message ) {
                 free( message );
             }

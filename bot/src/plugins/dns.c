@@ -272,8 +272,7 @@ void *dns_thread(void *arg)
         if( qItem->channel ) {
             LoggedChannelMessage( qItem->server, qItem->channel, response );
         } else {
-            BN_SendPrivateMessage( &qItem->server->ircInfo, 
-                                   (const char *)qItem->nick, response );
+            transmitMsg( qItem->server, TX_PRIVMSG, qItem->nick, response );
         }
 
         free( response );

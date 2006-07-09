@@ -33,6 +33,7 @@
 #include "environment.h"
 #include "linked_list.h"
 #include "balanced_btree.h"
+#include "queue.h"
 
 static char interthread_h_ident[] _UNUSED_ = 
     "$Id$";
@@ -55,6 +56,9 @@ typedef struct {
     BN_TInfo            ircInfo;
     pthread_t           threadId;
     char               *threadName;
+    pthread_t           txThreadId;
+    char               *txThreadName;
+    QueueObject_t      *txQueue;
 } IRCServer_t;
 
 typedef struct {
@@ -173,6 +177,19 @@ typedef struct
     } identifier;
 } LogFileChain_t;
 
+
+typedef enum {
+    TX_NOTICE,
+    TX_MESSAGE,
+    TX_ACTION,
+    TX_PRIVMSG,
+    TX_JOIN,
+    TX_PASSWORD,
+    TX_NICK,
+    TX_REGISTER,
+    TX_WHO,
+    TX_QUIT
+} TxType_t;
 
 #endif
 

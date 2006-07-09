@@ -128,6 +128,10 @@ void thread_register( pthread_t *pthreadId, char *name );
 char *thread_name( pthread_t pthreadId );
 void thread_deregister( pthread_t pthreadId );
 
+void *transmit_thread(void *arg);
+void transmitMsg( IRCServer_t *server, TxType_t type, char *channel, 
+                  char *message );
+
 #endif
 
 /*

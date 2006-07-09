@@ -99,8 +99,8 @@ void botCmdSearch( IRCServer_t *server, IRCChannel_t *channel, char *who,
         }
 
         if( !message ) {
-            BN_SendPrivateMessage(&server->ircInfo, (const char *)who, 
-                                  "You must specify \"search #channel text\"");
+            transmitMsg( server, TX_PRIVMSG, who,
+                         "You must specify \"search #channel text\"");
             return;
         }
 
@@ -120,8 +120,7 @@ void botCmdSearch( IRCServer_t *server, IRCChannel_t *channel, char *who,
         if( !channel ) {
             message = (char *)malloc(22 + len);
             sprintf( message, "Can't find channel %s", chan );
-            BN_SendPrivateMessage(&server->ircInfo, (const char *)who, 
-                                  message);
+            transmitMsg( server, TX_PRIVMSG, who, message);
             free( message );
             free( chan );
             return;
@@ -130,14 +129,13 @@ void botCmdSearch( IRCServer_t *server, IRCChannel_t *channel, char *who,
     }
 
     if( !strcmp( channel->url, "" ) ) {
-        BN_SendPrivateMessage(&server->ircInfo, (const char *)who, 
-                              "No URL configured" );
+        transmitMsg( server, TX_PRIVMSG, who, "No URL configured" );
         return;
     }
 
     message = (char *)malloc(32 + strlen(msg) + strlen(channel->channel) );
     sprintf( message, "Searching %s for \"%s\"...", channel->channel, msg );
-    BN_SendPrivateMessage(&server->ircInfo, (const char *)who, message );
+    transmitMsg( server, TX_PRIVMSG, who, message );
 
     gettimeofday( &start, NULL );
     db_search_text( server, channel, who, msg );
@@ -151,7 +149,7 @@ void botCmdSearch( IRCServer_t *server, IRCChannel_t *channel, char *who,
     }
 
     sprintf( message, "Search took %ld.%06lds", end.tv_sec, end.tv_usec );
-    BN_SendPrivateMessage(&server->ircInfo, (const char *)who, message);
+    transmitMsg( server, TX_PRIVMSG, who, message);
 
     LogPrint( LOG_INFO, "Search for \"%s\" by %s in %s, duration %ld.%06lds", 
               msg, who, channel->fullspec, end.tv_sec, end.tv_usec );
@@ -192,8 +190,8 @@ void botCmdSeen( IRCServer_t *server, IRCChannel_t *channel, char *who,
         }
 
         if( !message ) {
-            BN_SendPrivateMessage(&server->ircInfo, (const char *)who, 
-                                  "You must specify \"seen #channel nick\"");
+            transmitMsg( server, TX_PRIVMSG, who, 
+                         "You must specify \"seen #channel nick\"");
             return;
         }
 
@@ -213,8 +211,7 @@ void botCmdSeen( IRCServer_t *server, IRCChannel_t *channel, char *who,
         if( !channel ) {
             message = (char *)malloc(22 + len);
             sprintf( message, "Can't find channel %s", chan );
-            BN_SendPrivateMessage(&server->ircInfo, (const char *)who, 
-                                  message);
+            transmitMsg( server, TX_PRIVMSG, who, message);
             free( message );
             free( chan );
             return;
@@ -229,7 +226,7 @@ void botCmdSeen( IRCServer_t *server, IRCChannel_t *channel, char *who,
     }
 
     if( privmsg ) {
-        BN_SendPrivateMessage(&server->ircInfo, (const char *)who, message);
+        transmitMsg( server, TX_PRIVMSG, who, message);
     } else {
         LoggedChannelMessage(server, channel, message);
     }
@@ -264,8 +261,7 @@ void botCmdNotice( IRCServer_t *server, IRCChannel_t *channel, char *who,
         privmsg = true;
 
         if( !msg ) {
-            BN_SendPrivateMessage(&server->ircInfo, (const char *)who,
-                                  "Try \"help notice\"" );
+            transmitMsg( server, TX_PRIVMSG, who, "Try \"help notice\"" );
             return;
         }
 
@@ -273,8 +269,7 @@ void botCmdNotice( IRCServer_t *server, IRCChannel_t *channel, char *who,
         if( !channel ) {
             snprintf( message, MAX_STRING_LENGTH, "Can't find channel %s", 
                       msg );
-            BN_SendPrivateMessage(&server->ircInfo, (const char *)who, 
-                                  message );
+            transmitMsg( server, TX_PRIVMSG, who, message );
             free( message );
             return;
         }
@@ -291,7 +286,7 @@ void botCmdNotice( IRCServer_t *server, IRCChannel_t *channel, char *who,
     }
 
     if( privmsg ) {
-        BN_SendPrivateMessage(&server->ircInfo, (const char *)who, message );
+        transmitMsg( server, TX_PRIVMSG, who, message );
     } else {
         LoggedChannelMessage(server, channel, message);
     }
@@ -345,14 +340,14 @@ void db_search_text( IRCServer_t *server, IRCChannel_t *channel, char *who,
 
     if( !res || !(count = mysql_num_rows(res)) ) {
         mysql_free_result(res);
-        BN_SendPrivateMessage(&server->ircInfo, (const char *)who, none);
+        transmitMsg( server, TX_PRIVMSG, who, none );
         return;
     }
 
     len = 16;
     value = (char *)realloc(value, len + 1);
     sprintf( value, "Top %d matches:", count );
-    BN_SendPrivateMessage(&server->ircInfo, (const char *)who, value);
+    transmitMsg( server, TX_PRIVMSG, who, value );
 
     for( i = 0; i < count; i++ ) {
         row = mysql_fetch_row(res);
@@ -369,7 +364,7 @@ void db_search_text( IRCServer_t *server, IRCChannel_t *channel, char *who,
         value = (char *)realloc(value, len + 1);
         sprintf( value, "    %s/%s/%s (%.2f)", channel->url, start, stop, 
                                                score );
-        BN_SendPrivateMessage(&server->ircInfo, (const char *)who, value);
+        transmitMsg( server, TX_PRIVMSG, who, value);
     }
     mysql_free_result(res);
 }

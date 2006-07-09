@@ -258,10 +258,10 @@ void botCmdHelp( IRCServer_t *server, IRCChannel_t *channel, char *who,
     if( server ) {
         if( !channel ) {
             /* Private message */
-            BN_SendPrivateMessage(&server->ircInfo, (const char *)who, helpMsg);
+            transmitMsg( server, TX_PRIVMSG, who, helpMsg );
         } else {
             /* in channel */
-            LoggedChannelMessage(server, channel, helpMsg);
+            transmitMsg( server, TX_MESSAGE, channel->channel, helpMsg );
         }
     } else {
         /* Used for debugging purposes */
@@ -337,10 +337,10 @@ void botCmdList( IRCServer_t *server, IRCChannel_t *channel, char *who,
     if( server ) {
         if( !channel ) {
             /* Private message */
-            BN_SendPrivateMessage(&server->ircInfo, (const char *)who, message);
+            transmitMsg( server, TX_PRIVMSG, who, message );
         } else {
             /* in channel */
-            LoggedChannelMessage(server, channel, message);
+            transmitMsg( server, TX_MESSAGE, channel->channel, message );
         }
     } else {
         /* Used for debugging purposes */
