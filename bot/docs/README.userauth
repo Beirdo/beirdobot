@@ -1,0 +1,40 @@
+I currently use donkey for my OTP key needs.  To create a userauth key, do:
+
+donkey -f md5 -i
+
+Then enter the user's nick, any sequence number (the higher it is, the less
+soon you will need to re-key), any random text seed, then choose a passphrase.
+
+It will give you a line like:
+kazu 0099 ur18122          fc5b023e684968ff  Oct 02,1995 16:15:30
+WINK SEAM GRAB ROAD HELL FEST
+
+Add a row to the userauth table:
+
+INSERT INTO `userauth` (`username`, `digest`, `seed`, `key`, `keyIndex`) 
+VALUES ("kazu", "md5", "ur18122", "fc5b023e684968ff", 99 );
+
+using the values above.  Of COURSE, use your own key, username, seed, etc.
+
+
+When authenticating (via privmsg only): send
+
+authenticate
+
+you will receive (for this example):
+
+otp-md5 098 ur18122 ext
+
+run:
+
+donkey -f md5 098 ur18122
+
+enter your passphrase, then send to the bot:
+
+authenticate WINK SEAM GRAB ROAD HELL FEST
+
+or whatever the result was from donkey.  The bot should accept your 
+authentication for 30min, then timeout.
+
+you can "authenticate logoff" if you are done sooner
+
