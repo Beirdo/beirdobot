@@ -1,0 +1,87 @@
+#!/usr/bin/make -f
+# Sample debian/rules that uses debhelper. GNU copyright 1997 by Joey Hess.
+# Adapted for OPIE by Matt Kern -- May 1999.
+
+export DH_COMPAT=3
+
+CMANDIR=debian/opie-client/usr/share/man/man
+SMANDIR=debian/opie-server/usr/share/man/man
+
+build: build-stamp
+build-stamp:
+	dh_testdir
+	./configure --prefix=/usr --exec-prefix=/usr --sysconfdir=/etc \
+	  --enable-insecure-override
+	$(MAKE)
+	touch build-stamp
+
+clean:
+	dh_testdir
+	dh_testroot
+	test -e Makefile && $(MAKE) clean || true
+	rm -f Makefile
+	rm -f config.cache config.h config.log config.status
+	rm -f libmissing/Makefile libopie/Makefile
+	rm -f build-stamp install-stamp
+	dh_clean
+
+install: install-stamp
+install-stamp: build-stamp
+	dh_testdir
+	dh_testroot
+	dh_clean -k
+	dh_installdirs
+	dh_buildinfo
+
+# Install the client
+	$(MAKE) client-install LOCALBIN=debian/opie-client/usr/bin 
+	mkdir -p $(CMANDIR)1
+	cp opiekey.1 $(CMANDIR)1
+	ln -s opiekey.1 $(CMANDIR)1/otp-md4.1
+	ln -s opiekey.1 $(CMANDIR)1/otp-md5.1
+	mkdir -p $(CMANDIR)4
+	cp opie.4 $(CMANDIR)4
+
+# Install the server
+	$(MAKE) server-install LOCALBIN=debian/opie-server/usr/bin \
+	   KEY_FILE=debian/opie-server/etc/opiekeys \
+	   LOCK_DIR=debian/opie-server/etc/opielocks
+	mkdir -p $(SMANDIR)5
+	cp opiekeys.5 $(SMANDIR)5
+	mkdir -p $(SMANDIR)1
+	cp opiepasswd.1 $(SMANDIR)1
+	cp opieinfo.1 $(SMANDIR)1
+
+# Install the library
+	cp libopie/libopie.a debian/libopie-dev/usr/lib
+	cp opie.h debian/libopie-dev/usr/include
+
+	touch install-stamp
+
+# Build architecture-independent files here.
+binary-indep: build install
+
+# Build architecture-dependent files here.
+binary-arch: build install
+#	dh_testversion
+	dh_testdir
+	dh_testroot
+	dh_strip
+	dh_installdocs
+#	dh_installmanpages
+	dh_installchangelogs
+	dh_compress
+	dh_fixperms
+	chmod 4755 debian/opie-server/usr/bin/opiepasswd
+	chmod 0600 debian/opie-server/etc/opiekeys
+	dh_installdeb
+	dh_shlibdeps
+	dh_gencontrol
+	dh_md5sums
+	dh_builddeb
+
+source diff:
+	@echo >&2 'source and diff are obsolete - use dpkg-source -b'; false
+
+binary: binary-indep binary-arch
+.PHONY: build clean binary-indep binary-arch binary install

@@ -1,0 +1,36 @@
+Source: opie
+Section: admin
+Priority: optional
+Maintainer: Michael Stone <mstone@debian.org>
+Build-Depends: debhelper (>= 3.0.0), dh-buildinfo
+Standards-Version: 3.6.1.0
+
+Package: opie-client
+Architecture: any
+Depends: ${shlibs:Depends}
+Conflicts: opie
+Description: OPIE programs for generating OTPs on client machines
+ This package contains the necessary generators to produce one-time
+ passwords (OTPs) which allow you to log into systems running OPIE aware
+ daemons.
+
+Package: opie-server
+Architecture: any
+Depends: ${shlibs:Depends}, opie-client, libpam-opie
+Conflicts: suidmanager (<< 0.50)
+Recommends: libpam-opie
+Description: OPIE programs for maintaining an OTP key file
+ Creates a One Time Password (OTP) key file and includes the opiepasswd
+ and opieinfo commands to manipulate and display OTP information. Probably 
+ not useful without libpam-opie or another program to make use of the OTP's
+ for authentication.
+
+Package: libopie-dev
+Section: devel
+Architecture: any
+Description: OPIE library development files.
+ OPIE (One-time Password In Everything) is a system which makes it 
+ simple to use One-Time passwords in applications.
+ .
+ This package contains the development files needed to write
+ applications that use libopie.

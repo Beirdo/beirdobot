@@ -1,0 +1,92 @@
+opie (2.32-10) unstable; urgency=low
+
+  * use correct definitions for 32 bit types (Closes: #253471)
+  * build should fail on test failure
+  * use buildinfo
+
+ -- Michael Stone <mstone@debian.org>  Tue, 15 Jun 2004 09:42:15 -0400
+
+opie (2.32-9) unstable; urgency=low
+
+  * fix -fPIC issue (Closes: #116657)
+  * use errno.h instead of hard coding int errno (Closes: #199781)
+  * update description (Closes: #210132)
+  * update standards-version to 3.6.1.0
+
+ -- Michael Stone <mstone@debian.org>  Thu, 23 Oct 2003 09:26:06 -0400
+
+opie (2.32-8) unstable; urgency=low
+
+  * compile with -fPIC
+
+ -- Michael Stone <mstone@debian.org>  Mon, 27 Aug 2001 07:18:32 -0400
+
+opie (2.32-7) unstable; urgency=low
+
+  * It is libpam-opie, not libpam_opie
+  * Make opie-server recommend libpam-opie (the description mentioned
+    it's not very useful without it so we might as well make that more
+    explicit).
+  * Add libopie and libopie-dev packages.
+  * No longer use dh_suidregister
+  * Use debian/opie-client instead of debian/tmp
+  * This means we can use debhelper in V3 mode as well
+  * Add Build-Depends
+  * Use only a single copyright file instead of keeping multiple copies
+    in debian/
+  * Bump Standards-Version to 3.5.4
+  * all of above from Wichert Akkerman <wichert@wiggy.net>
+
+ -- Michael Stone <mstone@debian.org>  Fri, 20 Jul 2001 09:07:56 -0400
+
+opie (2.32-6) unstable; urgency=low
+
+  * Fix maintainer info in control
+  * Conflict with opie (Closes: #57631)
+  * Conffile was relative
+
+ -- Michael Stone <mstone@debian.org>  Wed, 31 May 2000 19:10:19 -0400
+
+opie (2.32-5.1) unstable frozen; urgency=medium
+
+  * NMU
+  * Dependency on libc6 is now calculated using ${shlibs:Depends}.
+    This closes: #64740 (RC bug on Alpha).
+
+ -- Adrian Bunk <bunk@fs.tum.de>  Sun, 28 May 2000 13:40:56 +0200
+
+opie (2.32-5) unstable; urgency=low
+
+  * /etc/opiekeys is mode 600 for possible security reasons. Detailed
+    in README.Debian
+
+ -- Michael Stone <mstone@debian.org>  Fri, 28 Jan 2000 21:15:25 -0500
+
+opie (2.32-4) unstable; urgency=low
+
+  * Make opiepasswd suid
+
+ -- Michael Stone <mstone@debian.org>  Wed, 26 Jan 2000 11:52:29 -0500
+
+opie (2.32-3) unstable; urgency=low
+
+  * Use pristine source package
+  * Add README's
+
+ -- Michael Stone <mstone@debian.org>  Tue, 19 Oct 1999 17:46:01 -0400
+
+opie (2.32-2) unstable; urgency=low
+
+  * Provide opie-client and opie-server
+
+ -- Michael Stone <mstone@debian.org>  Mon, 18 Oct 1999 18:34:48 -0400
+
+opie (2.32-1) unstable; urgency=low
+
+  * Initial Release.
+
+ -- Matt Kern <Matt.Kern@pobox.com>  Fri,  7 May 1999 18:44:41 +0100
+
+Local variables:
+mode: debian-changelog
+End:

@@ -1,0 +1,21 @@
+opie-server for Debian
+----------------------
+
+This package contains the utilities necessary to assign and maintain one time
+passwords. It does not contain any software to make use of those passwords for
+authentication--you'll want to configure the libpam-opie package for that. The
+opie-client package contains the software to generate a response to an OTP
+challenge.
+
+The /etc/opiekeys file is readable only by root in this distribution. Allowing
+users to read this file could possibly give away sensitive information (last
+login time) and could make a dictionary attack on the keys easier. Some people
+argue that this information is not truly sensitive (login times are also
+available via the last or lastlog commands, and the other information is
+presented in the opie challenge.) I have opted for the more paranoid approach,
+on the theory that less is lost by making permissions looser in the future than
+by finding a reason to tighten them up in the future. One side affect of this
+is that the opieinfo command will only work for root. This package will work
+fine with opiekeys set to mode 644, if you choose to do that.
+
+Michael Stone <mstone@debian.org>

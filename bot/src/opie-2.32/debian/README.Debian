@@ -1,0 +1,9 @@
+opie-client for Debian
+----------------------
+
+This package contains the utilities necessary to generate a response to an OTP
+challenge, and is sufficient to access an opie server from a remote
+workstation. If you want to set up a server that uses opie for authentication,
+you need the opie-server and libpam-opie packages.
+
+Michael Stone <mstone@debian.org>
