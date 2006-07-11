@@ -17,7 +17,8 @@ while [ ${RESULT} -eq 1 ] ; do
 	fi
 done
 
-# Check everything in
+# Check everything in (from above web & bot)
+cd ..
 svn commit
 
 # Create the tag
@@ -49,7 +50,7 @@ rm ChangeLog.tag ChangeLog.trunk
 cd ${TMPDIR}
 find beirdobot-${RELEASENUM} -name .svn -type d > excludes
 
-# Create a tarball as nuvtools-${RELEASENUM}
+# Create a tarball as beirdobot-${RELEASENUM}
 tar --exclude-from excludes -czvf beirdobot-${RELEASENUM}.tar.gz \
 	beirdobot-${RELEASENUM}
 cp beirdobot-${RELEASENUM}.tar.gz ${ORIGDIR}
