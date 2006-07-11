@@ -14,7 +14,7 @@ clean:
 	${RM} include/release.h
 
 release:
-	../scripts/mkrelease
+	${MAKE} -C .. release
 
 include/release.h:	FORCE
 	../scripts/tagversion

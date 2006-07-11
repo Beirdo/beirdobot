@@ -1,0 +1,6 @@
+.PHONY:	FORCE
+
+all:
+
+clean:
+
