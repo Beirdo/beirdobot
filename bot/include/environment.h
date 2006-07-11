@@ -56,7 +56,9 @@ static char environment_h_ident[] _UNUSED_ =
 #undef _FILE_OFFSET_BITS
 #define _FILE_OFFSET_BITS 64
 
+#ifndef _LARGEFILE_SOURCE
 #define _LARGEFILE_SOURCE
+#endif
 
 #define O_LARGEFILE 0
 
