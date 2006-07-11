@@ -1,0 +1,18 @@
+INSTALL = install
+LIBDIR = ../../lib
+INCDIR = ../../include
+
+.PHONY:	all clean
+
+all:	${LIBDIR}/libopie.a
+
+${LIBDIR}/libopie.a:
+	./configure --prefix=`cd ../.. ; pwd` --disable-shared --with-pic
+	${MAKE} libopie/libopie.a
+	${INSTALL} -m 644 libopie/libopie.a ${LIBDIR}
+	${INSTALL} -m 644 opie.h ${INCDIR}
+
+clean:
+	-${RM} ${LIBDIR}/libopie.a ${INCDIR}/opie.h
+	-${MAKE} -C libopie clean
+

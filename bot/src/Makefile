@@ -19,7 +19,7 @@ LIBS	+= $(shell ${BOTNETCFG} --libs-static)
 LIBS	+= $(shell ${PCRECFG} --libs)
 LIBS	+= $(shell PKG_CONFIG_PATH=${PKGCONFIGPATH} pkg-config --libs nxml)
 LIBS	+= $(shell PKG_CONFIG_PATH=${PKGCONFIGPATH} pkg-config --libs mrss)
-LIBS    += -ldl -lopie -lresolv
+LIBS    += -ldl -L../lib -lopie -lresolv
 
 SRCS	= main.c plugin_api.c bot.c bot_cmds.c mysql.c linked_list.c regexp.c
 SRCS    += balanced_btree.c protected_data.c mysql_upgrade.c queue.c notice.c
