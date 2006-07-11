@@ -31,7 +31,9 @@
 
 #include "botnet.h"
 #include "environment.h"
+#ifndef __USE_BSD
 #define __USE_BSD
+#endif
 #include <string.h>
 #include <strings.h>
 #include <stdio.h>
