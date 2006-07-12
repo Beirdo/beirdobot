@@ -39,5 +39,6 @@ else
 fi
 
 sed -e "s/@VERSION@/${VERSION}/" include/release.h.in > include/release.h
+sed -e "s/@VERSION@/${VERSION}/" ../configure.ac.in > ../configure.ac 
 echo ${VERSION}
 
