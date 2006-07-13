@@ -35,4 +35,9 @@ install-data:
 		@INSTALL@ -D -m 644 $$i ${DESTDIR}${pkgwebdir}/$$i ; \
 	done
 
+uninstall:
+	for i in ${INSTALL_FILES} ; do \
+		${RM} ${DESTDIR}${pkgwebdir}/$$i ; \
+	done
+
 ${EMPTY_AUTOMAKE_TARGETS}:

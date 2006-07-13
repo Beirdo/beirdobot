@@ -19,6 +19,7 @@ CFLAGS  += $(shell ${BOTNETCFG} --cflags)
 
 CFLAGS_rssfeed  = $(shell PKG_CONFIG_PATH=${PKGCONFIGPATH} pkg-config --cflags nxml)
 CFLAGS_rssfeed += $(shell PKG_CONFIG_PATH=${PKGCONFIGPATH} pkg-config --cflags mrss)
+CFLAGS_rssfeed += -DDATEMSK_PATH=\"${pkglibdir}\"
 
 LDFLAGS = -g
 LIBS	= $(shell ${MYSQLCFG} --libs_r)
@@ -32,6 +33,8 @@ DLLIBS_rssfeed += -lcurl
 SRCS	= trout.c fart.c core.c dns.c rssfeed.c
 OBJS	= ${SRCS:%.c=plugin_%.so}
 DEPS	= ${SRCS:.c=.d}
+
+EXTRAS	= datemsk.txt
 
 .PHONY:	clean cleanall ${EMPTY_AUTOMAKE_TARGETS}
 
@@ -57,10 +60,18 @@ install:	install-data install-exec
 
 install-exec:
 	for i in ${OBJS} ; do \
-		@INSTALL@ -D -m 775 $$i ${DESTDIR}${pkglibdir}/$$i ; \
+		@INSTALL@ -D -m 755 $$i ${DESTDIR}${pkglibdir}/$$i ; \
 	done
 
 install-data:
+	for i in ${EXTRAS} ; do \
+		@INSTALL@ -D -m 644 $$i ${DESTDIR}${pkglibdir}/$$i ; \
+	done
+
+uninstall:
+	for i in ${OBJS} ${EXTRAS} ; do \
+		${RM} ${DESTDIR}${pkglibdir}/$$i ; \
+	done
 
 ${EMPTY_AUTOMAKE_TARGETS}:
 

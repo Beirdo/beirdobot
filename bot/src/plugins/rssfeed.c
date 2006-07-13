@@ -50,7 +50,10 @@
 static char ident[] _UNUSED_ = 
     "$Id$";
 
-#define DATEMSK_FILE "../lib/datemsk.txt"
+#ifndef DATEMSK_PATH
+#define DATEMSK_PATH "../lib"
+#endif
+#define DATEMSK_FILE DATEMSK_PATH "/datemsk.txt"
 #define CURRENT_SCHEMA_RSSFEED 2
 #define MAX_SCHEMA_QUERY 100
 typedef char *SchemaUpgrade_t[MAX_SCHEMA_QUERY];
@@ -134,6 +137,7 @@ void plugin_initialize( char *args )
     int                     printed;
 
     LogPrintNoArg( LOG_NOTICE, "Initializing rssfeed..." );
+    LogPrint( LOG_NOTICE, "Date Mask File: %s", DATEMSK_FILE );
 
     setenv( "DATEMSK", DATEMSK_FILE, 1 );
     rssItemTree = BalancedBTreeCreate( BTREE_KEY_INT );

@@ -68,17 +68,17 @@ cleanall:	clean
 	${RM} ${DEPS}
 	${MAKE} -C plugins cleanall
 
-install:	install-data install-exec
+install:	all install-data install-exec
 
-install-exec:
+install-exec:	all
 	@INSTALL@ -D -m 775 ${EXE} ${DESTDIR}${bindir}/${EXE}
 	${MAKE} -C plugins install-exec
 
-install-data:
+install-data:	all
 	${MAKE} -C plugins install-data
 
 uninstall:
-	${RM} ${bindir}/${EXE}
+	${RM} ${DESTDIR}${bindir}/${EXE}
 	${MAKE} -C plugins uninstall
 
 ${EMPTY_AUTOMAKE_TARGETS}:

@@ -40,6 +40,7 @@ DIST_COMMON = scripts/config.guess scripts/config.sub INSTALL NEWS \
 	README AUTHORS ChangeLog $(srcdir)/Makefile.in \
 	$(srcdir)/Makefile.am $(top_srcdir)/configure \
 	$(am__configure_deps) $(top_srcdir)/bot/include/config.h.in \
+	$(top_srcdir)/web/Makefile.in \
 	$(top_srcdir)/bot/src/Makefile.in \
 	$(top_srcdir)/bot/src/plugins/Makefile.in
 subdir = .
@@ -51,7 +52,8 @@ am__CONFIG_DISTCLEAN_FILES = config.status config.cache config.log \
  configure.lineno configure.status.lineno
 mkinstalldirs = $(install_sh) -d
 CONFIG_HEADER = $(top_builddir)/bot/include/config.h
-CONFIG_CLEAN_FILES = bot/src/Makefile bot/src/plugins/Makefile
+CONFIG_CLEAN_FILES = web/Makefile bot/src/Makefile \
+	bot/src/plugins/Makefile
 SOURCES =
 RECURSIVE_TARGETS = all-recursive check-recursive dvi-recursive \
 	html-recursive info-recursive install-data-recursive \
@@ -201,6 +203,8 @@ $(top_srcdir)/bot/include/config.h.in:  $(am__configure_deps)
 
 distclean-hdr:
 	-rm -f bot/include/config.h bot/include/stamp-h1
+web/Makefile: $(top_builddir)/config.status $(top_srcdir)/web/Makefile.in
+	cd $(top_builddir) && $(SHELL) ./config.status $@
 bot/src/Makefile: $(top_builddir)/config.status $(top_srcdir)/bot/src/Makefile.in
 	cd $(top_builddir) && $(SHELL) ./config.status $@
 bot/src/plugins/Makefile: $(top_builddir)/config.status $(top_srcdir)/bot/src/plugins/Makefile.in
