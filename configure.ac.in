@@ -59,5 +59,6 @@ AC_FUNC_VPRINTF
 #AC_CHECK_FUNCS([bzero gethostbyaddr gethostbyname gethostname getpagesize gettimeofday inet_ntoa isascii memset select socket strcasecmp strchr strdup strncasecmp strstr strsep])
 
 
-AC_CONFIG_FILES([Makefile bot/src/Makefile bot/src/plugins/Makefile])
+AC_CONFIG_FILES([Makefile web/Makefile bot/src/Makefile 
+                 bot/src/plugins/Makefile])
 AC_OUTPUT

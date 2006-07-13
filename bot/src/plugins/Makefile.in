@@ -7,10 +7,10 @@ PKGCONFIGPATH	= ../../lib/pkgconfig
 
 CC	= @CC@
 
-DESTDIR =
-prefix	= @prefix@
-datadir	= @datadir@
-pkglibdir = ${datadir}/beirdobot/plugins
+DESTDIR		=
+prefix		= @prefix@
+datadir		= @datadir@
+pkglibdir	= ${datadir}/beirdobot/plugins
 
 CFLAGS	= -O6 -g -Wall -Werror -I../../include -std=c99 -pedantic
 # -DDEBUG

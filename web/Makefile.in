@@ -1,0 +1,38 @@
+EMPTY_AUTOMAKE_TARGETS  = install-info installdirs check installcheck dvi pdf
+EMPTY_AUTOMAKE_TARGETS += ps info html tags ctags distdir distclean
+.PHONY:	FORCE ${EMPTY_AUTOMAKE_TARGETS}
+
+INSTALL_FILES  = js/browser.js js/debug.js js/visibility.js js/ajax.js 
+INSTALL_FILES += js/utils.js skins/default/log.css skins/default/global.css
+INSTALL_FILES += skins/default/search.css skins/default/channel.css .htaccess
+INSTALL_FILES += modules/server.php modules/search.php modules/welcome.php
+INSTALL_FILES += modules/channel/history.php modules/channel.php beirdobot.php
+INSTALL_FILES += includes/irc_messages.php includes/irc_channels.php
+INSTALL_FILES += includes/errordisplay.php includes/db.php includes/errors.php
+INSTALL_FILES += includes/init.php includes/irc_servers.php includes/utils.php
+INSTALL_FILES += templates/log/table_foot.php templates/log/table_empty.php
+INSTALL_FILES += templates/log/table_head.php templates/log/table_message.php
+INSTALL_FILES += templates/log/table_newday.php templates/search.php
+INSTALL_FILES += templates/footer.php templates/welcome.php 
+INSTALL_FILES += templates/header.php templates/channel/history.php
+INSTALL_FILES += templates/_error.php templates/channel.php
+
+DESTDIR		=
+prefix		= @prefix@
+datadir		= @datadir@
+pkgwebdir	= ${datadir}/beirdobot/web
+
+all:
+
+clean:
+
+install:	install-exec install-data
+
+install-exec:
+
+install-data:
+	for i in ${INSTALL_FILES} ; do \
+		@INSTALL@ -D -m 644 $$i ${DESTDIR}${pkgwebdir}/$$i ; \
+	done
+
+${EMPTY_AUTOMAKE_TARGETS}:

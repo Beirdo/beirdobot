@@ -1,13 +1,13 @@
 # Process this file with autoconf to produce a configure script.
 AC_PREREQ(2.59)
 
-AC_INIT(beirdobot, [SVN Version 197M], [gjhurlbu@gmail.com])
+AC_INIT(beirdobot, [SVN Version 200M], [gjhurlbu@gmail.com])
 AC_CONFIG_AUX_DIR(scripts)
 AC_CONFIG_SRCDIR(bot/src/main.c)
 AM_CONFIG_HEADER(bot/include/config.h)
 AC_CANONICAL_SYSTEM
 
-AM_INIT_AUTOMAKE(beirdobot, "SVN Version 197M")
+AM_INIT_AUTOMAKE(beirdobot, "SVN Version 200M")
 
 
 
@@ -59,5 +59,6 @@ AC_FUNC_VPRINTF
 #AC_CHECK_FUNCS([bzero gethostbyaddr gethostbyname gethostname getpagesize gettimeofday inet_ntoa isascii memset select socket strcasecmp strchr strdup strncasecmp strstr strsep])
 
 
-AC_CONFIG_FILES([Makefile bot/src/Makefile bot/src/plugins/Makefile])
+AC_CONFIG_FILES([Makefile web/Makefile bot/src/Makefile 
+                 bot/src/plugins/Makefile])
 AC_OUTPUT
