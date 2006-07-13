@@ -85,10 +85,16 @@ int main ( int argc, char **argv )
         if( childPid != 0 ) {
             /* This is still the parent, report the child's pid and exit */
             printf( "[Detached as PID %d]\n", childPid );
+            /* And exit the parent */
             _exit( 0 );
         }
 
         /* After this is in the detached child */
+
+        /* Close stdin, stdout, stderr to release the tty */
+        close(0);
+        close(1);
+        close(2);
     }
 
     mainThreadId = pthread_self();
