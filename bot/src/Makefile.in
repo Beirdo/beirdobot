@@ -6,7 +6,7 @@ MYSQLCFG	= mysql_config
 PCRECFG		= pcre-config
 PKGCONFIGPATH	= ../lib/pkgconfig
 
-CC	= gcc
+CC	= @CC@
 
 CFLAGS	= -O6 -g -Wall -Werror -I../include -std=c99 -pedantic 
 # -DDEBUG
@@ -34,9 +34,9 @@ EXE	= beirdobot${EXEEXT}
 CFLAGS_plugin_api = -DPLUGIN_PATH=\"${pkglibdir}\"
 
 DESTDIR		=
-prefix		= /usr/local
-exec_prefix	= ${prefix}
-bindir  	= ${exec_prefix}/bin
+prefix		= @prefix@
+exec_prefix	= @exec_prefix@
+bindir  	= @bindir@
 datadir	= ${prefix}/share
 pkglibdir = ${datadir}/beirdobot/plugins
 
@@ -71,7 +71,7 @@ cleanall:	clean
 install:	install-data install-exec
 
 install-exec:
-	/usr/bin/install -c -D -m 775 ${EXE} ${DESTDIR}${bindir}/${EXE}
+	@INSTALL@ -D -m 775 ${EXE} ${DESTDIR}${bindir}/${EXE}
 	${MAKE} -C plugins install-exec
 
 install-data:

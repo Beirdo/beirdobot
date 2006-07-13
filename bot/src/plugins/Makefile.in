@@ -5,11 +5,11 @@ BOTNETCFG	= ../../bin/botnet-config
 MYSQLCFG	= mysql_config
 PKGCONFIGPATH	= ../../lib/pkgconfig
 
-CC	= gcc
+CC	= @CC@
 
 DESTDIR =
-prefix	= /usr/local
-datadir	= ${prefix}/share
+prefix	= @prefix@
+datadir	= @datadir@
 pkglibdir = ${datadir}/beirdobot/plugins
 
 CFLAGS	= -O6 -g -Wall -Werror -I../../include -std=c99 -pedantic
@@ -57,7 +57,7 @@ install:	install-data install-exec
 
 install-exec:
 	for i in ${OBJS} ; do \
-		/usr/bin/install -c -D -m 775 $$i ${DESTDIR}${pkglibdir}/$$i ; \
+		@INSTALL@ -D -m 775 $$i ${DESTDIR}${pkglibdir}/$$i ; \
 	done
 
 install-data:

@@ -1,4 +1,7 @@
-.PHONY:	FORCE
+EMPTY_AUTOMAKE_TARGETS  = install-info installdirs check installcheck dvi pdf
+EMPTY_AUTOMAKE_TARGETS += ps info html tags ctags distdir distclean
+RECURSE_AUTOMAKE_TARGETS  = install install-exec install-data
+.PHONY:	FORCE ${EMPTY_AUTOMAKE_TARGETS} ${RECURSE_AUTOMAKE_TARGETS}
 
 all:	include/release.h
 	${MAKE} -C src/botnet-1.6.4 -f Makefile.gjh all
@@ -16,8 +19,12 @@ clean:
 	${RM} include/release.h
 
 release:
-	${MAKE} -C .. release
+	../scripts/mkrelease
 
 include/release.h:	FORCE
 	../scripts/tagversion
 
+${RECURSE_AUTOMAKE_TARGETS}:
+	${MAKE} -C src $@
+
+${EMPTY_AUTOMAKE_TARGETS}:

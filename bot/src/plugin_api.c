@@ -36,8 +36,9 @@
 #include "balanced_btree.h"
 #include "logging.h"
 
-
+#ifndef PLUGIN_PATH
 #define PLUGIN_PATH "./plugins"
+#endif
 
 /* INTERNAL FUNCTION PROTOTYPES */
 void pluginInitializeTree( BalancedBTreeItem_t *item );
