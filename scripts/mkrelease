@@ -1,5 +1,13 @@
 #! /bin/bash
 
+if [ -f mkrelease ] ; then
+	cd ..
+fi
+
+if [ -d bin ] ; then
+	cd ..
+fi
+
 ORIGDIR=`pwd`
 TMPDIR=${ORIGDIR}/mkrelease.$$
 
@@ -17,8 +25,10 @@ while [ ${RESULT} -eq 1 ] ; do
 	fi
 done
 
+# Make the new configure.ac
+scripts/tagversion -R ${RELEASENUM}
+
 # Check everything in (from above web & bot)
-cd ..
 svn commit
 
 # Create the tag
@@ -33,7 +43,7 @@ mkdir ${TMPDIR}
 cd ${TMPDIR}
 svn co https://trac.beirdo.ca:4443/svn/beirdobot/tags/release-${RELEASENUM} \
 	beirdobot-${RELEASENUM}
-cd beirdobot-${RELEASENUM}/bot
+cd beirdobot-${RELEASENUM}
 
 # Make the release.h
 scripts/tagversion -r ${RELEASENUM}
@@ -61,3 +71,8 @@ cp beirdobot-${RELEASENUM}.tar.gz ${ORIGDIR}
 # Clean up the checked out dir
 cd ${ORIGDIR}
 rm -rf ${TMPDIR}
+
+# Make the new configure.ac
+scripts/tagversion -R ${RELEASENUM}+SVN
+svn commit -m "Post-commit release tagging for configure.ac"
+

@@ -1,10 +1,19 @@
 #! /bin/sh
 
 RELEASE=0
+CONFIGAC=0
 DONE=0
 
+if [ -f configure.ac ] ; then
+	cd bot
+fi
+
+if [ -f tagversion ] ; then
+	cd ../bot
+fi
+
 while [ ${DONE} -eq 0 ] ; do
-	getopts "r:" arg
+	getopts "r:R:" arg
 	if [ $? -ne 0 ] ; then
 		DONE=1
 		continue 1
@@ -16,11 +25,21 @@ while [ ${DONE} -eq 0 ] ; do
 		RELEASE=1
 		RELEASENUM=${OPTARG}
 		;;
+	R)
+		CONFIGAC=1
+		RELEASENUM=${OPTARG}
+		;;
 	?)
 		DONE=1
 		;;
 	esac
 done
+
+if [ ${CONFIGAC} -eq 1 ] ; then
+	sed -e "s/@VERSION@/${RELEASENUM}/" ../configure.ac.in > \
+		../configure.ac 
+	exit 0
+fi
 	
 if [ ${RELEASE} -eq 0 ] ; then
 	if [ -f .release ] ; then
@@ -39,6 +58,5 @@ else
 fi
 
 sed -e "s/@VERSION@/${VERSION}/" include/release.h.in > include/release.h
-sed -e "s/@VERSION@/${VERSION}/" ../configure.ac.in > ../configure.ac 
 echo ${VERSION}
 
