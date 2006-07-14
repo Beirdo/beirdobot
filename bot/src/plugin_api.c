@@ -35,6 +35,9 @@
 #include "protos.h"
 #include "balanced_btree.h"
 #include "logging.h"
+#define _DEFINE_PLUGINS
+#include "plugins/plugin_list.h"
+
 
 #ifndef PLUGIN_PATH
 #define PLUGIN_PATH "./plugins"
@@ -56,6 +59,10 @@ static char ident[] _UNUSED_ =
 void plugins_initialize( void )
 {
     static char        *command = "plugin";
+
+    db_check_plugins( DefaultPlugins, DefaultPluginCount );
+
+    LogPrint( LOG_NOTICE, "Plugin path: %s", PLUGIN_PATH );
 
     pluginTree = db_get_plugins();
     if( !pluginTree ) {
@@ -271,7 +278,6 @@ void botCmdPlugin( IRCServer_t *server, IRCChannel_t *channel, char *who,
     free( message );
     free( command );
 }
-
 
 
 /*

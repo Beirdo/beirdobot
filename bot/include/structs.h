@@ -191,6 +191,14 @@ typedef enum {
     TX_QUIT
 } TxType_t;
 
+typedef struct {
+    char           *pluginName;
+    char           *libName;
+    int             preload;
+    char           *arguments;
+} PluginDef_t;
+
+
 #endif
 
 /*

@@ -855,6 +855,34 @@ void db_set_auth( char *nick, AuthData_t *auth )
     mysql_free_result(res);
 }
 
+void db_check_plugins( PluginDef_t *plugins, int count )
+{
+    PluginDef_t            *plugin;
+    int                     i;
+    MYSQL_RES              *res;
+
+    for( i = 0; i < count; i++ ) {
+        plugin = &plugins[i];
+
+        res = db_query( "SELECT `pluginName` FROM `plugins` "
+                        "WHERE `pluginName` = '%s'", plugin->pluginName );
+        if( !res || !(mysql_num_rows(res)) ) {
+            mysql_free_result(res);
+
+            LogPrint( LOG_NOTICE, "Adding new plugin to database: %s (%s)",
+                                  plugin->pluginName, 
+                                  (plugin->preload ? "enabled" : "disabled") );
+
+            res = db_query( "INSERT INTO `pluginName` ( `pluginName`, "
+                            "`libName`, `preload`, `arguments`) VALUES "
+                            "('%s', '%s', %d, '%s')", plugin->pluginName,
+                            plugin->libName, plugin->preload, 
+                            plugin->arguments );
+            mysql_free_result(res);
+        }
+    }
+}
+
 /*
  * vim:ts=4:sw=4:ai:et:si:sts=4
  */

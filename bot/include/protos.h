@@ -76,6 +76,7 @@ void db_nick_history( IRCChannel_t *channel, char *nick, NickHistory_t type );
 AuthData_t *db_get_auth( char *nick );
 void db_set_auth( char *nick, AuthData_t *auth );
 void db_free_auth( AuthData_t *auth );
+void db_check_plugins( PluginDef_t *plugins, int count );
 
 IRCChannel_t *FindChannelNum( IRCServer_t *server, int channum );
 IRCChannel_t *FindChannel(IRCServer_t *server, const char *channame);

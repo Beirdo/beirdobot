@@ -54,7 +54,8 @@ depend:		${DEPS}
 ${DEPS}:	Makefile
 
 %.o:	%.c
-	@${CC} ${CFLAGS} ${CFLAGS_${<:%.c=%}} -c -o $@ $<
+	@echo "Compiling $@"
+	${CC} ${CFLAGS} ${CFLAGS_${<:%.c=%}} -c -o $@ $<
 
 %.d:	%.c
 	@echo "Making $@ (dependencies for $<)"
