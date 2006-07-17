@@ -36,10 +36,11 @@ POST_UNINSTALL = :
 build_triplet = @build@
 host_triplet = @host@
 target_triplet = @target@
-DIST_COMMON = scripts/config.guess scripts/config.sub INSTALL NEWS \
-	README AUTHORS ChangeLog $(srcdir)/Makefile.in \
-	$(srcdir)/Makefile.am $(top_srcdir)/configure \
-	$(am__configure_deps) $(top_srcdir)/bot/include/config.h.in \
+DIST_COMMON = $(srcdir)/Makefile.local scripts/config.guess \
+	scripts/config.sub INSTALL NEWS README AUTHORS ChangeLog \
+	$(srcdir)/Makefile.in $(srcdir)/Makefile.am \
+	$(top_srcdir)/configure $(am__configure_deps) \
+	$(top_srcdir)/bot/include/config.h.in \
 	$(top_srcdir)/web/Makefile.in \
 	$(top_srcdir)/bot/src/Makefile.in \
 	$(top_srcdir)/bot/src/plugins/Makefile.in
@@ -155,7 +156,7 @@ all: all-recursive
 .SUFFIXES:
 am--refresh:
 	@:
-$(srcdir)/Makefile.in:  $(srcdir)/Makefile.am  $(am__configure_deps)
+$(srcdir)/Makefile.in:  $(srcdir)/Makefile.am $(srcdir)/Makefile.local $(am__configure_deps)
 	@for dep in $?; do \
 	  case '$(am__configure_deps)' in \
 	    *$$dep*) \
@@ -423,6 +424,9 @@ uninstall-info: uninstall-info-recursive
 	pdf-am ps ps-am tags tags-recursive uninstall uninstall-am \
 	uninstall-info-am
 
+
+release:
+	scripts/mkrelease
 # Tell versions [3.59,3.63) of GNU make to not export all variables.
 # Otherwise a system limit (for SysV at least) may be exceeded.
 .NOEXPORT:
