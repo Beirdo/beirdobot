@@ -64,9 +64,11 @@ void botCmdTrout( IRCServer_t *server, IRCChannel_t *channel, char *who,
                   char *msg )
 {
     char           *message;
+    char           *line;
+    char           *target;
     char           *chan;
+    int             len;
     bool            privmsg = false;
-    int             len = 0;
 
     if( !channel ) {
         privmsg = true;
@@ -75,11 +77,11 @@ void botCmdTrout( IRCServer_t *server, IRCChannel_t *channel, char *who,
             return;
         }
 
-        chan = CommandLineParse( msg, &message );
+        chan = CommandLineParse( msg, &line );
 
         channel = FindChannel(server, chan);
         if( !channel ) {
-            message = (char *)malloc(22 + len);
+            message = (char *)malloc(22 + strlen(chan));
             sprintf( message, "Can't find channel %s", chan );
             transmitMsg( server, TX_PRIVMSG, who, message);
             if( message ) {
@@ -95,25 +97,38 @@ void botCmdTrout( IRCServer_t *server, IRCChannel_t *channel, char *who,
         if( chan ) {
             free( chan );
         }
+    } else {
+        line = msg;
     }
 
     if( !msg ) {
+        target = NULL;
         message = (char *)malloc(29+strlen(who)+2);
         sprintf( message, "dumps a bucket of trout onto %s", who );
     } else {
-        message = (char *)malloc(36+strlen(who)+strlen(msg)+2);
-        sprintf( message, "slaps %s with a trout on behalf of %s...", msg, 
-                 who );
+        target = CommandLineParse( line, &line );
+        if( line ) {
+            len = 38 + strlen(who) + strlen(target) + strlen(line) + 2;
+            message = (char *)malloc(len);
+            sprintf( message, "slaps %s with a %s trout on behalf of %s...", 
+                     target, line, who );
+        } else {
+            len = 36 + strlen(who) + strlen(target) + 2;
+            message = (char *)malloc(len);
+            sprintf( message, "slaps %s with a trout on behalf of %s...", 
+                     target, who );
+        }
     }
     LoggedActionMessage( server, channel, message );
+    free(target);
     free(message);
 }
 
 char *botHelpTrout( void )
 {
     static char *help = "Slaps someone with a trout on your behalf.  "
-                        "Syntax: (in channel) trout nick  "
-                        "(in privmsg) trout #channel nick.";
+                        "Syntax: (in channel) trout nick [adjective] "
+                        "(in privmsg) trout #channel nick [adjective]";
     
     return( help );
 }
