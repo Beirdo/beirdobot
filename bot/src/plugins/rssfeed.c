@@ -402,7 +402,8 @@ void *rssfeed_thread(void *arg)
             }
 
             LoggedChannelMessage( feed->server, feed->channel, message );
-            LogPrint( LOG_NOTICE, "RSS: feed %d: %s", feed->feedId, message );
+            LogPrint( LOG_NOTICE, "RSS: feed %d: (%d) %s", feed->feedId, 
+                      strlen(message), message );
 
             if( itemData->link ) {
                 free( itemData->link );
