@@ -32,7 +32,7 @@
 static char db_schema_h_ident[] _UNUSED_ = 
     "$Id$";
 
-#define CURRENT_SCHEMA  8
+#define CURRENT_SCHEMA  9
 
 
 static char *defSchema[] = {
@@ -88,6 +88,10 @@ static char *defSchema[] = {
 "  `realname` varchar(255) NOT NULL default '',\n"
 "  `nickserv` varchar(64) NOT NULL default '',\n"
 "  `nickservmsg` varchar(255) NOT NULL default '',\n"
+"  `floodInterval` int(11) NOT NULL default '2',\n"
+"  `floodMaxTime` int(11) NOT NULL default '8',\n"
+"  `floodBuffer` int(11) NOT NULL default '2000',\n"
+"  `floodMaxLine` int(11) NOT NULL default '256',\n"
 "  PRIMARY KEY  (`serverid`),\n"
 "  KEY `serverNick` (`server`,`port`,`nick`)\n"
 ") TYPE=MyISAM PACK_KEYS=0;\n",

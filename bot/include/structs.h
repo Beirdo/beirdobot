@@ -53,6 +53,10 @@ typedef struct {
     char               *realname;
     char               *nickserv;
     char               *nickservmsg;
+    int                 floodInterval;
+    int                 floodMaxTime;
+    int                 floodBuffer;
+    int                 floodMaxLine;
     BN_TInfo            ircInfo;
     pthread_t           threadId;
     char               *threadName;
