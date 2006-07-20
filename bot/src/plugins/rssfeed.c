@@ -444,7 +444,6 @@ void botCmdRssfeed( IRCServer_t *server, IRCChannel_t *channel, char *who,
 {
     static char            *notauth = "You are not authorized, you can't do "
                                       "that!";
-    int                     len;
     char                   *line;
     char                   *command;
     char                   *message;
@@ -453,30 +452,9 @@ void botCmdRssfeed( IRCServer_t *server, IRCChannel_t *channel, char *who,
     RssFeed_t              *feed;
     struct timeval          tv;
 
-    line = strstr( msg, " " );
-    if( line ) {
-        /* Command has trailing text, skip the space */
-        len = line - msg;
-        line++;
-
-        command = (char *)malloc( len + 2 );
-        strncpy( command, msg, len );
-        command[len] = '\0';
-    } else {
-        /* Command is the whole line */
-        command = strdup( msg );
-    }
-
-    /* Strip trailing spaces */
-    if( line ) {
-        for( len = strlen(line); len && line[len-1] == ' ';
-             len = strlen(line) ) {
-            line[len-1] = '\0';
-        }
-
-        if( *line == '\0' ) {
-            line = NULL;
-        }
+    command = CommandLineParse( msg, &line );
+    if( !command ) {
+        return;
     }
 
     if( !strcmp( command, "list" ) ) {

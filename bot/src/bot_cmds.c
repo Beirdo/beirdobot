@@ -165,41 +165,11 @@ int botCmd_parse( IRCServer_t *server, IRCChannel_t *channel, char *who,
 {
     char                   *line;
     char                   *cmd;
-    int                     len;
     BalancedBTreeItem_t    *item;
     BotCmd_t               *cmdStruct;
     int                     ret;
 
-    line = strstr( msg, " " );
-    if( line ) {
-        /* Command has trailing text, skip the space */
-        len = line - msg;
-        line++;
-
-        cmd = (char *)malloc( len + 2 );
-        strncpy( cmd, msg, len );
-        cmd[len] = '\0';
-    } else {
-        /* Command is the whole line */
-        cmd = strdup( msg );
-    }
-
-    /* Strip leading spaces */
-    while( line && *line == ' ' ) {
-        line++;
-    }
-
-    /* Strip trailing spaces */
-    if( line ) {
-        for( len = strlen(line); len && line[len-1] == ' '; 
-             len = strlen(line) ) {
-            line[len-1] = '\0';
-        }
-
-        if( *line == '\0' ) {
-            line = NULL;
-        }
-    }
+    cmd = CommandLineParse( msg, &line );
 
     ret = 0;
     item = BalancedBTreeFind( botCmdTree, (void *)&cmd, UNLOCKED );
@@ -219,7 +189,6 @@ void botCmdHelp( IRCServer_t *server, IRCChannel_t *channel, char *who,
 {
     char                   *line;
     char                   *cmd;
-    int                     len;
     BalancedBTreeItem_t    *item;
     BotCmd_t               *cmdStruct;
     static char            *help = "help";
@@ -230,19 +199,7 @@ void botCmdHelp( IRCServer_t *server, IRCChannel_t *channel, char *who,
         msg = help;
     }
 
-    line = strstr( msg, " " );
-    if( line ) {
-        /* Command has trailing text, skip the space */
-        len = line - msg;
-        line++;
-
-        cmd = (char *)malloc( len + 2 );
-        strncpy( cmd, msg, len );
-        cmd[len] = '\0';
-    } else {
-        /* Command is the whole line */
-        cmd = strdup( msg );
-    }
+    cmd = CommandLineParse( msg, &line );
 
     helpMsg = helpNotFound;
 
@@ -357,6 +314,48 @@ char *botHelpList( void )
     return( help );
 }
 
+char *CommandLineParse( char *msg, char **pLine )
+{
+    char       *line;
+    char       *cmd;
+    int         len;
+
+    if( !msg ) {
+        *pLine = NULL;
+        return( NULL );
+    }
+
+    line = strstr( msg, " " );
+    if( line ) {
+        /* Command has trailing text, skip the space */
+        len = line - msg;
+        line++;
+
+        cmd = strndup( msg, len );
+    } else {
+        /* Command is the whole line */
+        cmd = strdup( msg );
+    }
+
+    /* Strip leading spaces */
+    while( line && *line == ' ' ) {
+        line++;
+    }
+
+    /* Strip trailing spaces */
+    if( line ) {
+        for( len = strlen(line); len && line[len-1] == ' '; len-- ) {
+            line[len-1] = '\0';
+        }
+
+        if( *line == '\0' ) {
+            line = NULL;
+        }
+    }
+
+    *pLine = line;
+    return( cmd );
+}
 
 /*
  * vim:ts=4:sw=4:ai:et:si:sts=4

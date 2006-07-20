@@ -83,7 +83,6 @@ void botCmdSearch( IRCServer_t *server, IRCChannel_t *channel, char *who,
     char           *message;
     char           *chan;
     bool            privmsg = false;
-    int             len;
     struct timeval  start, end;
 
     if( !server || !msg ) {
@@ -92,33 +91,17 @@ void botCmdSearch( IRCServer_t *server, IRCChannel_t *channel, char *who,
 
     if( !channel ) {
         privmsg = true;
-        if( msg ) {
-            message = strstr( msg, " " );
-        } else {
-            message = NULL;
-        }
 
+        chan = CommandLineParse( msg, &message );
         if( !message ) {
             transmitMsg( server, TX_PRIVMSG, who,
                          "You must specify \"search #channel text\"");
             return;
         }
 
-        len = message - msg;
-        chan = strndup(msg, len);
-        chan[len] = '\0';
-
-        msg += (len + 1);
-        while( *msg == ' ' ) {
-            msg++;
-        }
-        if( *msg == '\0' ) {
-            msg = NULL;
-        }
-
         channel = FindChannel(server, chan);
         if( !channel ) {
-            message = (char *)malloc(22 + len);
+            message = (char *)malloc(22 + strlen(chan));
             sprintf( message, "Can't find channel %s", chan );
             transmitMsg( server, TX_PRIVMSG, who, message);
             free( message );
@@ -174,7 +157,6 @@ void botCmdSeen( IRCServer_t *server, IRCChannel_t *channel, char *who,
     static char    *huh = "Huh? Who?";
     char           *chan;
     bool            privmsg = false;
-    int             len;
 
     if( !server || !msg ) {
         return;
@@ -183,33 +165,16 @@ void botCmdSeen( IRCServer_t *server, IRCChannel_t *channel, char *who,
     if( !channel ) {
         privmsg = true;
 
-        if( msg ) {
-            message = strstr( msg, " " );
-        } else {
-            message = NULL;
-        }
-
+        chan = CommandLineParse( msg, &message );
         if( !message ) {
             transmitMsg( server, TX_PRIVMSG, who, 
                          "You must specify \"seen #channel nick\"");
             return;
         }
 
-        len = message - msg;
-        chan = strndup(msg, len);
-        chan[len] = '\0';
-
-        msg += (len + 1);
-        while( *msg == ' ' ) {
-            msg++;
-        }
-        if( *msg == '\0' ) {
-            msg = NULL;
-        }
-
         channel = FindChannel(server, chan);
         if( !channel ) {
-            message = (char *)malloc(22 + len);
+            message = (char *)malloc(22 + strlen(chan));
             sprintf( message, "Can't find channel %s", chan );
             transmitMsg( server, TX_PRIVMSG, who, message);
             free( message );

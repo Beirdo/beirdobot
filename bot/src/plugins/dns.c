@@ -158,7 +158,6 @@ void *dns_thread(void *arg)
     char                   *host;
     char                   *line;
     char                   *command;
-    int                     len;
     char                   *response;
     static char            *type_ptr = "PTR";
 
@@ -181,10 +180,11 @@ void *dns_thread(void *arg)
 
         /* Parse the command string */
         while( command ) {
-            line = strstr( command, " " );
+            command = CommandLineParse( command, &line );
             if( !line ) {
                 if( *command == '@' ) {
-                    dnsserver = &command[1];
+                    dnsserver = strdup(&command[1]);
+                    free(command);
                 } else if( !host ) {
                     /* Only the host */
                     dnsserver = NULL;
@@ -196,17 +196,9 @@ void *dns_thread(void *arg)
                 continue;
             }
 
-            /* At least one word */
-            len = line - command;
-            /* Strip off the spaces between words */
-            for( ; *line && *line == ' '; line++ );
-
-            command[len] = '\0';
-
             if( *command == '@' ) {
-                command++;
-                len--;
-                dnsserver = command;
+                dnsserver = strdup(&command[1]);
+                free( command );
             } else if ( !strcasecmp( command, "-x" ) ) {
                 type = command;
             } else if ( !host ) {
@@ -216,7 +208,7 @@ void *dns_thread(void *arg)
             }
 
             command = line;
-            if( !*command ) {
+            if( command && !*command ) {
                 command = NULL;
             }
         }
