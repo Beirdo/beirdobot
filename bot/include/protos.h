@@ -89,6 +89,8 @@ int botCmd_parse( IRCServer_t *server, IRCChannel_t *channel, char *who,
                   char *msg );
 void botCmd_remove( char *command );
 char *botCmdDepthFirst( BalancedBTreeItem_t *item, bool filterPlugins );
+char *CommandLineParse( char *msg, char **pLine );
+
 void send_notice( IRCChannel_t *channel, char *nick );
 void notify_start(void);
 
