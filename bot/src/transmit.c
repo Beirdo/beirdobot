@@ -79,8 +79,8 @@ void *transmit_thread(void *arg)
             sendTime = now.tv_sec;
         }
 
-        if( sendTime - now.tv_sec > 8 ) {
-            ts.tv_sec = sendTime - now.tv_sec - 8;
+        if( sendTime - now.tv_sec > server->floodMaxTime ) {
+            ts.tv_sec = sendTime - now.tv_sec - server->floodMaxTime;
             ts.tv_nsec = 0L;
 
             LogPrint( LOG_NOTICE, "Delaying %ld seconds", ts.tv_sec );
@@ -136,7 +136,7 @@ void *transmit_thread(void *arg)
 
         if( msg ) {
             BN_SendMessage( &server->ircInfo, msg, BN_LOW_PRIORITY );
-            sendTime += 2 + (strlen(msg) / 120);
+            sendTime += server->floodInterval + (strlen(msg) / 120);
         }
 
         gettimeofday( &now, NULL );

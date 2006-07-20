@@ -162,7 +162,9 @@ void db_load_servers(void)
     MYSQL_ROW       row;
 
     res = db_query( "SELECT `serverid`, `server`, `port`, `password`, `nick`, "
-                    "`username`, `realname`, `nickserv`, `nickservmsg` "
+                    "`username`, `realname`, `nickserv`, `nickservmsg`, "
+                    "`floodInterval`, `floodMaxTime`, `floodBuffer`, "
+                    "`floodMaxLine` "
                     "FROM `servers` ORDER BY `serverid`" );
 
     if( !res || !(count = mysql_num_rows(res)) ) {
@@ -189,6 +191,18 @@ void db_load_servers(void)
         server->realname        = strdup(row[6]);
         server->nickserv        = strdup(row[7]);
         server->nickservmsg     = strdup(row[8]);
+        server->floodInterval   = atoi(row[9]);
+        server->floodMaxTime    = atoi(row[10]);
+        server->floodBuffer     = atoi(row[11]);
+        server->floodMaxLine    = atoi(row[12]);
+
+        if( server->floodInterval <= 0 ) {
+            server->floodInterval = 1;
+        }
+
+        if( server->floodMaxTime < 4 ) {
+            server->floodMaxTime = 4;
+        }
 
         len = strlen(server->server) + strlen(server->nick) + 15;
         server->threadName      = (char *)malloc(len) ;

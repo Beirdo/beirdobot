@@ -104,6 +104,14 @@ static SchemaUpgrade_t schemaUpgrade[CURRENT_SCHEMA] = {
         "ALTER TABLE `servers` ADD `password` VARCHAR( 255 ) NOT NULL "
         "AFTER `port` ;\n",
         NULL
+    },
+    /* 8 -> 9 */
+    {
+        "ALTER TABLE `servers` ADD `floodInterval` INT DEFAULT '2' NOT NULL ,\n"
+        "ADD `floodMaxTime` INT DEFAULT '8' NOT NULL ,\n"
+        "ADD `floodBuffer` INT DEFAULT '2000' NOT NULL ,\n"
+        "ADD `floodMaxLine` INT DEFAULT '256' NOT NULL ;\n",
+        NULL
     }
 };
 

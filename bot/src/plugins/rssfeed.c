@@ -397,8 +397,17 @@ void *rssfeed_thread(void *arg)
             sprintf( message, "RSS: [%s] \"%s\" at %s", feed->prefix,
                               itemData->title, buf );
             if( itemData->link ) {
-                sprintf( buf, " (%s)", itemData->link );
-                strcat( message, buf );
+                if( strlen(message) + strlen(itemData->link) + 3  <=
+                    feed->server->floodMaxLine ) {
+                    sprintf( buf, " (%s)", itemData->link );
+                    strcat( message, buf );
+                } else {
+                    LoggedChannelMessage( feed->server, feed->channel, 
+                                          message );
+                    LogPrint( LOG_NOTICE, "RSS: feed %d: (%d) %s", 
+                              feed->feedId, strlen(message), message );
+                    sprintf( message, "     (%s)", itemData->link );
+                }
             }
 
             LoggedChannelMessage( feed->server, feed->channel, message );
