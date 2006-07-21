@@ -57,6 +57,7 @@ typedef struct {
     int                 floodMaxTime;
     int                 floodBuffer;
     int                 floodMaxLine;
+    LinkedList_t       *floodList;
     BN_TInfo            ircInfo;
     pthread_t           threadId;
     char               *threadName;
@@ -202,6 +203,11 @@ typedef struct {
     char           *arguments;
 } PluginDef_t;
 
+typedef struct {
+    LinkedListItem_t    item;
+    time_t              timeWake;
+    int                 bytes;
+} FloodListItem_t;
 
 #endif
 

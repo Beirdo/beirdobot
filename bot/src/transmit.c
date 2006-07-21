@@ -51,6 +51,10 @@ typedef struct {
     char       *message;
 } TransmitItem_t;
 
+int floodSize( IRCServer_t *server );
+time_t floodReady( IRCServer_t *server, int bytes );
+void floodCleanup( IRCServer_t *server );
+
 void *transmit_thread(void *arg)
 {
     TransmitItem_t     *item;
@@ -61,6 +65,9 @@ void *transmit_thread(void *arg)
     time_t              sendTime;
     char               *msg;
     int                 len;
+    FloodListItem_t    *floodItem;
+    int                 size;
+    time_t              time;
 
     server   = (IRCServer_t *)arg;
     sendTime = 0;
@@ -135,13 +142,44 @@ void *transmit_thread(void *arg)
         }
 
         if( msg ) {
-            BN_SendMessage( &server->ircInfo, msg, BN_LOW_PRIORITY );
-            sendTime += server->floodInterval + (strlen(msg) / 120);
-        }
+            len = strlen(msg);
 
-        gettimeofday( &now, NULL );
-        LogPrint( LOG_NOTICE, "Server %d: Sendtime: %ld/%ld", server->serverId,
-                              sendTime, sendTime - now.tv_sec );
+            floodCleanup( server );
+            size = floodSize( server );
+            if( size + len >= server->floodBuffer ) {
+                time = floodReady( server, 
+                                   size + len + 1 - server->floodBuffer );
+                gettimeofday( &now, NULL );
+                if( now.tv_sec < time ) {
+                    ts.tv_sec = time - now.tv_sec;
+                    ts.tv_nsec = 0L;
+
+                    LogPrint( LOG_NOTICE, 
+                              "Delaying %ld seconds to avoid flood (%d used)", 
+                              ts.tv_sec, size );
+                    nanosleep( &ts, NULL );
+                    floodCleanup( server );
+                }
+            }
+            
+            BN_SendMessage( &server->ircInfo, msg, BN_LOW_PRIORITY );
+            sendTime += server->floodInterval + (len / 120);
+
+            gettimeofday( &now, NULL );
+            LogPrint( LOG_NOTICE, "Server %d: Sendtime: %ld/%ld", 
+                                  server->serverId, sendTime, 
+                                  sendTime - now.tv_sec );
+
+            floodItem = (FloodListItem_t *)malloc(sizeof(FloodListItem_t));
+
+            floodItem->timeWake = now.tv_sec + server->floodInterval +
+                                  (len / 120);
+            floodItem->bytes    = len;
+
+            LinkedListAdd( server->floodList, (LinkedListItem_t *)floodItem,
+                           UNLOCKED, AT_TAIL );
+
+        }
 
         if( item->message ) {
             free( item->message );
@@ -177,6 +215,79 @@ void transmitMsg( IRCServer_t *server, TxType_t type, char *channel,
     }
 
     QueueEnqueueItem( server->txQueue, item );
+}
+
+int floodSize( IRCServer_t *server )
+{
+    LinkedListItem_t   *item;
+    FloodListItem_t    *flood;
+    int                 total = 0;
+
+    LinkedListLock( server->floodList );
+
+    for( item = server->floodList->head; item ; item = item->next ) {
+        flood = (FloodListItem_t *)item;
+        total += flood->bytes;
+    }
+
+    LinkedListUnlock( server->floodList );
+
+    return( total );
+}
+
+time_t floodReady( IRCServer_t *server, int bytes )
+{
+    LinkedListItem_t   *item;
+    FloodListItem_t    *flood;
+    bool                found;
+    struct timeval      now;
+    time_t              time;
+
+    LinkedListLock( server->floodList );
+
+    gettimeofday( &now, NULL );
+    time = now.tv_sec;
+
+    for( item = server->floodList->head, found = false; item && !found; 
+        item = item->next ) {
+        flood = (FloodListItem_t *)item;
+
+        time  = flood->timeWake;
+        if( flood->bytes >= bytes ) {
+            found = true;
+        }
+        bytes -= flood->bytes;
+    }
+
+    LinkedListUnlock( server->floodList );
+
+    return( time );
+}
+
+void floodCleanup( IRCServer_t *server )
+{
+    LinkedListItem_t   *item;
+    LinkedListItem_t   *prev;
+    FloodListItem_t    *flood;
+    struct timeval      now;
+    time_t              time;
+
+    LinkedListLock( server->floodList );
+
+    gettimeofday( &now, NULL );
+    time = now.tv_sec;
+
+    for( prev = NULL, item = server->floodList->head; item ; 
+         prev = item, item = (prev ? item->next : server->floodList->head ) ) {
+        flood = (FloodListItem_t *)item;
+
+        if( flood->timeWake <= time ) {
+            LinkedListRemove( server->floodList, item, LOCKED );
+            item = prev;
+        }
+    }
+
+    LinkedListUnlock( server->floodList );
 }
 
 /*

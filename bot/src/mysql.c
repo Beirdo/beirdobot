@@ -204,6 +204,8 @@ void db_load_servers(void)
             server->floodMaxTime = 4;
         }
 
+        server->floodList = LinkedListCreate();
+
         len = strlen(server->server) + strlen(server->nick) + 15;
         server->threadName      = (char *)malloc(len) ;
         sprintf( server->threadName, "thread_%s@%s:%d", server->nick,
