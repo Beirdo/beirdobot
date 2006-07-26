@@ -271,9 +271,17 @@ void ProcOnWho(BN_PInfo I, const char Channel[], const char *Info[],
 {
     int             i;
     IRCChannel_t   *channel;
+    IRCServer_t    *server;
     char           *nick;
 
-    channel = FindChannel((IRCServer_t *)I->User, Channel);
+    server = (IRCServer_t *)I->User;
+    channel = FindChannel(server, Channel);
+
+    if( !channel ) {
+        LogPrint( LOG_NOTICE, "Channel %s on %s not found in ProcOnWho!",
+                              Channel, server->server );
+        return;
+    }
 
     if( verbose ) {
         LogPrint( LOG_DEBUG, "Who infos for channel (%s)", Channel);
