@@ -31,7 +31,7 @@ void BN_Register(BN_PInfo I,const char *Nick,const char *UserName,const char *Re
 
   I->Nick[0] = 0;
   BN_SendNickMessage(I,Nick);
-  snprintf(buf,sizeof(buf),"%s 0 0 : %s",UserName,RealName);
+  snprintf(buf,sizeof(buf),"%s 0 0 :%s",UserName,RealName);
   BN_SendMessage(I,BN_MakeMessage(NULL,"USER",buf),BN_HIGH_PRIORITY);
 }
 
