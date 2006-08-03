@@ -128,7 +128,7 @@ void *transmit_thread(void *arg)
             break;
         case TX_REGISTER:
             /* channel -> username, message -> realname */
-            snprintf(string, MAX_STRING_LENGTH, "%s 0 0 : %s",
+            snprintf(string, MAX_STRING_LENGTH, "%s 0 0 :%s",
                      item->channel, item->message);
             msg = BN_MakeMessage(NULL, "USER", string);
             break;
