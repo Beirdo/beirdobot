@@ -393,9 +393,9 @@ void *rssfeed_thread(void *arg)
             pubTime = itemData->pubTime;
 
             localtime_r( &pubTime, &tm );
-            strftime( buf, sizeof(buf), "%d %b %Y %H:%M %z (%Z)", &tm );
-            sprintf( message, "RSS: [%s] \"%s\" at %s", feed->prefix,
-                              itemData->title, buf );
+            strftime( buf, sizeof(buf), "%H:%M %d %b %Y %z (%Z)", &tm );
+            sprintf( message, "[%s] at %s \"%s\"", feed->prefix, buf,
+                              itemData->title );
             if( itemData->link ) {
                 if( strlen(message) + strlen(itemData->link) + 3  <=
                     feed->server->floodMaxLine ) {
@@ -406,7 +406,7 @@ void *rssfeed_thread(void *arg)
                                           message );
                     LogPrint( LOG_NOTICE, "RSS: feed %d: (%d) %s", 
                               feed->feedId, strlen(message), message );
-                    sprintf( message, "     (%s)", itemData->link );
+                    sprintf( message, "  (%s)", itemData->link );
                 }
             }
 
