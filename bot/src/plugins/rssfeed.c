@@ -233,6 +233,7 @@ void *rssfeed_thread(void *arg)
     bool                    done;
     long                    localoffset;
     struct timespec         ts;
+    char                   *cr;
 
     pthread_mutex_lock( &shutdownMutex );
     db_thread_init();
@@ -345,6 +346,12 @@ void *rssfeed_thread(void *arg)
                     itemData = (RssItem_t *)malloc(sizeof(RssItem_t));
                     itemData->feed    = feed;
                     itemData->pubTime = pubTime;
+                    if( rssItem->title ) {
+                        while( (cr = strchr(rssItem->title, '\n') ) ||
+                               (cr = strchr(rssItem->title, '\r') ) ) {
+                            *cr = ' ';
+                        }
+                    }
                     itemData->title   = (rssItem->title ? 
                                          strdup(rssItem->title) : NULL);
                     itemData->link    = (rssItem->link ? 
