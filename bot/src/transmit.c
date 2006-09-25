@@ -181,6 +181,10 @@ void *transmit_thread(void *arg)
 
         }
 
+        if( item->channel ) {
+            free( item->channel );
+        }
+
         if( item->message ) {
             free( item->message );
         }
@@ -207,7 +211,12 @@ void transmitMsg( IRCServer_t *server, TxType_t type, char *channel,
     }
 
     item->type    = type;
-    item->channel = channel;
+    if( channel ) {
+        item->channel = strdup( channel );
+    } else {
+        item->channel = NULL;
+    }
+
     if( message ) {
         item->message = strdup( message );
     } else {
