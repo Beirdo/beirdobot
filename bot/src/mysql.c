@@ -57,6 +57,7 @@ MYSQL_RES *db_query( char *format, ... );
 void db_setup(void)
 {
     MysqlData_t    *item;
+    my_bool         my_true;
 
     item = (MysqlData_t *)malloc(sizeof(MysqlData_t));
     if( !item ) {
@@ -89,6 +90,14 @@ void db_setup(void)
         mysql_error(item->sql);
         exit(1);
     }
+
+#ifdef MYSQL_OPT_RECONNECT
+    /* Only defined in MySQL 5.0.13 and above, before that, it was always on */
+    my_true = TRUE;
+    mysql_options( item->sql, MYSQL_OPT_RECONNECT, &my_true );
+#else
+    (void)my_true;
+#endif
 }
 
 void db_thread_init( void )
