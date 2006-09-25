@@ -98,6 +98,8 @@ void db_setup(void)
 #else
     (void)my_true;
 #endif
+
+    LogPrint( LOG_CRIT, "MySQL version %s", mysql_get_server_info(item->sql) );
 }
 
 void db_thread_init( void )
