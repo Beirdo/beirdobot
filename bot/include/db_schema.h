@@ -46,7 +46,7 @@ static char *defSchema[] = {
 "  `cmdChar` char(1) NOT NULL default '',\n"
 "  PRIMARY KEY  (`chanid`),\n"
 "  KEY `serverChan` (`serverid`,`channel`)\n"
-") TYPE=MyISAM PACK_KEYS=1;\n",
+") TYPE=MyISAM PACK_KEYS=1\n",
 
 "CREATE TABLE `irclog` (\n"
 "  `msgid` int(11) NOT NULL auto_increment,\n"
@@ -59,7 +59,7 @@ static char *defSchema[] = {
 "  KEY `timeChan` (`chanid`,`timestamp`),\n"
 "  KEY `messageType` (`msgtype`,`chanid`,`timestamp`),\n"
 "  FULLTEXT KEY `searchtext` (`nick`,`message`)\n"
-") TYPE=MyISAM;\n",
+") TYPE=MyISAM\n",
 
 "CREATE TABLE `nicks` (\n"
 "  `chanid` int(11) NOT NULL default '0',\n"
@@ -68,7 +68,7 @@ static char *defSchema[] = {
 "  `lastnotice` int(11) NOT NULL default '0',\n"
 "  `present` int(11) NOT NULL default '0',\n"
 "  PRIMARY KEY  (`chanid`,`nick`)\n"
-") TYPE=MyISAM;\n",
+") TYPE=MyISAM\n",
 
 "CREATE TABLE `plugins` (\n"
 "  `pluginName` varchar(64) NOT NULL default '',\n"
@@ -76,7 +76,7 @@ static char *defSchema[] = {
 "  `preload` int(11) NOT NULL default '0',\n"
 "  `arguments` varchar(255) NOT NULL default '',\n"
 "  PRIMARY KEY  (`pluginName`)\n"
-") TYPE=MyISAM;\n",
+") TYPE=MyISAM\n",
 
 "CREATE TABLE `servers` (\n"
 "  `serverid` int(11) NOT NULL auto_increment,\n"
@@ -94,13 +94,13 @@ static char *defSchema[] = {
 "  `floodMaxLine` int(11) NOT NULL default '256',\n"
 "  PRIMARY KEY  (`serverid`),\n"
 "  KEY `serverNick` (`server`,`port`,`nick`)\n"
-") TYPE=MyISAM PACK_KEYS=0;\n",
+") TYPE=MyISAM PACK_KEYS=0\n",
 
 "CREATE TABLE `settings` (\n"
 "  `name` varchar(80) NOT NULL default '',\n"
 "  `value` varchar(255) NOT NULL default '',\n"
 "  PRIMARY KEY  (`name`)\n"
-") TYPE=MyISAM;\n",
+") TYPE=MyISAM\n",
 
 "CREATE TABLE `nickhistory` (\n"
 "  `chanid` int(11) NOT NULL default '0',\n"
@@ -108,7 +108,7 @@ static char *defSchema[] = {
 "  `histType` int(11) NOT NULL default '0',\n"
 "  `timestamp` int(11) NOT NULL default '0',\n"
 "  PRIMARY KEY  (`chanid`,`histType`,`timestamp`,`nick`)\n"
-") TYPE=MyISAM;\n",
+") TYPE=MyISAM\n",
 
 "CREATE TABLE `userauth` (\n"
 " `username` VARCHAR( 64 ) NOT NULL ,\n"
@@ -117,13 +117,13 @@ static char *defSchema[] = {
 " `key` VARCHAR( 16 ) NOT NULL ,\n"
 " `keyIndex` INT NOT NULL ,\n"
 " PRIMARY KEY ( `username` )\n"
-") TYPE = MYISAM ;\n",
+") TYPE = MYISAM\n",
 
 "CREATE TABLE `plugin_trac` (\n"
 " `chanid` INT NOT NULL ,\n"
 " `url` VARCHAR( 255 ) NOT NULL ,\n"
 " PRIMARY KEY ( `chanid` )\n"
-") TYPE = MYISAM ;\n"
+") TYPE = MYISAM\n"
 };
 static int defSchemaCount = NELEMENTS(defSchema);
 

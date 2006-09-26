@@ -54,13 +54,13 @@ static SchemaUpgrade_t schemaUpgrade[CURRENT_SCHEMA] = {
         "  `histType` int(11) NOT NULL default '0',\n"
         "  `timestamp` int(11) NOT NULL default '0',\n"
         "  PRIMARY KEY  (`chanid`,`nick`,`histType`,`timestamp`)\n"
-        ") TYPE=MyISAM;\n",
+        ") TYPE=MyISAM\n",
         NULL
     },
     /* 2 -> 3 */
     {
         "ALTER TABLE `nickhistory` DROP PRIMARY KEY ,\n"
-        "ADD PRIMARY KEY ( `chanid` , `histType` , `timestamp` , `nick` );\n",
+        "ADD PRIMARY KEY ( `chanid` , `histType` , `timestamp` , `nick` )\n",
         NULL
     },
     /* 3 -> 4 */
@@ -87,7 +87,7 @@ static SchemaUpgrade_t schemaUpgrade[CURRENT_SCHEMA] = {
         " `key` VARCHAR( 16 ) NOT NULL ,\n"
         " `keyIndex` INT NOT NULL ,\n"
         " PRIMARY KEY ( `username` )\n"
-        ") TYPE = MYISAM ;\n",
+        ") TYPE = MYISAM\n",
         NULL
     },
     /* 6 -> 7 */
@@ -96,13 +96,13 @@ static SchemaUpgrade_t schemaUpgrade[CURRENT_SCHEMA] = {
         " `chanid` INT NOT NULL ,\n"
         " `url` VARCHAR( 255 ) NOT NULL ,\n"
         " PRIMARY KEY ( `chanid` )\n"
-        ") TYPE = MYISAM ;\n",
+        ") TYPE = MYISAM\n",
         NULL
     },
     /* 7 -> 8 */
     {
         "ALTER TABLE `servers` ADD `password` VARCHAR( 255 ) NOT NULL "
-        "AFTER `port` ;\n",
+        "AFTER `port`\n",
         NULL
     },
     /* 8 -> 9 */
@@ -110,7 +110,7 @@ static SchemaUpgrade_t schemaUpgrade[CURRENT_SCHEMA] = {
         "ALTER TABLE `servers` ADD `floodInterval` INT DEFAULT '2' NOT NULL ,\n"
         "ADD `floodMaxTime` INT DEFAULT '8' NOT NULL ,\n"
         "ADD `floodBuffer` INT DEFAULT '2000' NOT NULL ,\n"
-        "ADD `floodMaxLine` INT DEFAULT '256' NOT NULL ;\n",
+        "ADD `floodMaxLine` INT DEFAULT '256' NOT NULL\n",
         NULL
     }
 };
