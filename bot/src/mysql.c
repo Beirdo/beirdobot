@@ -900,7 +900,7 @@ void db_check_plugins( PluginDef_t *plugins, int count )
                                   plugin->pluginName, 
                                   (plugin->preload ? "enabled" : "disabled") );
 
-            res = db_query( "INSERT INTO `pluginName` ( `pluginName`, "
+            res = db_query( "INSERT INTO `plugins` ( `pluginName`, "
                             "`libName`, `preload`, `arguments`) VALUES "
                             "('%s', '%s', %d, '%s')", plugin->pluginName,
                             plugin->libName, plugin->preload, 
