@@ -158,6 +158,7 @@ void *mysql_thread( void *arg ) {
     int                 i;
 
     LogPrintNoArg( LOG_NOTICE, "Starting MySQL thread" );
+    mysql_thread_init();
 
     while( !GlobalAbort ) {
         item = (QueryItem_t *)QueueDequeueItem( QueryQ, -1 );
@@ -422,6 +423,7 @@ MYSQL_RES *db_query( const char *query, MYSQL_BIND *args, int arg_count )
         args++;
     } while( insert );
 
+    LogPrint( LOG_DEBUG, "Query: %s", sqlbuf );
     mysql_query(item->sql, sqlbuf);
     res = mysql_store_result(item->sql);
 

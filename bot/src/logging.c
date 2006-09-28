@@ -68,7 +68,7 @@ typedef struct
 
 
 /* INTERNAL MACRO DEFINITIONS */
-#define LOGLINE_MAX 256
+#define LOGLINE_MAX 1024
 #define DEBUG_FILE "/var/log/beirdobot/debug.log"
 
 /* INTERNAL FUNCTION PROTOTYPES */

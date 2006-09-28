@@ -89,6 +89,7 @@ void botCmdSearch( IRCServer_t *server, IRCChannel_t *channel, char *who,
                    char *msg )
 {
     char           *message;
+    char           *search;
     char           *chan;
     bool            privmsg = false;
     struct timeval  start, end;
@@ -107,6 +108,8 @@ void botCmdSearch( IRCServer_t *server, IRCChannel_t *channel, char *who,
             return;
         }
 
+        search = message;
+
         channel = FindChannel(server, chan);
         if( !channel ) {
             message = (char *)malloc(22 + strlen(chan));
@@ -117,6 +120,8 @@ void botCmdSearch( IRCServer_t *server, IRCChannel_t *channel, char *who,
             return;
         }
         free( chan );
+    } else {
+        search = msg;
     }
 
     if( !strcmp( channel->url, "" ) ) {
@@ -124,12 +129,13 @@ void botCmdSearch( IRCServer_t *server, IRCChannel_t *channel, char *who,
         return;
     }
 
-    message = (char *)malloc(32 + strlen(msg) + strlen(channel->channel) );
-    sprintf( message, "Searching %s for \"%s\"...", channel->channel, msg );
+
+    message = (char *)malloc(32 + strlen(search) + strlen(channel->channel) );
+    sprintf( message, "Searching %s for \"%s\"...", channel->channel, search );
     transmitMsg( server, TX_PRIVMSG, who, message );
 
     gettimeofday( &start, NULL );
-    db_search_text( server, channel, who, msg );
+    db_search_text( server, channel, who, search );
     gettimeofday( &end, NULL );
 
     end.tv_sec  -= start.tv_sec;
@@ -327,7 +333,6 @@ void result_search_text( MYSQL_RES *res, MYSQL_BIND *input, void *args )
     who = (char *)input[9].buffer;
 
     if( !res || !(count = mysql_num_rows(res)) ) {
-        mysql_free_result(res);
         transmitMsg( server, TX_PRIVMSG, who, none );
         return;
     }
@@ -354,7 +359,6 @@ void result_search_text( MYSQL_RES *res, MYSQL_BIND *input, void *args )
                                                score );
         transmitMsg( server, TX_PRIVMSG, who, value);
     }
-    mysql_free_result(res);
 }
 
 

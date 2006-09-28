@@ -296,6 +296,7 @@ void botCmdDig( IRCServer_t *server, IRCChannel_t *channel, char *who,
         return;
     }
 
+    LogPrint( LOG_DEBUG, "DIG: %s %s", who, msg );
     item->server = server;
     item->channel = channel;
     item->nick = who;
@@ -304,6 +305,8 @@ void botCmdDig( IRCServer_t *server, IRCChannel_t *channel, char *who,
     if( !GlobalAbort && !threadAbort ) {
         QueueEnqueueItem( DnsQ, item );
     }
+    
+    LogPrintNoArg( LOG_DEBUG, "Queued" );
 }
 
 char *botHelpDig( void )

@@ -671,7 +671,6 @@ static void db_load_rssfeeds( void )
 
     db_queue_query( 0, rssfeedQueryTable, NULL, 0, result_load_rssfeeds,
                     NULL, mutex );
-    pthread_mutex_lock( mutex );
     pthread_mutex_unlock( mutex );
     pthread_mutex_destroy( mutex );
     free( mutex );
@@ -690,7 +689,6 @@ static void result_load_rssfeeds( MYSQL_RES *res, MYSQL_BIND *input,
     char                   *message;
 
     if( !res || !(count = mysql_num_rows(res)) ) {
-        mysql_free_result(res);
         return;
     }
 
@@ -733,11 +731,6 @@ static void result_load_rssfeeds( MYSQL_RES *res, MYSQL_BIND *input,
                               "timeout %d", data->feedId, data->prefix, 
                               data->serverId, data->chanId, data->timeout );
     }
-    mysql_free_result(res);
-
-    message = botRssfeedDump( rssfeedActiveTree->root );
-    LogPrint( LOG_NOTICE, "RSS: %s", message );
-    free( message );
 
     BalancedBTreeAdd( rssfeedTree, NULL, LOCKED, TRUE );
     BalancedBTreeAdd( rssfeedActiveTree, NULL, LOCKED, TRUE );
