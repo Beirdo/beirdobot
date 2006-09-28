@@ -56,29 +56,42 @@ static char ident[] _UNUSED_ =
 #define DATEMSK_FILE DATEMSK_PATH "/datemsk.txt"
 #define CURRENT_SCHEMA_RSSFEED 2
 #define MAX_SCHEMA_QUERY 100
-typedef char *SchemaUpgrade_t[MAX_SCHEMA_QUERY];
+typedef QueryTable_t SchemaUpgrade_t[MAX_SCHEMA_QUERY];
 
-static char *defSchema[] = {
-"CREATE TABLE `plugin_rssfeed` (\n"
-"    `feedid` INT NOT NULL AUTO_INCREMENT ,\n"
-"    `chanid` INT NOT NULL ,\n"
-"    `url` VARCHAR( 255 ) NOT NULL ,\n"
-"    `prefix` VARCHAR( 64 ) NOT NULL ,\n"
-"    `timeout` INT NOT NULL ,\n"
-"    `lastpost` INT NOT NULL ,\n"
-"    `feedoffset` INT NOT NULL ,\n"
-"    PRIMARY KEY ( `feedid` )\n"
-") TYPE = MYISAM ;\n"
+static QueryTable_t defSchema[] = {
+  { "CREATE TABLE `plugin_rssfeed` (\n"
+    "    `feedid` INT NOT NULL AUTO_INCREMENT ,\n"
+    "    `chanid` INT NOT NULL ,\n"
+    "    `url` VARCHAR( 255 ) NOT NULL ,\n"
+    "    `prefix` VARCHAR( 64 ) NOT NULL ,\n"
+    "    `timeout` INT NOT NULL ,\n"
+    "    `lastpost` INT NOT NULL ,\n"
+    "    `feedoffset` INT NOT NULL ,\n"
+    "    PRIMARY KEY ( `feedid` )\n"
+    ") TYPE = MYISAM\n", NULL, NULL, FALSE }
 };
 static int defSchemaCount = NELEMENTS(defSchema);
 
 static SchemaUpgrade_t schemaUpgrade[CURRENT_SCHEMA_RSSFEED] = {
     /* 0 -> 1 */
-    { NULL },
+    { { NULL, NULL, NULL, FALSE } },
     /* 1 -> 2 */
-    { "ALTER TABLE `plugin_rssfeed` ADD `feedoffset` INT NOT NULL ;",
-      NULL }
+    { { "ALTER TABLE `plugin_rssfeed` ADD `feedoffset` INT NOT NULL ;", NULL,
+        NULL, FALSE },
+      { NULL, NULL, NULL, FALSE } }
 };
+
+static QueryTable_t rssfeedQueryTable[] = {
+    /* 0 */
+    { "SELECT a.`feedid`, a.`chanid`, b.`serverid`, a.`url`, a.`prefix`, "
+      "a.`timeout`, a.`lastpost`, a.`feedoffset` FROM `plugin_rssfeed` AS a, "
+      "`channels` AS b WHERE a.`chanid` = b.`chanid` ORDER BY a.`feedid` ASC",
+      NULL, NULL, FALSE },
+    /* 1 */
+    { "UPDATE `plugin_rssfeed` SET `lastpost` = ? WHERE `feedid` = ?", NULL,
+      NULL, FALSE }
+};
+
 
 typedef struct {
     int             feedId;
@@ -103,13 +116,14 @@ typedef struct {
 } RssItem_t;
 
 /* INTERNAL FUNCTION PROTOTYPES */
-extern MYSQL_RES *db_query( char *format, ... );
 void botCmdRssfeed( IRCServer_t *server, IRCChannel_t *channel, char *who, 
                     char *msg );
 char *botHelpRssfeed( void );
 void *rssfeed_thread(void *arg);
 static int db_upgrade_schema( int current, int goal );
 static void db_load_rssfeeds( void );
+static void result_load_rssfeeds( MYSQL_RES *res, MYSQL_BIND *input, 
+                                  void *args );
 void db_update_lastpost( int feedId, int lastPost );
 void rssfeedFindUnconflictingTime( BalancedBTree_t *tree, time_t *key );
 char *botRssfeedDepthFirst( BalancedBTreeItem_t *item, IRCServer_t *server,
@@ -615,7 +629,6 @@ char *botHelpRssfeed( void )
 static int db_upgrade_schema( int current, int goal )
 {
     int                 i;
-    MYSQL_RES          *res;
 
     if( current >= goal ) {
         return( current );
@@ -628,8 +641,7 @@ static int db_upgrade_schema( int current, int goal )
         LogPrint( LOG_ERR, "Initializing RSSfeed database to schema version %d",
                   CURRENT_SCHEMA_RSSFEED );
         for( i = 0; i < defSchemaCount; i++ ) {
-            res = db_query( defSchema[i] );
-            mysql_free_result(res);
+            db_queue_query( i, defSchema, NULL, 0, NULL, NULL, NULL );
         }
         db_set_setting("dbSchemaRssfeed", "%d", CURRENT_SCHEMA_RSSFEED);
         return( CURRENT_SCHEMA_RSSFEED );
@@ -637,9 +649,8 @@ static int db_upgrade_schema( int current, int goal )
 
     LogPrint( LOG_ERR, "Upgrading RSSfeed database from schema version %d to "
                        "%d", current, current+1 );
-    for( i = 0; schemaUpgrade[current][i]; i++ ) {
-        res = db_query( schemaUpgrade[current][i] );
-        mysql_free_result(res);
+    for( i = 0; schemaUpgrade[current][i].queryPattern; i++ ) {
+        db_queue_query( i, schemaUpgrade[current], NULL, 0, NULL, NULL, NULL );
     }
 
     current++;
@@ -650,9 +661,27 @@ static int db_upgrade_schema( int current, int goal )
 
 static void db_load_rssfeeds( void )
 {
+    pthread_mutex_t        *mutex;
+
+    rssfeedTree = BalancedBTreeCreate( BTREE_KEY_INT );
+    rssfeedActiveTree = BalancedBTreeCreate( BTREE_KEY_INT );
+
+    mutex = (pthread_mutex_t *)malloc(sizeof(pthread_mutex_t));
+    pthread_mutex_init( mutex, NULL );
+
+    db_queue_query( 0, rssfeedQueryTable, NULL, 0, result_load_rssfeeds,
+                    NULL, mutex );
+    pthread_mutex_lock( mutex );
+    pthread_mutex_unlock( mutex );
+    pthread_mutex_destroy( mutex );
+    free( mutex );
+}
+
+static void result_load_rssfeeds( MYSQL_RES *res, MYSQL_BIND *input, 
+                                  void *args )
+{
     int                     count;
     int                     i;
-    MYSQL_RES              *res;
     MYSQL_ROW               row;
     RssFeed_t              *data;
     BalancedBTreeItem_t    *item;
@@ -660,14 +689,6 @@ static void db_load_rssfeeds( void )
     time_t                  nextpoll;
     char                   *message;
 
-    rssfeedTree = BalancedBTreeCreate( BTREE_KEY_INT );
-    rssfeedActiveTree = BalancedBTreeCreate( BTREE_KEY_INT );
-
-    res = db_query( "SELECT a.`feedid`, a.`chanid`, b.`serverid`, a.`url`, "
-                    "a.`prefix`, a.`timeout`, a.`lastpost`, a.`feedoffset` "
-                    "FROM `plugin_rssfeed` AS a, `channels` AS b "
-                    "WHERE a.`chanid` = b.`chanid` "
-                    "ORDER BY a.`feedid` ASC" );
     if( !res || !(count = mysql_num_rows(res)) ) {
         mysql_free_result(res);
         return;
@@ -730,13 +751,17 @@ static void db_load_rssfeeds( void )
 }
 
 void db_update_lastpost( int feedId, int lastPost ) {
-    MYSQL_RES              *res;
+    MYSQL_BIND         *data;
+
+    data = (MYSQL_BIND *)malloc(2 * sizeof(MYSQL_BIND));
+    memset( data, 0, 2 * sizeof(MYSQL_BIND) );
+
+    bind_numeric( &data[0], lastPost, MYSQL_TYPE_LONG );
+    bind_numeric( &data[1], feedId, MYSQL_TYPE_LONG );
 
     LogPrint( LOG_NOTICE, "RSS: feed %d: updating lastpost to %d", feedId,
                           lastPost );
-    res = db_query( "UPDATE `plugin_rssfeed` SET `lastpost` = %d "
-                    "WHERE `feedid` = %d", lastPost, feedId );
-    mysql_free_result(res);
+    db_queue_query( 1, rssfeedQueryTable, data, 2, NULL, NULL, NULL );
 }
 
 void rssfeedFindUnconflictingTime( BalancedBTree_t *tree, time_t *key )

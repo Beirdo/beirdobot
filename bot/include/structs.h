@@ -29,6 +29,7 @@
 
 #include <pthread.h>
 #include <pcre.h>
+#include <mysql.h>
 #include "botnet.h"
 #include "environment.h"
 #include "linked_list.h"
@@ -208,6 +209,72 @@ typedef struct {
     time_t              timeWake;
     int                 bytes;
 } FloodListItem_t;
+
+#if ( MYSQL_VERSION_ID < 40102 ) 
+
+#define NO_PREPARED_STATEMENTS
+
+/*
+ * From libmysqlclient14 (4.1.x) mysql_com.h
+ */
+enum enum_field_types { MYSQL_TYPE_DECIMAL, MYSQL_TYPE_TINY,
+                        MYSQL_TYPE_SHORT,  MYSQL_TYPE_LONG,
+                        MYSQL_TYPE_FLOAT,  MYSQL_TYPE_DOUBLE,
+                        MYSQL_TYPE_NULL,   MYSQL_TYPE_TIMESTAMP,
+                        MYSQL_TYPE_LONGLONG,MYSQL_TYPE_INT24,
+                        MYSQL_TYPE_DATE,   MYSQL_TYPE_TIME,
+                        MYSQL_TYPE_DATETIME, MYSQL_TYPE_YEAR,
+                        MYSQL_TYPE_NEWDATE,
+                        MYSQL_TYPE_ENUM=247,
+                        MYSQL_TYPE_SET=248,
+                        MYSQL_TYPE_TINY_BLOB=249,
+                        MYSQL_TYPE_MEDIUM_BLOB=250,
+                        MYSQL_TYPE_LONG_BLOB=251,
+                        MYSQL_TYPE_BLOB=252,
+                        MYSQL_TYPE_VAR_STRING=253,
+                        MYSQL_TYPE_STRING=254,
+                        MYSQL_TYPE_GEOMETRY=255
+};
+
+/*
+ * From libmysqlclient14 (4.1.x) mysql.h
+ */
+typedef struct st_mysql_bind
+{
+  unsigned long *length;          /* output length pointer */
+  my_bool       *is_null;         /* Pointer to null indicator */
+  void          *buffer;          /* buffer to get/put data */
+  enum enum_field_types buffer_type;    /* buffer type */
+  unsigned long buffer_length;    /* buffer length, must be set for str/binary */  
+} MYSQL_BIND;
+
+#define MYSQL_STMT void
+
+#endif
+
+struct _QueryItem_t;
+typedef void (*QueryChainFunc_t)( MYSQL_RES *res, struct _QueryItem_t *item ); 
+
+typedef struct {
+    const char         *queryPattern;
+    QueryChainFunc_t    queryChainFunc;
+    MYSQL_STMT         *queryStatement;
+    bool                queryPrepared;
+} QueryTable_t;
+
+
+typedef void (*QueryResFunc_t)( MYSQL_RES *res, MYSQL_BIND *input, void *arg );
+
+typedef struct _QueryItem_t {
+    int                 queryId;
+    QueryTable_t       *queryTable;
+    MYSQL_BIND         *queryData;
+    int                 queryDataCount;
+    QueryResFunc_t      queryCallback;
+    void               *queryCallbackArg;
+    pthread_mutex_t    *queryMutex;
+    unsigned int        querySequence;
+} QueryItem_t;
 
 #endif
 

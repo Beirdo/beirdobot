@@ -600,13 +600,15 @@ void *bot_shutdown(void *arg)
     IRCServer_t      *server;
     static char      *quitMsg = "Received SIGINT, shutting down";
 
-    LinkedListLock( ServerList );
-    for( item = ServerList->head; item; item = item->next ) {
-        server = (IRCServer_t *)item;
-        transmitMsg( server, TX_QUIT, NULL, quitMsg );
-        pthread_join( server->threadId, NULL );
+    if( ServerList ) {
+        LinkedListLock( ServerList );
+        for( item = ServerList->head; item; item = item->next ) {
+            server = (IRCServer_t *)item;
+            transmitMsg( server, TX_QUIT, NULL, quitMsg );
+            pthread_join( server->threadId, NULL );
+        }
+        LinkedListUnlock( ServerList );
     }
-    LinkedListUnlock( ServerList );
     LogPrintNoArg( LOG_NOTICE, "Shutdown all bot threads" );
     BotDone = true;
 

@@ -135,6 +135,17 @@ void *transmit_thread(void *arg);
 void transmitMsg( IRCServer_t *server, TxType_t type, char *channel, 
                   char *message );
 
+void db_queue_query( int queryId, QueryTable_t *queryTable,
+                     MYSQL_BIND *queryData, int queryDataCount,
+                     QueryResFunc_t queryCallback, void *queryCallbackArg,
+                     pthread_mutex_t *queryMutex );
+
+void bind_null_blob( MYSQL_BIND *data, void *value );
+void bind_string( MYSQL_BIND *data, char *value, enum enum_field_types type );
+void bind_numeric( MYSQL_BIND *data, long long int value, 
+                   enum enum_field_types type );
+
+
 #endif
 
 /*

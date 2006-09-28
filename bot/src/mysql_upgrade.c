@@ -41,82 +41,90 @@ static char ident[] _UNUSED_ =
     "$Id$";
 
 #define MAX_SCHEMA_QUERY 100
-typedef char *SchemaUpgrade_t[MAX_SCHEMA_QUERY];
+typedef QueryTable_t SchemaUpgrade_t[MAX_SCHEMA_QUERY];
 
 static SchemaUpgrade_t schemaUpgrade[CURRENT_SCHEMA] = {
     /* 0 -> 1 */
-    { NULL },
+    { { NULL, NULL, NULL, FALSE } },
     /* 1 -> 2 */
     {
-        "CREATE TABLE `nickhistory` (\n"
+      { "CREATE TABLE `nickhistory` (\n"
         "  `chanid` int(11) NOT NULL default '0',\n"
         "  `nick` varchar(64) NOT NULL default '',\n"
         "  `histType` int(11) NOT NULL default '0',\n"
         "  `timestamp` int(11) NOT NULL default '0',\n"
         "  PRIMARY KEY  (`chanid`,`nick`,`histType`,`timestamp`)\n"
-        ") TYPE=MyISAM\n",
-        NULL
+        ") TYPE=MyISAM\n", NULL, NULL, FALSE },
+      { NULL, NULL, NULL, FALSE }
     },
     /* 2 -> 3 */
     {
-        "ALTER TABLE `nickhistory` DROP PRIMARY KEY ,\n"
+      { "ALTER TABLE `nickhistory` DROP PRIMARY KEY ,\n"
         "ADD PRIMARY KEY ( `chanid` , `histType` , `timestamp` , `nick` )\n",
-        NULL
+        NULL, NULL, FALSE },
+      { NULL, NULL, NULL, FALSE }
     },
     /* 3 -> 4 */
     {
-        "ALTER TABLE `channels` ADD `notify` INT DEFAULT '0' NOT NULL AFTER "
-        "`channel`\n",
-        "UPDATE `channels` SET `notify` = '1' WHERE `url` != ''\n",
-        NULL
+      { "ALTER TABLE `channels` ADD `notify` INT DEFAULT '0' NOT NULL AFTER "
+        "`channel`\n", NULL, NULL, FALSE },
+      { "UPDATE `channels` SET `notify` = '1' WHERE `url` != ''\n", NULL, NULL,
+        FALSE },
+      { NULL, NULL, NULL, FALSE }
     },
     /* 4 -> 5 */
     {
-        "ALTER TABLE `irclog` DROP INDEX `timeChan` ,\n"
-        "ADD INDEX `timeChan` ( `chanid` , `timestamp` )\n",
-        "ALTER TABLE `irclog` DROP INDEX `messageType` ,\n"
+      { "ALTER TABLE `irclog` DROP INDEX `timeChan` ,\n"
+        "ADD INDEX `timeChan` ( `chanid` , `timestamp` )\n", NULL, NULL, 
+        FALSE },
+      { "ALTER TABLE `irclog` DROP INDEX `messageType` ,\n"
         "ADD INDEX `messageType` ( `msgtype` , `chanid` , `timestamp` )\n",
-        NULL
+        NULL, NULL, FALSE },
+      { NULL, NULL, NULL, FALSE }
     },
     /* 5 -> 6 */
     {
-        "CREATE TABLE `userauth` (\n"
+      { "CREATE TABLE `userauth` (\n"
         " `username` VARCHAR( 64 ) NOT NULL ,\n"
         " `digest` ENUM( 'md4', 'md5', 'sha1' ) NOT NULL ,\n"
         " `seed` VARCHAR( 20 ) NOT NULL ,\n"
         " `key` VARCHAR( 16 ) NOT NULL ,\n"
         " `keyIndex` INT NOT NULL ,\n"
         " PRIMARY KEY ( `username` )\n"
-        ") TYPE = MYISAM\n",
-        NULL
+        ") TYPE = MYISAM\n", NULL, NULL, FALSE },
+      { NULL, NULL, NULL, FALSE }
     },
     /* 6 -> 7 */
     {
-        "CREATE TABLE `plugin_trac` (\n"
+      { "CREATE TABLE `plugin_trac` (\n"
         " `chanid` INT NOT NULL ,\n"
         " `url` VARCHAR( 255 ) NOT NULL ,\n"
         " PRIMARY KEY ( `chanid` )\n"
-        ") TYPE = MYISAM\n",
-        NULL
+        ") TYPE = MYISAM\n", NULL, NULL, FALSE },
+      { NULL, NULL, NULL, FALSE }
     },
     /* 7 -> 8 */
     {
-        "ALTER TABLE `servers` ADD `password` VARCHAR( 255 ) NOT NULL "
-        "AFTER `port`\n",
-        NULL
+      { "ALTER TABLE `servers` ADD `password` VARCHAR( 255 ) NOT NULL "
+        "AFTER `port`\n", NULL, NULL, FALSE },
+      { NULL, NULL, NULL, FALSE }
     },
     /* 8 -> 9 */
     {
-        "ALTER TABLE `servers` ADD `floodInterval` INT DEFAULT '2' NOT NULL ,\n"
+      { "ALTER TABLE `servers` ADD `floodInterval` INT DEFAULT '2' NOT NULL ,\n"
         "ADD `floodMaxTime` INT DEFAULT '8' NOT NULL ,\n"
         "ADD `floodBuffer` INT DEFAULT '2000' NOT NULL ,\n"
-        "ADD `floodMaxLine` INT DEFAULT '256' NOT NULL\n",
-        NULL
+        "ADD `floodMaxLine` INT DEFAULT '256' NOT NULL\n", NULL, NULL, FALSE },
+      { NULL, NULL, NULL, FALSE }
     }
 };
 
 /* Internal protos */
-extern MYSQL_RES *db_query( char *format, ... );
+extern void db_queue_query( int queryId, QueryTable_t *queryTable,
+                            MYSQL_BIND *queryData, int queryDataCount,
+                            QueryResFunc_t queryCallback, 
+                            void *queryCallbackArg,
+                            pthread_mutex_t *queryMutex );
 static int db_upgrade_schema( int current, int goal );
 
 
@@ -152,7 +160,6 @@ void db_check_schema(void)
 static int db_upgrade_schema( int current, int goal )
 {
     int                 i;
-    MYSQL_RES          *res;
 
     if( current >= goal ) {
         return( current );
@@ -165,8 +172,7 @@ static int db_upgrade_schema( int current, int goal )
         LogPrint( LOG_ERR, "Initializing database to schema version %d",
                   CURRENT_SCHEMA );
         for( i = 0; i < defSchemaCount; i++ ) {
-            res = db_query( defSchema[i] );
-            mysql_free_result(res);
+            db_queue_query( i, defSchema, NULL, 0, NULL, NULL, NULL );
         }
         db_set_setting("dbSchema", "%d", CURRENT_SCHEMA);
         return( CURRENT_SCHEMA );
@@ -174,9 +180,8 @@ static int db_upgrade_schema( int current, int goal )
 
     LogPrint( LOG_ERR, "Upgrading database from schema version %d to %d",
               current, current+1 );
-    for( i = 0; schemaUpgrade[current][i]; i++ ) {
-        res = db_query( schemaUpgrade[current][i] );
-        mysql_free_result(res);
+    for( i = 0; schemaUpgrade[current][i].queryPattern; i++ ) {
+        db_queue_query( i, schemaUpgrade[current], NULL, 0, NULL, NULL, NULL );
     }
 
     current++;

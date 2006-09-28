@@ -38,9 +38,6 @@
 #include "protos.h"
 #include "logging.h"
 
-char *db_quote(char *string);
-MYSQL_RES *db_query( char *format, ... );
-
 /* INTERNAL FUNCTION PROTOTYPES */
 void botCmdSearch( IRCServer_t *server, IRCChannel_t *channel, char *who,
                    char *msg );
@@ -53,10 +50,21 @@ char *botHelpSeen( void );
 char *botHelpNotice( void );
 void db_search_text( IRCServer_t *server, IRCChannel_t *channel, char *who, 
                      char *text );
+void result_search_text( MYSQL_RES *res, MYSQL_BIND *input, void *args );
 
 /* CVS generated ID string */
 static char ident[] _UNUSED_ = 
     "$Id$";
+
+static QueryTable_t coreQueryTable[] = {
+    /* 0 */
+    { "SELECT ? * FLOOR(MIN(`timestamp`) / ?) AS starttime, "
+      "SUM(MATCH(`nick`, `message`) AGAINST (?)) AS score "
+      "FROM `irclog` WHERE `msgtype` IN (0, 1) "
+      "AND MATCH(`nick`, `message`) AGAINST (?) > 0 AND `chanid` = ? "
+      "GROUP BY ? * FLOOR(`timestamp` / ?) "
+      "ORDER BY score DESC, `msgid` ASC LIMIT 3", NULL, NULL, FALSE }
+};
 
 void plugin_initialize( char *args )
 {
@@ -273,10 +281,39 @@ char *botHelpNotice( void )
 void db_search_text( IRCServer_t *server, IRCChannel_t *channel, char *who, 
                      char *text )
 {
+    MYSQL_BIND     *data;
+
+    if( !text || !channel || !server ) {
+        return;
+    }
+
+    data = (MYSQL_BIND *)malloc(10 * sizeof(MYSQL_BIND));
+    memset( data, 0, 10 * sizeof(MYSQL_BIND) );
+
+    bind_numeric( &data[0], SEARCH_WINDOW, MYSQL_TYPE_LONG );
+    bind_numeric( &data[1], SEARCH_WINDOW, MYSQL_TYPE_LONG );
+    bind_string( &data[2], text, MYSQL_TYPE_BLOB );
+    bind_string( &data[3], text, MYSQL_TYPE_BLOB );
+    bind_numeric( &data[4], channel->channelId, MYSQL_TYPE_LONG );
+    bind_numeric( &data[5], SEARCH_WINDOW, MYSQL_TYPE_LONG );
+    bind_numeric( &data[6], SEARCH_WINDOW, MYSQL_TYPE_LONG );
+    bind_null_blob( &data[7], server );
+    bind_null_blob( &data[8], channel );
+    bind_null_blob( &data[9], who );
+
+    db_queue_query( 0, coreQueryTable, data, 10, result_search_text,
+                    NULL, NULL );
+}
+
+void result_search_text( MYSQL_RES *res, MYSQL_BIND *input, void *args )
+{
+    IRCServer_t    *server; 
+    IRCChannel_t   *channel;
+    char           *who;
+
     int             count = 0;
     int             i;
     int             len;
-    MYSQL_RES      *res;
     MYSQL_ROW       row;
     char           *value = NULL;
     static char    *none = "No matches found";
@@ -284,24 +321,10 @@ void db_search_text( IRCServer_t *server, IRCChannel_t *channel, char *who,
     struct tm       tm_start, tm_end;
     char            start[20], stop[20];
     float           score;
-    char           *quotedText;
 
-    if( !text || !channel || !server ) {
-        return;
-    }
-
-    quotedText = db_quote(text);
-
-    res = db_query( "SELECT "
-                    "%d * FLOOR(MIN(`timestamp`) / %d) AS starttime, "
-                    "SUM(MATCH(`nick`, `message`) AGAINST ('%s')) AS score "
-                    "FROM `irclog` WHERE `msgtype` IN (0, 1) "
-                    "AND MATCH(`nick`, `message`) AGAINST ('%s') > 0 "
-                    "AND `chanid` = %d "
-                    "GROUP BY %d * FLOOR(`timestamp` / %d) "
-                    "ORDER BY score DESC, `msgid` ASC LIMIT 3", SEARCH_WINDOW,
-                    SEARCH_WINDOW, quotedText, quotedText, channel->channelId,
-                    SEARCH_WINDOW, SEARCH_WINDOW );
+    server = (IRCServer_t *)input[7].buffer;
+    channel = (IRCChannel_t *)input[8].buffer;
+    who = (char *)input[9].buffer;
 
     if( !res || !(count = mysql_num_rows(res)) ) {
         mysql_free_result(res);
