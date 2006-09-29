@@ -313,7 +313,8 @@ void *rssfeed_thread(void *arg)
              * in the tree, then poll it
              */
             LogPrint( LOG_NOTICE, "RSS: polling feed %d in %s", feed->feedId,
-                                  feed->channel->fullspec );
+                                  (feed->channel ? feed->channel->fullspec : 
+                                   "not connected yet") );
 
             if( !feed->channel->joined ) {
                 LogPrint( LOG_NOTICE, "RSS: feed %d: delaying 60s, not "
