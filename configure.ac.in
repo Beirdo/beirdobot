@@ -30,7 +30,7 @@ AC_PROG_CC
 # Checks for libraries.
 AC_CHECK_LIB([pcre], [pcre_config])
 AC_CHECK_LIB([curl], [Curl_connect])
-AC_CHECK_LIB([mysql], [mysql_connect])
+AC_CHECK_LIB([mysqlclient], [mysql_connect])
 
 
 # Checks for header files.

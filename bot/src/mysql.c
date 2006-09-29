@@ -423,7 +423,6 @@ MYSQL_RES *db_query( const char *query, MYSQL_BIND *args, int arg_count )
         args++;
     } while( insert );
 
-    LogPrint( LOG_DEBUG, "Query: %s", sqlbuf );
     mysql_query(item->sql, sqlbuf);
     res = mysql_store_result(item->sql);
 

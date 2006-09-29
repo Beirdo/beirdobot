@@ -1,13 +1,13 @@
 # Process this file with autoconf to produce a configure script.
 AC_PREREQ(2.59)
 
-AC_INIT(beirdobot, [0.1+SVN], [gjhurlbu@gmail.com])
+AC_INIT(beirdobot, [SVN], [gjhurlbu@gmail.com])
 AC_CONFIG_AUX_DIR(scripts)
 AC_CONFIG_SRCDIR(bot/src/main.c)
 AM_CONFIG_HEADER(bot/include/config.h)
 AC_CANONICAL_SYSTEM
 
-AM_INIT_AUTOMAKE(beirdobot, "0.1+SVN")
+AM_INIT_AUTOMAKE(beirdobot, "SVN")
 
 
 
@@ -30,7 +30,7 @@ AC_PROG_CC
 # Checks for libraries.
 AC_CHECK_LIB([pcre], [pcre_config])
 AC_CHECK_LIB([curl], [Curl_connect])
-AC_CHECK_LIB([mysql], [mysql_connect])
+AC_CHECK_LIB([mysqlclient], [mysql_connect])
 
 
 # Checks for header files.
