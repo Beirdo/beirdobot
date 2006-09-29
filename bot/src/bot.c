@@ -585,11 +585,11 @@ void bot_start(void)
     LinkedListLock( ServerList );
     for( item = ServerList->head; item; item = item->next ) {
         server = (IRCServer_t *)item;
-        thread_create( &server->threadId, bot_server_thread, (void *)server,
-                       server->threadName );
         server->txQueue = QueueCreate( 1024 );
         thread_create( &server->txThreadId, transmit_thread, (void *)server,
                        server->txThreadName );
+        thread_create( &server->threadId, bot_server_thread, (void *)server,
+                       server->threadName );
     }
     LinkedListUnlock( ServerList );
 }
