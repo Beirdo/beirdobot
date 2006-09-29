@@ -167,7 +167,7 @@ void *dns_thread(void *arg)
     LogPrintNoArg( LOG_NOTICE, "Starting DNS thread" );
 
     while( !GlobalAbort && !threadAbort ) {
-        qItem = (DNSItem_t *)QueueDequeueItem( DnsQ, 500 );
+        qItem = (DNSItem_t *)QueueDequeueItem( DnsQ, 1000 );
         if( !qItem ) {
             continue;
         }
@@ -296,7 +296,6 @@ void botCmdDig( IRCServer_t *server, IRCChannel_t *channel, char *who,
         return;
     }
 
-    LogPrint( LOG_DEBUG, "DIG: %s %s", who, msg );
     item->server = server;
     item->channel = channel;
     item->nick = who;
@@ -305,8 +304,6 @@ void botCmdDig( IRCServer_t *server, IRCChannel_t *channel, char *who,
     if( !GlobalAbort && !threadAbort ) {
         QueueEnqueueItem( DnsQ, item );
     }
-    
-    LogPrintNoArg( LOG_DEBUG, "Queued" );
 }
 
 char *botHelpDig( void )
