@@ -14,7 +14,6 @@ AM_INIT_AUTOMAKE(beirdobot, "SVN")
 AC_ARG_VAR(CUT, [location of the cut command])
 AC_PATH_PROG(CUT, cut)
 
-dnl check package version - formatted like: "1.11.23 July 12, 2004"
 AC_MSG_CHECKING(version of the package)
 
 VERSION=`cat bot/include/release.h | grep "SVN_Version =" | $CUT -d '"' -f 2`
@@ -32,6 +31,13 @@ AC_CHECK_LIB([pcre], [pcre_config])
 AC_CHECK_LIB([curl], [Curl_connect])
 AC_CHECK_LIB([mysqlclient], [mysql_connect])
 
+# Check for mysql having --libs_r in mysql_config
+if mysql_config --libs_r > /dev/null ; then
+	ac_cv_mysql_libs="--libs_r"
+else
+	ac_cv_mysql_libs="--libs"
+fi
+AC_SUBST(MYSQL_LIBS, ${ac_cv_mysql_libs})
 
 # Checks for header files.
 #AC_HEADER_DIRENT
