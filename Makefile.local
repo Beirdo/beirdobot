@@ -2,3 +2,5 @@
 release:
 	scripts/mkrelease
 
+configure.ac:	configure.ac.in
+	scripts/tagversion -R SVN

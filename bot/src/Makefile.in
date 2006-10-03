@@ -8,7 +8,7 @@ PKGCONFIGPATH	= ../lib/pkgconfig
 
 CC	= @CC@
 
-CFLAGS	= -O6 -g -Wall -Werror -I../include -std=c99 -pedantic 
+CFLAGS	= -O6 -g -Wall -Werror -I../include -std=c99 -pedantic -Wno-long-long
 # -DDEBUG
 CFLAGS	+= $(shell ${MYSQLCFG} --cflags)
 CFLAGS  += $(shell ${BOTNETCFG} --cflags)
@@ -17,7 +17,7 @@ CFLAGS  += $(shell PKG_CONFIG_PATH=${PKGCONFIGPATH} pkg-config --cflags nxml)
 CFLAGS  += $(shell PKG_CONFIG_PATH=${PKGCONFIGPATH} pkg-config --cflags mrss)
 
 LDFLAGS = -g -rdynamic
-LIBS	= $(shell ${MYSQLCFG} --libs_r)
+LIBS	= $(shell ${MYSQLCFG} @MYSQL_LIBS@)
 LIBS   += $(shell ${BOTNETCFG} --libs-static)
 LIBS   += $(shell ${PCRECFG} --libs)
 LIBS   += $(shell PKG_CONFIG_PATH=${PKGCONFIGPATH} pkg-config --libs nxml)
