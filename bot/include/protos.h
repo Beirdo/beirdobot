@@ -145,6 +145,9 @@ void bind_string( MYSQL_BIND *data, char *value, enum enum_field_types type );
 void bind_numeric( MYSQL_BIND *data, long long int value, 
                    enum enum_field_types type );
 
+#if ( MYSQL_VERSION_ID < 40100 ) 
+unsigned long mysql_get_server_version(MYSQL *mysql);
+#endif
 
 #endif
 

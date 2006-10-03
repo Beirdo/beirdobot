@@ -203,6 +203,7 @@ void db_setup(void)
 {
     MysqlData_t    *item;
     my_bool         my_true;
+    unsigned long   serverVers;
 
     item = (MysqlData_t *)malloc(sizeof(MysqlData_t));
     if( !item ) {
@@ -244,7 +245,14 @@ void db_setup(void)
     (void)my_true;
 #endif
 
-    LogPrint( LOG_CRIT, "MySQL version %s", mysql_get_server_info(item->sql) );
+    LogPrint( LOG_CRIT, "MySQL client version %d.%d.%d", 
+                        MYSQL_VERSION_ID / 10000,
+                        (MYSQL_VERSION_ID / 100 ) % 100,
+                        MYSQL_VERSION_ID % 100 );
+    serverVers = mysql_get_server_version( item->sql );
+    LogPrint( LOG_CRIT, "MySQL server version %d.%d.%d", 
+                        serverVers / 10000, (serverVers / 100) % 100,
+                        serverVers % 100 );
 
     QueryQ = QueueCreate( 1024 );
 
@@ -1543,6 +1551,44 @@ void result_check_plugins( MYSQL_RES *res, MYSQL_BIND *input, void *arg )
         *found = TRUE;
     }
 }
+
+/*
+ * Helper functions to duplicate what's in newer versions of libmysqlclient
+ */
+#if ( MYSQL_VERSION_ID < 40100 )
+unsigned long mysql_get_server_version(MYSQL *mysql)
+{
+    char           *orig;
+    char           *verstring;
+    char           *dot;
+    unsigned long   version;
+
+    verstring = strdup( mysql_get_server_info(mysql) );
+    orig = verstring;
+
+    dot = strchr( verstring, '.' );
+    *dot = '\0';
+    version = atol( verstring ) * 10000;
+    verstring = dot + 1;
+
+    dot = strchr( verstring, '.' );
+    *dot = '\0';
+    version += atol( verstring ) * 100;
+    verstring = dot + 1;
+
+    dot = strchr( verstring, '-' );
+    if( dot ) {
+        *dot = '\0';
+    }
+    version += atol( verstring );
+
+    free( orig );
+
+    return( version );
+}
+#endif
+
+
 
 /*
  * vim:ts=4:sw=4:ai:et:si:sts=4
