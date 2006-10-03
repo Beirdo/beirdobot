@@ -215,26 +215,38 @@ typedef struct {
 #define NO_PREPARED_STATEMENTS
 
 /*
- * From libmysqlclient14 (4.1.x) mysql_com.h
+ * Adapted libmysqlclient14 (4.1.x) mysql_com.h
  */
-enum enum_field_types { MYSQL_TYPE_DECIMAL, MYSQL_TYPE_TINY,
-                        MYSQL_TYPE_SHORT,  MYSQL_TYPE_LONG,
-                        MYSQL_TYPE_FLOAT,  MYSQL_TYPE_DOUBLE,
-                        MYSQL_TYPE_NULL,   MYSQL_TYPE_TIMESTAMP,
-                        MYSQL_TYPE_LONGLONG,MYSQL_TYPE_INT24,
-                        MYSQL_TYPE_DATE,   MYSQL_TYPE_TIME,
-                        MYSQL_TYPE_DATETIME, MYSQL_TYPE_YEAR,
-                        MYSQL_TYPE_NEWDATE,
-                        MYSQL_TYPE_ENUM=247,
-                        MYSQL_TYPE_SET=248,
-                        MYSQL_TYPE_TINY_BLOB=249,
-                        MYSQL_TYPE_MEDIUM_BLOB=250,
-                        MYSQL_TYPE_LONG_BLOB=251,
-                        MYSQL_TYPE_BLOB=252,
-                        MYSQL_TYPE_VAR_STRING=253,
-                        MYSQL_TYPE_STRING=254,
-                        MYSQL_TYPE_GEOMETRY=255
-};
+#ifndef MYSQL_TYPE_DECIMAL
+
+#define MYSQL_TYPE_DECIMAL     FIELD_TYPE_DECIMAL
+#define MYSQL_TYPE_TINY        FIELD_TYPE_TINY
+#define MYSQL_TYPE_SHORT       FIELD_TYPE_SHORT
+#define MYSQL_TYPE_LONG        FIELD_TYPE_LONG
+#define MYSQL_TYPE_FLOAT       FIELD_TYPE_FLOAT
+#define MYSQL_TYPE_DOUBLE      FIELD_TYPE_DOUBLE
+#define MYSQL_TYPE_NULL        FIELD_TYPE_NULL
+#define MYSQL_TYPE_TIMESTAMP   FIELD_TYPE_TIMESTAMP
+#define MYSQL_TYPE_LONGLONG    FIELD_TYPE_LONGLONG
+#define MYSQL_TYPE_INT24       FIELD_TYPE_INT24
+#define MYSQL_TYPE_DATE        FIELD_TYPE_DATE
+#define MYSQL_TYPE_TIME        FIELD_TYPE_TIME
+#define MYSQL_TYPE_DATETIME    FIELD_TYPE_DATETIME
+#define MYSQL_TYPE_YEAR        FIELD_TYPE_YEAR
+#define MYSQL_TYPE_NEWDATE     FIELD_TYPE_NEWDATE
+#define MYSQL_TYPE_ENUM        FIELD_TYPE_ENUM
+#define MYSQL_TYPE_SET         FIELD_TYPE_SET
+#define MYSQL_TYPE_TINY_BLOB   FIELD_TYPE_TINY_BLOB
+#define MYSQL_TYPE_MEDIUM_BLOB FIELD_TYPE_MEDIUM_BLOB
+#define MYSQL_TYPE_LONG_BLOB   FIELD_TYPE_LONG_BLOB
+#define MYSQL_TYPE_BLOB        FIELD_TYPE_BLOB
+#define MYSQL_TYPE_VAR_STRING  FIELD_TYPE_VAR_STRING
+#define MYSQL_TYPE_STRING      FIELD_TYPE_STRING
+#define MYSQL_TYPE_CHAR        FIELD_TYPE_TINY
+#define MYSQL_TYPE_INTERVAL    FIELD_TYPE_ENUM
+#define MYSQL_TYPE_GEOMETRY    FIELD_TYPE_GEOMETRY
+
+#endif
 
 /*
  * From libmysqlclient14 (4.1.x) mysql.h
