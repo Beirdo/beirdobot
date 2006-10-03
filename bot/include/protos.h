@@ -149,6 +149,11 @@ void bind_numeric( MYSQL_BIND *data, long long int value,
 unsigned long mysql_get_server_version(MYSQL *mysql);
 #endif
 
+#if ( MYSQL_VERSION_ID < 40000 )
+my_bool mysql_thread_init(void);
+#endif
+
+
 #endif
 
 /*

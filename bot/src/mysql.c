@@ -1588,6 +1588,12 @@ unsigned long mysql_get_server_version(MYSQL *mysql)
 }
 #endif
 
+#if ( MYSQL_VERSION_ID < 40000 )
+my_bool mysql_thread_init(void)
+{
+    return( 0 );
+}
+#endif
 
 
 /*
