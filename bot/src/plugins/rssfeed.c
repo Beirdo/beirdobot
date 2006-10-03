@@ -312,9 +312,9 @@ void *rssfeed_thread(void *arg)
             /* This feed needs to be polled now!   Remove it, and requeue it
              * in the tree, then poll it
              */
-            if( feed->channel ) {
+            if( feed->channel && feed->channel->fullspec ) {
                 LogPrint( LOG_NOTICE, "RSS: polling feed %d in %s", 
-                                      feed->feedId, feed->channel );
+                                      feed->feedId, feed->channel->fullspec );
             }
 
             if( !feed->channel || !feed->channel->joined ) {
