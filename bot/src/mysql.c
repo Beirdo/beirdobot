@@ -45,7 +45,11 @@
 static char ident[] _UNUSED_ =
     "$Id$";
 
-/* 1h activity timeout for MySQL, ping the server if idle that long */
+/* 
+ * 1h activity timeout for MySQL, ping the server if idle that long 
+ * The code should check against the results of "SELECT @@wait_timeout" from
+ * the server to make sure that we are delaying less time than the server is.
+ * */
 #define MYSQL_PING_THRESHOLD    (60 * 60)
 
 typedef struct {
