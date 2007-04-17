@@ -34,6 +34,7 @@
 #include <stdlib.h>
 #include <sys/time.h>
 #include <time.h>
+#include <unistd.h>
 #include "botnet.h"
 #include "structs.h"
 #include "protos.h"
@@ -43,6 +44,9 @@
 
 static char ident[] _UNUSED_ =
     "$Id$";
+
+/* 1h activity timeout for MySQL, ping the server if idle that long */
+#define MYSQL_PING_THRESHOLD    (60 * 60)
 
 typedef struct {
     MYSQL  *sql;
@@ -56,6 +60,7 @@ pthread_t       sqlThreadId;
 /* Internal protos */
 char *db_quote(char *string);
 MYSQL_RES *db_query( const char *query, MYSQL_BIND *args, int arg_count );
+bool db_server_connect( MYSQL *sql );
 
 
 void chain_update_nick( MYSQL_RES *res, QueryItem_t *item );
@@ -153,17 +158,57 @@ QueueObject_t   *QueryQ;
 
 void *mysql_thread( void *arg ) {
     QueryItem_t        *item;
+    MysqlData_t        *protItem;
     QueryTable_t       *query;
     MYSQL_RES          *res;
     int                 i;
+    time_t              lastAccess;
+    struct timeval      now;
+    int                 timeout;
+    int                 connected;
 
     LogPrintNoArg( LOG_NOTICE, "Starting MySQL thread" );
     mysql_thread_init();
+
+    gettimeofday( &now, NULL );
+    lastAccess = now.tv_sec;
 
     while( !GlobalAbort ) {
         item = (QueryItem_t *)QueueDequeueItem( QueryQ, -1 );
         if( !item ) {
             continue;
+        }
+
+        gettimeofday( &now, NULL );
+        timeout = now.tv_sec - lastAccess;
+        lastAccess = now.tv_sec;
+
+#if 0
+        LogPrint( LOG_NOTICE, "MySQL session idle for %ds", timeout );
+#endif
+        if( timeout >= MYSQL_PING_THRESHOLD ) {
+            LogPrint( LOG_NOTICE, "MySQL session idle for %ds, pinging",
+                                  timeout );
+
+            /* Ping the server, if it's gone, reconnect */
+            ProtectedDataLock( sql );
+            protItem = (MysqlData_t *)sql->data;
+            connected = FALSE;
+            while( !connected ) {
+                connected = (mysql_ping( protItem->sql ) != 0 ? FALSE : TRUE);
+                if( !connected ) {
+                    LogPrintNoArg( LOG_NOTICE, "MySQL session disconnected, "
+                                               "reconnecting." );
+                    connected = db_server_connect( protItem->sql );
+                }
+
+                if( !connected ) {
+                    LogPrintNoArg( LOG_NOTICE, "MySQL reconnection failed, "
+                                               "retrying in 60s" );
+                    sleep( 60 );
+                }
+            }
+            ProtectedDataUnlock( sql );
         }
 
         query = &item->queryTable[item->queryId];
@@ -202,8 +247,6 @@ void *mysql_thread( void *arg ) {
 void db_setup(void)
 {
     MysqlData_t    *item;
-    my_bool         my_true;
-    unsigned long   serverVers;
 
     item = (MysqlData_t *)malloc(sizeof(MysqlData_t));
     if( !item ) {
@@ -227,20 +270,35 @@ void db_setup(void)
         exit(1);
     }
 
+    if( !db_server_connect( item->sql ) ) {
+        exit(1);
+    }
+
+    QueryQ = QueueCreate( 1024 );
+
+    /* Start the thread */
+    thread_create( &sqlThreadId, mysql_thread, NULL, "thread_mysql" );
+}
+
+bool db_server_connect( MYSQL *mysql )
+{
+    my_bool         my_true;
+    unsigned long   serverVers;
+
     LogPrint( LOG_CRIT, "Using database %s at %s:%d", mysql_db, mysql_host, 
               mysql_portnum);
 
-    if( !mysql_real_connect(item->sql, mysql_host, mysql_user, mysql_password, 
+    if( !mysql_real_connect(mysql, mysql_host, mysql_user, mysql_password, 
                             mysql_db, mysql_port, NULL, 0) ) {
         LogPrint(LOG_CRIT, "Unable to connect to the database - %s",
-                           mysql_error(item->sql) );
-        exit(1);
+                           mysql_error(mysql) );
+        return( FALSE );
     }
 
 #ifdef MYSQL_OPT_RECONNECT
     /* Only defined in MySQL 5.0.13 and above, before that, it was always on */
     my_true = TRUE;
-    mysql_options( item->sql, MYSQL_OPT_RECONNECT, &my_true );
+    mysql_options( mysql, MYSQL_OPT_RECONNECT, &my_true );
 #else
     (void)my_true;
 #endif
@@ -249,15 +307,12 @@ void db_setup(void)
                         MYSQL_VERSION_ID / 10000,
                         (MYSQL_VERSION_ID / 100 ) % 100,
                         MYSQL_VERSION_ID % 100 );
-    serverVers = mysql_get_server_version( item->sql );
+    serverVers = mysql_get_server_version( mysql );
     LogPrint( LOG_CRIT, "MySQL server version %d.%d.%d", 
                         serverVers / 10000, (serverVers / 100) % 100,
                         serverVers % 100 );
 
-    QueryQ = QueueCreate( 1024 );
-
-    /* Start the thread */
-    thread_create( &sqlThreadId, mysql_thread, NULL, "thread_mysql" );
+    return( TRUE );
 }
 
 void db_thread_init( void )
@@ -297,32 +352,6 @@ char *db_quote(char *string)
     return( retString );
 }
 
-
-#if 0
-MYSQL_RES *db_query( char *format, ... )
-{
-    MYSQL_RES      *res;
-    MysqlData_t    *item;
-    va_list         arguments;
-
-    ProtectedDataLock( sql );
-
-    item = (MysqlData_t *)sql->data;
-
-    va_start( arguments, format );
-    vsnprintf( item->sqlbuf, item->buflen, format, arguments );
-    va_end( arguments );
-    item->sqlbuf[item->buflen-1] = '\0';
-
-    mysql_query(item->sql, item->sqlbuf);
-    res = mysql_store_result(item->sql);
-
-    ProtectedDataUnlock( sql );
-
-    return( res );
-}
-
-#endif
 
 MYSQL_RES *db_query( const char *query, MYSQL_BIND *args, int arg_count )
 {
