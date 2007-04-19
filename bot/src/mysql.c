@@ -31,6 +31,7 @@
 #include <string.h>
 #include <stdarg.h>
 #include <mysql.h>
+#include <mysql/errmsg.h>
 #include <stdlib.h>
 #include <sys/time.h>
 #include <time.h>
@@ -63,7 +64,8 @@ pthread_t       sqlThreadId;
 
 /* Internal protos */
 char *db_quote(char *string);
-MYSQL_RES *db_query( const char *query, MYSQL_BIND *args, int arg_count );
+MYSQL_RES *db_query( const char *query, MYSQL_BIND *args, int arg_count, 
+                     bool *connected );
 bool db_server_connect( MYSQL *sql );
 
 
@@ -169,7 +171,7 @@ void *mysql_thread( void *arg ) {
     time_t              lastAccess;
     struct timeval      now;
     int                 timeout;
-    int                 connected;
+    bool                connected;
 
     LogPrintNoArg( LOG_NOTICE, "Starting MySQL thread" );
     mysql_thread_init();
@@ -183,41 +185,55 @@ void *mysql_thread( void *arg ) {
             continue;
         }
 
-        gettimeofday( &now, NULL );
-        timeout = now.tv_sec - lastAccess;
-        lastAccess = now.tv_sec;
+        connected = TRUE;
+
+        do {
+            gettimeofday( &now, NULL );
+            timeout = now.tv_sec - lastAccess;
+            lastAccess = now.tv_sec;
 
 #if 0
-        LogPrint( LOG_NOTICE, "MySQL session idle for %ds", timeout );
+            LogPrint( LOG_NOTICE, "MySQL session idle for %ds", timeout );
 #endif
-        if( timeout >= MYSQL_PING_THRESHOLD ) {
-            LogPrint( LOG_NOTICE, "MySQL session idle for %ds, pinging",
-                                  timeout );
-
-            /* Ping the server, if it's gone, reconnect */
-            ProtectedDataLock( sql );
-            protItem = (MysqlData_t *)sql->data;
-            connected = FALSE;
-            while( !connected ) {
-                connected = (mysql_ping( protItem->sql ) != 0 ? FALSE : TRUE);
-                if( !connected ) {
-                    LogPrintNoArg( LOG_NOTICE, "MySQL session disconnected, "
-                                               "reconnecting." );
-                    connected = db_server_connect( protItem->sql );
-                }
-
-                if( !connected ) {
-                    LogPrintNoArg( LOG_NOTICE, "MySQL reconnection failed, "
-                                               "retrying in 60s" );
-                    sleep( 60 );
-                }
+            if( timeout >= MYSQL_PING_THRESHOLD ) {
+                LogPrint( LOG_NOTICE, "MySQL session idle for %ds, pinging",
+                                      timeout );
+                connected = FALSE;
             }
-            ProtectedDataUnlock( sql );
-        }
 
-        query = &item->queryTable[item->queryId];
-        res = db_query( query->queryPattern, item->queryData, 
-                        item->queryDataCount );
+            if( !connected ) {
+                /* Ping the server, if it's gone, reconnect */
+                ProtectedDataLock( sql );
+                protItem = (MysqlData_t *)sql->data;
+                while( !connected ) {
+                    connected = (mysql_ping( protItem->sql ) != 0 ? FALSE : 
+                                 TRUE);
+                    if( !connected ) {
+                        LogPrintNoArg( LOG_NOTICE, "MySQL session disconnected,"
+                                                   " reconnecting." );
+                        connected = db_server_connect( protItem->sql );
+                    }
+
+                    if( !connected ) {
+                        LogPrintNoArg( LOG_NOTICE, "MySQL reconnection failed, "
+                                                   "retrying in 60s" );
+                        sleep( 60 );
+                    }
+                }
+                ProtectedDataUnlock( sql );
+            }
+
+            connected = TRUE;
+            query = &item->queryTable[item->queryId];
+            res = db_query( query->queryPattern, item->queryData, 
+                            item->queryDataCount, &connected );
+
+            if( !connected ) {
+                LogPrintNoArg( LOG_NOTICE, "MySQL connection is gone, "
+                                           "reconnecting" );
+            }
+        } while( !connected );
+
         if( res ) {
             if( item->queryCallback ) {
                 item->queryCallback( res, item->queryData, 
@@ -357,7 +373,8 @@ char *db_quote(char *string)
 }
 
 
-MYSQL_RES *db_query( const char *query, MYSQL_BIND *args, int arg_count )
+MYSQL_RES *db_query( const char *query, MYSQL_BIND *args, int arg_count, 
+                     bool *connected )
 {
     MYSQL_RES      *res;
     MysqlData_t    *item;
@@ -368,6 +385,7 @@ MYSQL_RES *db_query( const char *query, MYSQL_BIND *args, int arg_count )
     static char     buf[128];
     char           *string;
     char           *sqlbuf;
+    int             retval;
 
     ProtectedDataLock( sql );
 
@@ -376,6 +394,7 @@ MYSQL_RES *db_query( const char *query, MYSQL_BIND *args, int arg_count )
     sqlbuf[0] = '\0';
     buflen = item->buflen - 1;
     count = 0;
+    *connected = TRUE;
 
     do {
         insert = strchr( query, '?' );
@@ -386,6 +405,7 @@ MYSQL_RES *db_query( const char *query, MYSQL_BIND *args, int arg_count )
 
         if( !args ) {
             LogPrintNoArg( LOG_CRIT, "SQL malformed query!!" );
+            ProtectedDataUnlock( sql );
             return( NULL );
         }
 
@@ -394,6 +414,7 @@ MYSQL_RES *db_query( const char *query, MYSQL_BIND *args, int arg_count )
         if( buflen < len ) {
             /* Oh oh! */
             LogPrintNoArg( LOG_CRIT, "SQL buffer overflow!!" );
+            ProtectedDataUnlock( sql );
             return( NULL );
         }
         strncat( sqlbuf, query, len );
@@ -412,6 +433,7 @@ MYSQL_RES *db_query( const char *query, MYSQL_BIND *args, int arg_count )
             if( buflen < len ) {
                 /* Oh oh! */
                 LogPrintNoArg( LOG_CRIT, "SQL buffer overflow!!" );
+                ProtectedDataUnlock( sql );
                 return( NULL );
             }
             strncat( sqlbuf, "NULL", 4 );
@@ -447,6 +469,7 @@ MYSQL_RES *db_query( const char *query, MYSQL_BIND *args, int arg_count )
             if( buflen < len ) {
                 /* Oh oh! */
                 LogPrintNoArg( LOG_CRIT, "SQL buffer overflow!!" );
+                ProtectedDataUnlock( sql );
                 return( NULL );
             }
 
@@ -464,7 +487,18 @@ MYSQL_RES *db_query( const char *query, MYSQL_BIND *args, int arg_count )
         args++;
     } while( insert );
 
-    mysql_query(item->sql, sqlbuf);
+    if( mysql_query(item->sql, sqlbuf) != 0 ) {
+        retval = mysql_errno(item->sql);
+        LogPrint( LOG_CRIT, "MySQL error %d: %s", retval,
+                            mysql_error(item->sql) );
+
+        if( retval == CR_SERVER_GONE_ERROR || retval == CR_SERVER_LOST ) {
+            *connected = FALSE;
+            ProtectedDataUnlock( sql );
+            return( NULL );
+        }
+    }
+
     res = mysql_store_result(item->sql);
 
     ProtectedDataUnlock( sql );
