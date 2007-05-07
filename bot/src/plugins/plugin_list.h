@@ -41,7 +41,8 @@ static PluginDef_t DefaultPlugins[] = {
     { "fart",       "plugin_fart.so",       0,  "" },
     { "core",       "plugin_core.so",       1,  "" },
     { "dns",        "plugin_dns.so",        1,  "" },
-    { "rssfeed",    "plugin_rssfeed.so",    0,  "" }
+    { "rssfeed",    "plugin_rssfeed.so",    0,  "" },
+    { "luascript",  "plugin_luascript.so",  0,  "" },
 };
 static int DefaultPluginCount = NELEMENTS(DefaultPlugins);
 #endif
