@@ -4,3 +4,4 @@
 %a, %d %b %Y %H:%M:%S GMT
 %a, %d %b %Y %H:%M:%S PDT
 %a, %d %b %Y %H:%M:%S
+%Y-%m-%d %H:%M:%S
