@@ -21,7 +21,9 @@ CFLAGS  += $(shell ${BOTNETCFG} --cflags)
 CFLAGS_rssfeed  = $(shell PKG_CONFIG_PATH=${PKGCONFIGPATH} pkg-config --cflags nxml)
 CFLAGS_rssfeed += $(shell PKG_CONFIG_PATH=${PKGCONFIGPATH} pkg-config --cflags mrss)
 CFLAGS_rssfeed += -DDATEMSK_PATH=\"${pkglibdir}\"
-CFLAGS_luascript = $(shell ${LUACFG} --include)
+CFLAGS_luascript  = $(shell ${LUACFG} --include)
+CFLAGS_luascript += -DPLUGIN_PATH=\"${pkglibdir}\"
+
 
 LDFLAGS = -g
 LIBS	= $(shell ${MYSQLCFG} --libs_r)
@@ -38,6 +40,7 @@ OBJS	= ${SRCS:%.c=plugin_%.so}
 DEPS	= ${SRCS:.c=.d}
 
 EXTRAS	= datemsk.txt
+LUASCRIPTS = blah.lua
 
 .PHONY:	clean cleanall ${EMPTY_AUTOMAKE_TARGETS}
 
@@ -67,7 +70,7 @@ install-exec:
 	done
 
 install-data:
-	for i in ${EXTRAS} ; do \
+	for i in ${LUASCRIPTS} ${EXTRAS} ; do \
 		@INSTALL@ -D -m 644 $$i ${DESTDIR}${pkglibdir}/$$i ; \
 	done
 

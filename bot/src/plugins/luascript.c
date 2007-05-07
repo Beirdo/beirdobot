@@ -391,6 +391,14 @@ bool luascriptLoadItem( Luascript_t *luascript )
         return( FALSE );
     }
 
+    lua_getglobal(luascript->L, "initialize");
+    retval = lua_pcall(L, 0, 0, 0);
+    if( retval ) {
+        LogPrint( LOG_CRIT, "Error starting LUA script %s: %s", luascript->name,
+                            lua_tostring(L, -1) );
+        return( FALSE );
+    }
+
     luascript->loaded = true;
     return( TRUE );
 }
@@ -404,7 +412,7 @@ void luascriptUnloadItem( Luascript_t *luascript )
     lua_getglobal(luascript->L, "shutdown");
     lua_pcall(luascript->L, 0, 0, 0);
 
-    LogPrint( LOG_NOTICE, "Unloading plugin %s", luascript->name );
+    LogPrint( LOG_NOTICE, "Unloading LUA script %s", luascript->name );
     lua_close(luascript->L);
     luascript->loaded = false;
 }
