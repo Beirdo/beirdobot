@@ -4,6 +4,7 @@ EMPTY_AUTOMAKE_TARGETS += ps info html tags ctags distdir distclean
 BOTNETCFG	= ../../bin/botnet-config
 MYSQLCFG	= mysql_config
 PKGCONFIGPATH	= ../../lib/pkgconfig
+LUACFG		= lua-config
 
 CC	= @CC@
 
@@ -20,6 +21,7 @@ CFLAGS  += $(shell ${BOTNETCFG} --cflags)
 CFLAGS_rssfeed  = $(shell PKG_CONFIG_PATH=${PKGCONFIGPATH} pkg-config --cflags nxml)
 CFLAGS_rssfeed += $(shell PKG_CONFIG_PATH=${PKGCONFIGPATH} pkg-config --cflags mrss)
 CFLAGS_rssfeed += -DDATEMSK_PATH=\"${pkglibdir}\"
+CFLAGS_luascript = $(shell ${LUACFG} --include)
 
 LDFLAGS = -g
 LIBS	= $(shell ${MYSQLCFG} --libs_r)
@@ -29,8 +31,9 @@ DLLIBS_dns	= -lresolv
 DLLIBS_rssfeed	= $(shell PKG_CONFIG_PATH=${PKGCONFIGPATH} pkg-config --libs nxml)
 DLLIBS_rssfeed += $(shell PKG_CONFIG_PATH=${PKGCONFIGPATH} pkg-config --libs mrss)
 DLLIBS_rssfeed += -lcurl
+DLLIBS_luascript = $(shell ${LUACFG} --libs)
 
-SRCS	= trout.c fart.c core.c dns.c rssfeed.c
+SRCS	= trout.c fart.c core.c dns.c rssfeed.c luascript.c
 OBJS	= ${SRCS:%.c=plugin_%.so}
 DEPS	= ${SRCS:.c=.d}
 
@@ -48,7 +51,7 @@ ${DEPS}:	Makefile
 
 %.d: %.c
 	@echo "Making $@ (dependencies for $<)"
-	@${CC} -MM ${CFLAGS} $< | sed 's,\($*\)\.o[ :]*,\1.o $@ : ,g'  > $@
+	@${CC} -MM ${CFLAGS} ${CFLAGS_${<:%.c=%}} $< | sed 's,\($*\)\.o[ :]*,\1.o $@ : ,g'  > $@
 
 clean:
 	${RM} ${OBJS}
