@@ -1,8 +1,9 @@
 function initialize ( )
-   print "blah";
+   beirdobot.LogPrint("Starting LUA-blah");
+   beirdobot.transmitMsg( 1, 2, 3, 4 );
 end
 
 function shutdown ( )
-   print "blah2";
+   beirdobot.LogPrint("Ending LUA-blah");
 end
 

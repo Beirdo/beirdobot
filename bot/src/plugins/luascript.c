@@ -70,6 +70,28 @@ void luascriptInitializeTree( BalancedBTreeItem_t *item );
 
 static int db_upgrade_schema( int current, int goal );
 
+static int lua_LogPrint( lua_State *L );
+static int lua_transmitMsg( lua_State *L );
+static int lua_LoggedChannelMessage( lua_State *L );
+static int lua_LoggedActionMessage( lua_State *L );
+static int lua_regexp_add( lua_State *L );
+static int lua_regexp_remove( lua_State *L );
+static int lua_botCmd_add( lua_State *L );
+static int lua_botCmd_remove( lua_State *L );
+int luaopen_mylib( lua_State *L );
+
+static const struct luaL_reg mylib [] = {
+    {"LogPrint", lua_LogPrint},
+    {"transmitMsg", lua_transmitMsg},
+    {"LoggedChannelMessage", lua_LoggedChannelMessage},
+    {"LoggedActionMessage", lua_LoggedActionMessage},
+    {"regexp_add", lua_regexp_add},
+    {"regexp_remove", lua_regexp_remove},
+    {"botCmd_add", lua_botCmd_add},
+    {"botCmd_remove", lua_botCmd_remove},
+    {NULL, NULL}
+};
+
 BalancedBTree_t *luascriptTree = NULL;
 
 #define CURRENT_SCHEMA_LUASCRIPT 1
@@ -375,6 +397,7 @@ bool luascriptLoadItem( Luascript_t *luascript )
     luaopen_io(L);
     luaopen_string(L);
     luaopen_math(L);
+    luaopen_mylib(L);
 
     retval = luaL_loadfile(L, scriptfile);
     if( retval ) {
@@ -509,6 +532,89 @@ char *botHelpLuascript( void )
     return( help );
 }
 
+static int lua_LogPrint( lua_State *L )
+{
+    char           *message;
+
+    message = (char *)luaL_checkstring(L, 1);
+    LogPrint( LOG_NOTICE, "%s", message );
+    return( 0 );
+}
+
+static int lua_transmitMsg( lua_State *L )
+{
+    IRCServer_t    *server;
+    TxType_t        type;
+    char           *who, *message;
+
+    server = (IRCServer_t *)luaL_checkudata(L, 1, "IRCServer_t");
+    type = (TxType_t)luaL_checkint(L, 2);
+    who = (char *)luaL_checkstring(L, 3);
+    message = (char *)luaL_checkstring(L, 4);
+
+    if( server && who && message ) {
+        transmitMsg( server, type, who, message );
+    }
+    return( 0 );
+}
+
+static int lua_LoggedChannelMessage( lua_State *L )
+{
+    IRCServer_t    *server;
+    char           *channel, *message;
+
+    server = (IRCServer_t *)luaL_checkudata(L, 1, "IRCServer_t");
+    channel = (char *)luaL_checkstring(L, 2);
+    message = (char *)luaL_checkstring(L, 3);
+
+    if( server && channel && message ) {
+        LoggedChannelMessage( server, channel, message );
+    }
+
+    return( 0 );
+}
+
+static int lua_LoggedActionMessage( lua_State *L )
+{
+    IRCServer_t    *server;
+    char           *channel, *message;
+
+    server = (IRCServer_t *)luaL_checkudata(L, 1, "IRCServer_t");
+    channel = (char *)luaL_checkstring(L, 2);
+    message = (char *)luaL_checkstring(L, 3);
+
+    if( server && channel && message ) {
+        LoggedActionMessage( server, channel, message );
+    }
+
+    return( 0 );
+}
+
+static int lua_regexp_add( lua_State *L )
+{
+    return( 0 );
+}
+
+static int lua_regexp_remove( lua_State *L )
+{
+    return( 0 );
+}
+
+static int lua_botCmd_add( lua_State *L )
+{
+    return( 0 );
+}
+
+static int lua_botCmd_remove( lua_State *L )
+{
+    return( 0 );
+}
+
+int luaopen_mylib( lua_State *L )
+{
+    luaL_openlib(L, "beirdobot", mylib, 0);
+    return( 1 );
+}
 
 /*
  * vim:ts=4:sw=4:ai:et:si:sts=4
