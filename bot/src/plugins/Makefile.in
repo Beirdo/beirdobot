@@ -40,7 +40,7 @@ OBJS	= ${SRCS:%.c=plugin_%.so}
 DEPS	= ${SRCS:.c=.d}
 
 EXTRAS	= datemsk.txt
-LUASCRIPTS = blah.lua
+LUASCRIPTS = blah.lua burp.lua
 
 .PHONY:	clean cleanall ${EMPTY_AUTOMAKE_TARGETS}
 
