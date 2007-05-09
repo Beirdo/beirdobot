@@ -60,6 +60,8 @@ typedef struct {
     int             loaded;
     char           *args;
     lua_State      *L;
+    LinkedList_t   *regexps;
+    LinkedList_t   *commands;
 } Luascript_t;
 
 bool luascriptUnload( char *name );
@@ -201,6 +203,13 @@ void plugin_shutdown( void )
             luascriptUnloadItem( luascript );
         }
         BalancedBTreeRemove( luascriptTree, item, LOCKED, FALSE );
+
+        LinkedListLock( luascript->regexps );
+        LinkedListDestroy( luascript->regexps );
+        LinkedListLock( luascript->commands );
+        LinkedListDestroy( luascript->commands );
+        free( luascript );
+        free( item );
     }
     BalancedBTreeDestroy( luascriptTree );
 }
@@ -298,6 +307,9 @@ void result_get_luascripts( MYSQL_RES *res, MYSQL_BIND *input, void *arg )
         luascript->fileName = strdup(row[1]);
         luascript->preload  = atoi(row[2]);
         luascript->args     = strdup(row[3]);
+
+        luascript->regexps  = LinkedListCreate();
+        luascript->commands = LinkedListCreate();
 
         item->item = luascript;
         item->key  = (void *)&luascript->name;
@@ -561,10 +573,11 @@ static int lua_transmitMsg( lua_State *L )
 static int lua_LoggedChannelMessage( lua_State *L )
 {
     IRCServer_t    *server;
-    char           *channel, *message;
+    IRCChannel_t   *channel;
+    char           *message;
 
     server = (IRCServer_t *)luaL_checkudata(L, 1, "IRCServer_t");
-    channel = (char *)luaL_checkstring(L, 2);
+    channel = (IRCChannel_t *)luaL_checkudata(L, 2, "IRCChannel_t");
     message = (char *)luaL_checkstring(L, 3);
 
     if( server && channel && message ) {
@@ -577,10 +590,11 @@ static int lua_LoggedChannelMessage( lua_State *L )
 static int lua_LoggedActionMessage( lua_State *L )
 {
     IRCServer_t    *server;
-    char           *channel, *message;
+    IRCChannel_t   *channel;
+    char           *message;
 
     server = (IRCServer_t *)luaL_checkudata(L, 1, "IRCServer_t");
-    channel = (char *)luaL_checkstring(L, 2);
+    channel = (IRCChannel_t *)luaL_checkudata(L, 2, "IRCChannel_t");
     message = (char *)luaL_checkstring(L, 3);
 
     if( server && channel && message ) {
