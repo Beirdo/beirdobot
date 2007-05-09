@@ -37,8 +37,8 @@
 
 /* INTERNAL FUNCTION PROTOTYPES */
 void botCmdTrout( IRCServer_t *server, IRCChannel_t *channel, char *who, 
-                  char *msg );
-char *botHelpTrout( void );
+                  char *msg, void *tag );
+char *botHelpTrout( void *tag );
 
 /* CVS generated ID string */
 static char ident[] _UNUSED_ = 
@@ -50,7 +50,7 @@ void plugin_initialize( char *args )
     static char    *command = "trout";
 
     LogPrintNoArg( LOG_NOTICE, "Initializing trout..." );
-    botCmd_add( (const char **)&command, botCmdTrout, botHelpTrout );
+    botCmd_add( (const char **)&command, botCmdTrout, botHelpTrout, NULL );
 }
 
 void plugin_shutdown( void )
@@ -61,7 +61,7 @@ void plugin_shutdown( void )
 
 
 void botCmdTrout( IRCServer_t *server, IRCChannel_t *channel, char *who, 
-                  char *msg )
+                  char *msg, void *tag )
 {
     char           *message;
     char           *line;
@@ -124,7 +124,7 @@ void botCmdTrout( IRCServer_t *server, IRCChannel_t *channel, char *who,
     free(message);
 }
 
-char *botHelpTrout( void )
+char *botHelpTrout( void *tag )
 {
     static char *help = "Slaps someone with a trout on your behalf.  "
                         "Syntax: (in channel) trout nick [adjective] "

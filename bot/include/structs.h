@@ -94,13 +94,14 @@ typedef enum {
 } IRCMsgType_t;
 
 typedef void (*BotCmdFunc_t)( IRCServer_t *server, IRCChannel_t *channel, 
-                              char *who, char *msg );
-typedef char * (*BotCmdHelpFunc_t)( void );
+                              char *who, char *msg, void *tag );
+typedef char * (*BotCmdHelpFunc_t)( void *tag );
 
 typedef struct {
     char               *command;
     BotCmdFunc_t        func;
     BotCmdHelpFunc_t    helpFunc;
+    void               *tag;
 } BotCmd_t;
 
 typedef struct {
@@ -116,7 +117,7 @@ typedef struct {
 
 typedef void (*RegexpFunc_t)( IRCServer_t *server, IRCChannel_t *channel, 
                               char *who, char *msg, IRCMsgType_t type,
-                              int *ovector, int ovecsize );
+                              int *ovector, int ovecsize, void *tag );
 typedef struct {
     LinkedListItem_t    item;
     const char         *channelRegexp;
@@ -126,6 +127,7 @@ typedef struct {
     pcre               *reContent;
     pcre_extra         *peContent;
     RegexpFunc_t        func;
+    void               *tag;
 } Regexp_t;
 
 typedef enum {

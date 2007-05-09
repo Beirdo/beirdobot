@@ -39,15 +39,15 @@
 
 /* INTERNAL FUNCTION PROTOTYPES */
 void botCmdHelp( IRCServer_t *server, IRCChannel_t *channel, char *who, 
-                 char *msg );
+                 char *msg, void *tag );
 void botCmdList( IRCServer_t *server, IRCChannel_t *channel, char *who, 
-                 char *msg );
-char *botHelpHelp( void );
-char *botHelpList( void );
+                 char *msg, void *tag );
+char *botHelpHelp( void *tag );
+char *botHelpList( void *tag );
 
 void regexpBotCmdParse( IRCServer_t *server, IRCChannel_t *channel, char *who, 
                         char *msg, IRCMsgType_t type, int *ovector, 
-                        int ovecsize );
+                        int ovecsize, void *tag );
 
 /* CVS generated ID string */
 static char ident[] _UNUSED_ = 
@@ -84,7 +84,7 @@ void botCmd_initialize( void )
 }
 
 void botCmd_add( const char **command, BotCmdFunc_t func, 
-                 BotCmdHelpFunc_t helpFunc )
+                 BotCmdHelpFunc_t helpFunc, void *tag )
 {
     BalancedBTreeItem_t    *item;
     BotCmd_t               *cmd;
@@ -107,6 +107,7 @@ void botCmd_add( const char **command, BotCmdFunc_t func,
     cmd->command  = (char *)*command;
     cmd->func     = func;
     cmd->helpFunc = helpFunc;
+    cmd->tag      = tag;
     item->item = (void *)cmd;
     item->key  = (void *)command;
     BalancedBTreeAdd( botCmdTree, item, UNLOCKED, TRUE );
@@ -146,12 +147,12 @@ void regexpBotCmdAdd( IRCServer_t *server, IRCChannel_t *channel )
     snprintf( nickRegexp, 256, "(?i)^\\s*%s[:,]?\\s+(.*)$", server->nick );
 
     regexp_add( (const char *)chanRegexp, (const char *)nickRegexp, 
-                regexpBotCmdParse );
+                regexpBotCmdParse, NULL );
 }
 
 void regexpBotCmdParse( IRCServer_t *server, IRCChannel_t *channel, char *who, 
                         char *msg, IRCMsgType_t type, int *ovector, 
-                        int ovecsize )
+                        int ovecsize, void *tag )
 {
     char               *message;
 
@@ -175,7 +176,7 @@ int botCmd_parse( IRCServer_t *server, IRCChannel_t *channel, char *who,
     item = BalancedBTreeFind( botCmdTree, (void *)&cmd, UNLOCKED );
     if( item ) {
         cmdStruct = (BotCmd_t *)item->item;
-        cmdStruct->func( server, channel, who, line );
+        cmdStruct->func( server, channel, who, line, cmdStruct->tag );
         ret = 1;
     }
     free( cmd );
@@ -185,7 +186,7 @@ int botCmd_parse( IRCServer_t *server, IRCChannel_t *channel, char *who,
 
 
 void botCmdHelp( IRCServer_t *server, IRCChannel_t *channel, char *who, 
-                 char *msg )
+                 char *msg, void *tag )
 {
     char                   *line;
     char                   *cmd;
@@ -207,7 +208,7 @@ void botCmdHelp( IRCServer_t *server, IRCChannel_t *channel, char *who,
     if( item ) {
         cmdStruct = (BotCmd_t *)item->item;
         if( cmdStruct->helpFunc ) {
-            helpMsg = cmdStruct->helpFunc();
+            helpMsg = cmdStruct->helpFunc(cmdStruct->tag);
         }
     }
     free( cmd );
@@ -226,7 +227,7 @@ void botCmdHelp( IRCServer_t *server, IRCChannel_t *channel, char *who,
     }
 }
 
-char *botHelpHelp( void )
+char *botHelpHelp( void *tag )
 {
     static char *help = "Use \"help\" followed by a bot command.  For a list "
                         "of bot commands, use \"list\"";
@@ -283,7 +284,7 @@ char *botCmdDepthFirst( BalancedBTreeItem_t *item, bool filterPlugins )
 }
 
 void botCmdList( IRCServer_t *server, IRCChannel_t *channel, char *who, 
-                 char *msg )
+                 char *msg, void *tag )
 {
     char       *message;
 
@@ -307,7 +308,7 @@ void botCmdList( IRCServer_t *server, IRCChannel_t *channel, char *who,
     free( message );
 }
 
-char *botHelpList( void )
+char *botHelpList( void *tag )
 {
     static char *help = "Shows a list of supported bot commands.";
 

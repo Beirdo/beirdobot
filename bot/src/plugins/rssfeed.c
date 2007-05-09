@@ -117,8 +117,8 @@ typedef struct {
 
 /* INTERNAL FUNCTION PROTOTYPES */
 void botCmdRssfeed( IRCServer_t *server, IRCChannel_t *channel, char *who, 
-                    char *msg );
-char *botHelpRssfeed( void );
+                    char *msg, void *tag );
+char *botHelpRssfeed( void *tag );
 void *rssfeed_thread(void *arg);
 static int db_upgrade_schema( int current, int goal );
 static void db_load_rssfeeds( void );
@@ -187,7 +187,7 @@ void plugin_initialize( char *args )
     pthread_cond_init( &kickCond, NULL );
 
     thread_create( &rssfeedThreadId, rssfeed_thread, NULL, "thread_rssfeed" );
-    botCmd_add( (const char **)&command, botCmdRssfeed, botHelpRssfeed );
+    botCmd_add( (const char **)&command, botCmdRssfeed, botHelpRssfeed, NULL );
 }
 
 void plugin_shutdown( void )
@@ -473,7 +473,7 @@ void *rssfeed_thread(void *arg)
 }
 
 void botCmdRssfeed( IRCServer_t *server, IRCChannel_t *channel, char *who, 
-                    char *msg )
+                    char *msg, void *tag )
 {
     static char            *notauth = "You are not authorized, you can't do "
                                       "that!";
@@ -616,7 +616,7 @@ void botCmdRssfeed( IRCServer_t *server, IRCChannel_t *channel, char *who,
     free( command );
 }
 
-char *botHelpRssfeed( void )
+char *botHelpRssfeed( void *tag )
 {
     static char *help = "Enable/disable/list/show rssfeed notifications for a "
                         "channel.  Must be authenticated to use "

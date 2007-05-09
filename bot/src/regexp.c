@@ -51,7 +51,7 @@ void regexp_initialize( void )
 }
 
 void regexp_add( const char *channelRegexp, const char *contentRegexp, 
-                 RegexpFunc_t func )
+                 RegexpFunc_t func, void *tag )
 {
     Regexp_t    *item;
     const char  *error;
@@ -65,6 +65,8 @@ void regexp_add( const char *channelRegexp, const char *contentRegexp,
     if( !channelRegexp ) {
         channelRegexp = channelsAll;
     }
+
+    item->tag = tag;
 
     item->channelRegexp = channelRegexp;
     item->contentRegexp = contentRegexp;
@@ -170,7 +172,8 @@ void regexp_parse( IRCServer_t *server, IRCChannel_t *channel, char *who,
                         0, 0, ovector, 30 );
         if( rc >= 0 ) {
             /* We got a channel and content match, call the function */
-            regexp->func( server, channel, who, msg, type, ovector, rc );
+            regexp->func( server, channel, who, msg, type, ovector, rc,
+                          regexp->tag );
         }
     }
 

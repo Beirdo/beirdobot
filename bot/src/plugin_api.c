@@ -48,7 +48,7 @@ void pluginInitializeTree( BalancedBTreeItem_t *item );
 void pluginLoadItem( Plugin_t *plugin );
 void pluginUnloadItem( Plugin_t *plugin );
 void botCmdPlugin( IRCServer_t *server, IRCChannel_t *channel, char *who, 
-                   char *msg );
+                   char *msg, void *tag );
 
 BalancedBTree_t *pluginTree;
 
@@ -73,7 +73,7 @@ void plugins_initialize( void )
     pluginInitializeTree( pluginTree->root );
     BalancedBTreeUnlock( pluginTree );
 
-    botCmd_add( (const char **)&command, botCmdPlugin, NULL );
+    botCmd_add( (const char **)&command, botCmdPlugin, NULL, NULL );
 }
 
 void pluginInitializeTree( BalancedBTreeItem_t *item )
@@ -199,7 +199,7 @@ void pluginUnloadItem( Plugin_t *plugin )
 }
 
 void botCmdPlugin( IRCServer_t *server, IRCChannel_t *channel, char *who, 
-                   char *msg )
+                   char *msg, void *tag )
 {
     int             len;
     char           *line;

@@ -37,7 +37,8 @@
 
 /* INTERNAL FUNCTION PROTOTYPES */
 void regexpFuncFart( IRCServer_t *server, IRCChannel_t *channel, char *who, 
-                     char *msg, IRCMsgType_t type, int *ovector, int ovecsize );
+                     char *msg, IRCMsgType_t type, int *ovector, int ovecsize,
+                     void *tag );
 
 /* CVS generated ID string */
 static char ident[] _UNUSED_ = 
@@ -48,7 +49,7 @@ static char    *contentRegexp = "(?i)(\\s|^)farts?(\\s|\\.|$)";
 void plugin_initialize( char *args )
 {
     LogPrintNoArg( LOG_NOTICE, "Initializing fart..." );
-    regexp_add( NULL, (const char *)contentRegexp, regexpFuncFart );
+    regexp_add( NULL, (const char *)contentRegexp, regexpFuncFart, NULL );
 }
 
 void plugin_shutdown( void )
@@ -58,7 +59,8 @@ void plugin_shutdown( void )
 }
 
 void regexpFuncFart( IRCServer_t *server, IRCChannel_t *channel, char *who, 
-                     char *msg, IRCMsgType_t type, int *ovector, int ovecsize )
+                     char *msg, IRCMsgType_t type, int *ovector, int ovecsize,
+                     void *tag )
 {
     char       *message;
 

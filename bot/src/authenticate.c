@@ -306,7 +306,8 @@ void *authenticate_thread(void *arg)
     ts.tv_sec = 1;
     ts.tv_nsec = 0L;
 
-    botCmd_add( (const char **)&command, authenticate_state_machine, NULL );
+    botCmd_add( (const char **)&command, authenticate_state_machine, NULL, 
+                NULL );
 
     LogPrintNoArg(LOG_NOTICE, "Starting authenticate thread");
 
@@ -373,7 +374,7 @@ bool authenticate_check( IRCServer_t *server, char *nick )
 
 
 void authenticate_state_machine( IRCServer_t *server, IRCChannel_t *channel,
-                                 char *nick, char *msg )
+                                 char *nick, char *msg, void *tag )
 {
     LinkedListItem_t   *item;
     AuthData_t         *auth;

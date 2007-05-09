@@ -40,14 +40,14 @@
 
 /* INTERNAL FUNCTION PROTOTYPES */
 void botCmdSearch( IRCServer_t *server, IRCChannel_t *channel, char *who,
-                   char *msg );
+                   char *msg, void *tag );
 void botCmdSeen( IRCServer_t *server, IRCChannel_t *channel, char *who, 
-                 char *msg );
+                 char *msg, void *tag );
 void botCmdNotice( IRCServer_t *server, IRCChannel_t *channel, char *who, 
-                   char *msg );
-char *botHelpSearch( void );
-char *botHelpSeen( void );
-char *botHelpNotice( void );
+                   char *msg, void *tag );
+char *botHelpSearch( void *tag );
+char *botHelpSeen( void *tag );
+char *botHelpNotice( void *tag );
 void db_search_text( IRCServer_t *server, IRCChannel_t *channel, char *who, 
                      char *text );
 void result_search_text( MYSQL_RES *res, MYSQL_BIND *input, void *args );
@@ -71,9 +71,12 @@ void plugin_initialize( char *args )
     static char    *commands[] = { "search", "seen", "notice" };
 
     LogPrintNoArg( LOG_NOTICE, "Initializing core plugin..." );
-    botCmd_add( (const char **)&commands[0], botCmdSearch, botHelpSearch );
-    botCmd_add( (const char **)&commands[1], botCmdSeen,   botHelpSeen );
-    botCmd_add( (const char **)&commands[2], botCmdNotice, botHelpNotice );
+    botCmd_add( (const char **)&commands[0], botCmdSearch, botHelpSearch, 
+                NULL );
+    botCmd_add( (const char **)&commands[1], botCmdSeen,   botHelpSeen, 
+                NULL );
+    botCmd_add( (const char **)&commands[2], botCmdNotice, botHelpNotice,
+                NULL );
 }
 
 void plugin_shutdown( void )
@@ -86,7 +89,7 @@ void plugin_shutdown( void )
 
 
 void botCmdSearch( IRCServer_t *server, IRCChannel_t *channel, char *who, 
-                   char *msg )
+                   char *msg, void *tag )
 {
     char           *message;
     char           *search;
@@ -154,7 +157,7 @@ void botCmdSearch( IRCServer_t *server, IRCChannel_t *channel, char *who,
     free( message );
 }
 
-char *botHelpSearch( void )
+char *botHelpSearch( void *tag )
 {
     static char *help = "Search for text in a channel's log, "
                         "returns top 3 matches by privmsg.  "
@@ -165,7 +168,7 @@ char *botHelpSearch( void )
 }
 
 void botCmdSeen( IRCServer_t *server, IRCChannel_t *channel, char *who, 
-                 char *msg )
+                 char *msg, void *tag )
 {
     char           *message;
     static char    *huh = "Huh? Who?";
@@ -215,7 +218,7 @@ void botCmdSeen( IRCServer_t *server, IRCChannel_t *channel, char *who,
     }
 }
 
-char *botHelpSeen( void )
+char *botHelpSeen( void *tag )
 {
     static char *help = "Shows when the last time a user has been seen, or how"
                         " long they've been idle.  "
@@ -226,7 +229,7 @@ char *botHelpSeen( void )
 }
 
 void botCmdNotice( IRCServer_t *server, IRCChannel_t *channel, char *who, 
-                   char *msg )
+                   char *msg, void *tag )
 {
     char           *message;
     bool            privmsg = false;
@@ -273,7 +276,7 @@ void botCmdNotice( IRCServer_t *server, IRCChannel_t *channel, char *who,
     free( message );
 }
 
-char *botHelpNotice( void )
+char *botHelpNotice( void *tag )
 {
     static char *help = "Shows the channel's notice which includes the URL to "
                         " the logs online.  "

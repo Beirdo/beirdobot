@@ -44,8 +44,8 @@
 
 /* INTERNAL FUNCTION PROTOTYPES */
 void botCmdDig( IRCServer_t *server, IRCChannel_t *channel, char *who, 
-                char *msg );
-char *botHelpDig( void );
+                char *msg, void *tag );
+char *botHelpDig( void *tag );
 char           *findRR(char *domain, int requested_type);
 int skipToData(unsigned char *cp, unsigned short *type, unsigned short *class, 
                unsigned int *ttl, unsigned short *dlen, 
@@ -126,7 +126,7 @@ void plugin_initialize( char *args )
     BalancedBTreeUnlock( dnsTypeTree );
     BalancedBTreeUnlock( dnsTypeNumTree );
 
-    botCmd_add( (const char **)&command, botCmdDig, botHelpDig );
+    botCmd_add( (const char **)&command, botCmdDig, botHelpDig, NULL );
 }
 
 void plugin_shutdown( void )
@@ -283,7 +283,7 @@ void *dns_thread(void *arg)
 }
 
 void botCmdDig( IRCServer_t *server, IRCChannel_t *channel, char *who, 
-                char *msg )
+                char *msg, void *tag )
 {
     DNSItem_t      *item;
 
@@ -306,7 +306,7 @@ void botCmdDig( IRCServer_t *server, IRCChannel_t *channel, char *who,
     }
 }
 
-char *botHelpDig( void )
+char *botHelpDig( void *tag )
 {
     static char *help = "Looks up hosts in DNS.  "
                         "Syntax: dig hostname type @server or "

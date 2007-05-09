@@ -83,7 +83,7 @@ IRCChannel_t *FindChannel(IRCServer_t *server, const char *channame);
 
 void botCmd_initialize( void );
 void botCmd_add( const char **command, BotCmdFunc_t func,
-                 BotCmdHelpFunc_t helpFunc );
+                 BotCmdHelpFunc_t helpFunc, void *tag );
 void regexpBotCmdAdd( IRCServer_t *server, IRCChannel_t *channel );
 int botCmd_parse( IRCServer_t *server, IRCChannel_t *channel, char *who, 
                   char *msg );
@@ -101,7 +101,7 @@ bool pluginUnload( char *name );
 
 void regexp_initialize( void );
 void regexp_add( const char *channelRegexp, const char *contentRegexp, 
-                 RegexpFunc_t func );
+                 RegexpFunc_t func, void *tag );
 void regexp_remove( char *channelRegexp, char *contentRegexp );
 void regexp_parse( IRCServer_t *server, IRCChannel_t *channel, char *who, 
                    char *msg, IRCMsgType_t type );
@@ -113,7 +113,7 @@ void LoggedActionMessage( IRCServer_t *server, IRCChannel_t *channel,
 
 void authenticate_start(void);
 void authenticate_state_machine( IRCServer_t *server, IRCChannel_t *channel,
-                                 char *nick, char *msg );
+                                 char *nick, char *msg, void *tag );
 bool authenticate_check( IRCServer_t *server, char *nick );
 
 void logging_initialize( void );

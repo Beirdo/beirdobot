@@ -47,8 +47,8 @@
 
 /* INTERNAL FUNCTION PROTOTYPES */
 void botCmdLuascript( IRCServer_t *server, IRCChannel_t *channel, char *who, 
-                      char *msg );
-char *botHelpLuascript( void );
+                      char *msg, void *tag );
+char *botHelpLuascript( void *tag );
 
 BalancedBTree_t *db_get_luascripts( void );
 void result_get_luascripts( MYSQL_RES *res, MYSQL_BIND *input, void *arg );
@@ -122,6 +122,22 @@ static QueryTable_t luascriptQueryTable[] = {
       NULL, NULL, FALSE }
 };
 
+typedef struct {
+    LinkedListItem_t    link;
+    const char         *channelRegexp;
+    const char         *contentRegexp;
+    const char         *callback;
+    lua_State          *L;
+} LuaRegexp_t;
+
+typedef struct {
+    LinkedListItem_t    link;
+    const char         *command;
+    const char         *commandCallback;
+    const char         *helpCallback;
+    lua_State          *L;
+} LuaBotCmd_t;
+
 
 /* CVS generated ID string */
 static char ident[] _UNUSED_ = 
@@ -181,7 +197,8 @@ void plugin_initialize( char *args )
     luascriptInitializeTree( luascriptTree->root );
     BalancedBTreeUnlock( luascriptTree );
 
-    botCmd_add( (const char **)&command, botCmdLuascript, botHelpLuascript );
+    botCmd_add( (const char **)&command, botCmdLuascript, botHelpLuascript,
+                NULL );
 }
 
 void plugin_shutdown( void )
@@ -454,7 +471,7 @@ void luascriptUnloadItem( Luascript_t *luascript )
 
 
 void botCmdLuascript( IRCServer_t *server, IRCChannel_t *channel, char *who, 
-                      char *msg )
+                      char *msg, void *tag )
 {
     int             len;
     char           *line;
@@ -534,7 +551,7 @@ void botCmdLuascript( IRCServer_t *server, IRCChannel_t *channel, char *who,
     free( command );
 }
 
-char *botHelpLuascript( void )
+char *botHelpLuascript( void *tag )
 {
     static char *help = "Loads, unloads and lists LUA scripted plugins "
                         "(requires authentication)  "
