@@ -138,12 +138,14 @@ typedef struct {
     lua_State          *L;
 } LuaBotCmd_t;
 
-static void luaRegexpRemove( Luascript_t *luascript, char *channelRegexp, 
-                             char *contentRegexp );
 static void luaTrashRegexp( Luascript_t *luascript, LuaRegexp_t *regexp );
+static void luaTrashCommand( Luascript_t *luascript, LuaBotCmd_t *cmd );
 void luaRegexpFunc( IRCServer_t *server, IRCChannel_t *channel, char *who, 
                     char *msg, IRCMsgType_t type, int *ovector, int ovecsize,
                     void *tag );
+void luaCommandFunc( IRCServer_t *server, IRCChannel_t *channel, char *who, 
+                     char *msg, void *tag );
+char *luaHelpFunc( void *tag );
 
 /* CVS generated ID string */
 static char ident[] _UNUSED_ = 
@@ -452,6 +454,9 @@ bool luascriptLoadItem( Luascript_t *luascript )
     lua_pushlightuserdata(L, (void *)luascript);
     lua_setglobal(L, "luascript");
 
+    lua_pushlightuserdata(L, NULL);
+    lua_setglobal(L, "null");
+
     lua_getglobal(L, "initialize");
     retval = lua_pcall(L, 0, 0, 0);
     if( retval ) {
@@ -468,6 +473,7 @@ void luascriptUnloadItem( Luascript_t *luascript )
 {
     LinkedListItem_t       *item;
     LuaRegexp_t            *regexp;
+    LuaBotCmd_t            *cmd;
 
     if( !luascript ) {
         return;
@@ -481,15 +487,22 @@ void luascriptUnloadItem( Luascript_t *luascript )
     luascript->loaded = false;
 
     LinkedListLock( luascript->regexps );
-
     for( item = luascript->regexps->head; item; 
          item = luascript->regexps->head ) {
         regexp = (LuaRegexp_t *)item;
 
         luaTrashRegexp( luascript, regexp );
     }
-
     LinkedListUnlock( luascript->regexps );
+
+    LinkedListLock( luascript->commands );
+    for( item = luascript->commands->head; item; 
+         item = luascript->commands->head ) {
+        cmd = (LuaBotCmd_t *)item;
+
+        luaTrashCommand( luascript, cmd );
+    }
+    LinkedListUnlock( luascript->commands );
 }
 
 
@@ -708,15 +721,52 @@ static void luaTrashRegexp( Luascript_t *luascript, LuaRegexp_t *regexp )
     free( item );
 }
 
-static void luaRegexpRemove( Luascript_t *luascript, char *channelRegexp,
-                             char *contentRegexp )
+static void luaTrashCommand( Luascript_t *luascript, LuaBotCmd_t *cmd )
 {
+    LinkedListItem_t       *item;
+
+    if( !luascript || !cmd ) {
+        return;
+    }
+
+    item = (LinkedListItem_t *)cmd;
+
+    botCmd_remove( (char *)cmd->command ); 
+
+    LinkedListRemove( luascript->commands, item, LOCKED );
+
+    if( cmd->command ) {
+        free( (char *)cmd->command );
+    }
+
+    if( cmd->commandCallback ) {
+        free( (char *)cmd->commandCallback );
+    }
+
+    if( cmd->helpCallback ) {
+        free( (char *)cmd->helpCallback );
+    }
+
+    free( item );
+}
+
+static int lua_regexp_remove( lua_State *L )
+{
+    char               *channelRegexp;
+    char               *contentRegexp;
+    Luascript_t        *luascript;
     LinkedListItem_t   *item;
     LuaRegexp_t        *regexp;
     bool                found;
 
+    channelRegexp = (char *)luaL_checkstring(L, 1);
+    contentRegexp = (char *)luaL_checkstring(L, 2);
+
+    lua_getglobal(L, "luascript");
+    luascript = (Luascript_t *)lua_touserdata(L, -1);
+
     if( !luascript ) {
-        return;
+        return( 0 );
     }
 
     LinkedListLock(luascript->regexps);
@@ -736,31 +786,76 @@ static void luaRegexpRemove( Luascript_t *luascript, char *channelRegexp,
     }
 
     LinkedListUnlock(luascript->regexps);
-}
-
-static int lua_regexp_remove( lua_State *L )
-{
-    char               *channelRegexp;
-    char               *contentRegexp;
-    Luascript_t        *luascript;
-
-    channelRegexp = (char *)luaL_checkstring(L, 1);
-    contentRegexp = (char *)luaL_checkstring(L, 2);
-
-    lua_getglobal(L, "luascript");
-    luascript = (Luascript_t *)lua_touserdata(L, -1);
-
-    luaRegexpRemove( luascript, channelRegexp, contentRegexp );
     return( 0 );
 }
 
 static int lua_botCmd_add( lua_State *L )
 {
+    char           *command;
+    char           *commandCallback;
+    char           *helpCallback;
+    LuaBotCmd_t    *item;
+    Luascript_t    *luascript;
+
+    command         = (char *)lua_tostring(L, 1);
+    commandCallback = (char *)lua_tostring(L, 2);
+    helpCallback    = (char *)lua_tostring(L, 3);
+
+    lua_getglobal(L, "luascript");
+    luascript = (Luascript_t *)lua_touserdata(L, -1);
+
+    item = (LuaBotCmd_t *)malloc(sizeof(LuaBotCmd_t));
+    item->command = ( command ? 
+                      (const char *)strdup(command) :
+                      NULL );
+    item->commandCallback = ( commandCallback ?
+                              (const char *)strdup(commandCallback) :
+                              NULL );
+    item->helpCallback    = ( helpCallback ?
+                              (const char *)strdup(helpCallback) :
+                              NULL );
+    item->L = luascript->L;
+
+    LinkedListAdd( luascript->commands, (LinkedListItem_t *)item, UNLOCKED,
+                   AT_TAIL );
+
+    botCmd_add( &item->command, luaCommandFunc, luaHelpFunc, item );
     return( 0 );
 }
 
 static int lua_botCmd_remove( lua_State *L )
 {
+    char               *command;
+    Luascript_t        *luascript;
+    LinkedListItem_t   *item;
+    LuaBotCmd_t        *cmd;
+    bool                found;
+
+    command = (char *)luaL_checkstring(L, 1);
+
+    lua_getglobal(L, "luascript");
+    luascript = (Luascript_t *)lua_touserdata(L, -1);
+
+    if( !luascript ) {
+        return( 0 );
+    }
+
+    LinkedListLock(luascript->commands);
+
+    for( item = luascript->commands->head, found = FALSE; item && !found; 
+         item = item->next ) {
+        cmd = (LuaBotCmd_t *)item;
+
+        if( !strcmp( command, cmd->command ) ) {
+            found = TRUE;
+        }
+    }
+
+    if( found ) {
+        luaTrashCommand( luascript, cmd );
+    }
+
+    LinkedListUnlock(luascript->commands);
     return( 0 );
 }
 
@@ -799,6 +894,61 @@ void luaRegexpFunc( IRCServer_t *server, IRCChannel_t *channel, char *who,
         LogPrint( LOG_CRIT, "Error calling LUA script callback %s : %s", 
                             regexp->callback, lua_tostring(L, -1) );
     }
+}
+
+void luaCommandFunc( IRCServer_t *server, IRCChannel_t *channel, char *who, 
+                     char *msg, void *tag )
+{
+    lua_State          *L;
+    LuaBotCmd_t        *cmd;
+    int                 retval;
+
+    cmd = (LuaBotCmd_t *)tag;
+    if( !cmd || !cmd->commandCallback ) {
+        return;
+    }
+
+    L = cmd->L;
+
+    /* same order to how they appear in the function def in lua */
+    lua_getglobal(L, cmd->commandCallback);
+    lua_pushlightuserdata(L, (void *)server);
+    lua_pushlightuserdata(L, (void *)channel);
+    lua_pushstring(L, who);
+    lua_pushstring(L, msg);
+
+    retval = lua_pcall(L, 4, 0, 0);
+    if( retval ) {
+        LogPrint( LOG_CRIT, "Error calling LUA script callback %s : %s", 
+                            cmd->commandCallback, lua_tostring(L, -1) );
+    }
+}
+
+char *luaHelpFunc( void *tag )
+{
+    lua_State          *L;
+    LuaBotCmd_t        *cmd;
+    int                 retval;
+    char               *msg;
+
+    cmd = (LuaBotCmd_t *)tag;
+    if( !cmd || !cmd->helpCallback ) {
+        return( NULL );
+    }
+
+    L = cmd->L;
+
+    lua_getglobal(L, cmd->helpCallback);
+
+    retval = lua_pcall(L, 0, 1, 0);
+    if( retval ) {
+        LogPrint( LOG_CRIT, "Error calling LUA script callback %s : %s", 
+                            cmd->commandCallback, lua_tostring(L, -1) );
+    }
+
+    msg = (char *)lua_tostring(L, -1);
+
+    return( msg );
 }
 
 /*
