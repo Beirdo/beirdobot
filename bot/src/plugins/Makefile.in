@@ -34,8 +34,9 @@ DLLIBS_rssfeed	= $(shell PKG_CONFIG_PATH=${PKGCONFIGPATH} pkg-config --libs nxml
 DLLIBS_rssfeed += $(shell PKG_CONFIG_PATH=${PKGCONFIGPATH} pkg-config --libs mrss)
 DLLIBS_rssfeed += -lcurl
 DLLIBS_luascript = $(shell ${LUACFG} --libs)
+DLLIBS_mailbox	= -lc-client
 
-SRCS	= trout.c fart.c core.c dns.c rssfeed.c luascript.c
+SRCS	= trout.c fart.c core.c dns.c rssfeed.c luascript.c mailbox.c
 OBJS	= ${SRCS:%.c=plugin_%.so}
 DEPS	= ${SRCS:.c=.d}
 
