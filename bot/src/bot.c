@@ -287,7 +287,7 @@ void ProcOnWho(BN_PInfo I, const char Channel[], const char *Info[],
         LogPrint( LOG_DEBUG, "Who infos for channel (%s)", Channel);
     }
 
-    db_nick_history( channel, NULL, HIST_START );
+    db_nick_history( channel, "", HIST_START );
     for (i = 0; i < (Count * WHO_INFO_COUNT); i += WHO_INFO_COUNT) {
         if( verbose ) {
             LogPrint( LOG_DEBUG, "\t%s,%s,%s,%s,%s,%s", Info[i + 0], 

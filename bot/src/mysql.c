@@ -495,6 +495,7 @@ MYSQL_RES *db_query( const char *query, MYSQL_BIND *args, int arg_count,
         retval = mysql_errno(item->sql);
         LogPrint( LOG_CRIT, "MySQL error %d: %s", retval,
                             mysql_error(item->sql) );
+        LogPrint( LOG_CRIT, "MySQL query: %s", sqlbuf );
 
         if( retval == CR_SERVER_GONE_ERROR || retval == CR_SERVER_LOST ) {
             *connected = FALSE;
