@@ -675,15 +675,15 @@ void db_load_channels(void)
     pthread_mutex_t    *mutex;
     MYSQL_BIND         *data;
 
-    data = (MYSQL_BIND *)malloc(sizeof(MYSQL_BIND));
-    memset( data, 0, sizeof(MYSQL_BIND) );
-
     mutex = (pthread_mutex_t *)malloc(sizeof(pthread_mutex_t));
     pthread_mutex_init( mutex, NULL );
 
     LinkedListLock( ServerList );
     
     for( item = ServerList->head; item; item = item->next ) {
+        data = (MYSQL_BIND *)malloc(sizeof(MYSQL_BIND));
+        memset( data, 0, sizeof(MYSQL_BIND) );
+
         server = (IRCServer_t *)item;
 
         bind_numeric( &data[0], server->serverId, MYSQL_TYPE_LONG );
