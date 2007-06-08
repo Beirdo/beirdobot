@@ -292,6 +292,7 @@ void floodCleanup( IRCServer_t *server )
 
         if( flood->timeWake <= time ) {
             LinkedListRemove( server->floodList, item, LOCKED );
+            free( item );
             item = prev;
         }
     }

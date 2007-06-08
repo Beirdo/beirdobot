@@ -255,6 +255,10 @@ void *mysql_thread( void *arg ) {
                     free( item->queryData[i].buffer );
                 }
             }
+
+            if( item->queryData ) {
+                free( item->queryData );
+            }
         }
 
         free( item );
