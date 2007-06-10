@@ -355,7 +355,7 @@ char *db_quote(char *string)
     len = strlen(string);
 
     for(i = 0, count = 0; i < len; i++) {
-        if( string[i] == '\'' || string[i] == '\"' ) {
+        if( string[i] == '\'' || string[i] == '\"' || string[i] == '\\' ) {
             count++;
         }
     }
@@ -366,7 +366,7 @@ char *db_quote(char *string)
 
     retString = (char *)malloc(len + count + 1);
     for(i = 0, j = 0; i < len; i++, j++) {
-        if( string[i] == '\'' || string[i] == '\"' ) {
+        if( string[i] == '\'' || string[i] == '\"' | string[i] == '\\' ) {
             retString[j++] = '\\';
         }
         retString[j] = string[i];
