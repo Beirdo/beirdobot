@@ -73,7 +73,9 @@ class irc_channel {
     // Keep a reference to this channel's server
         $this->server       =& $Servers[$this->serverid];
     // Add this channel to its parent server
-        $Servers[$this->serverid]->add_channel($this);
+	if( $this->server ) {
+	    $Servers[$this->serverid]->add_channel($this);
+	}
     }
 
 /**
