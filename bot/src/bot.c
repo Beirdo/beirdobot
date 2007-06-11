@@ -141,8 +141,13 @@ void ProcOnUnknown(BN_PInfo I, const char Who[], const char Command[],
 
 void ProcOnError(BN_PInfo I, int err)
 {
-    if( verbose ) {
-        LogPrint( LOG_DEBUG, "Event Error : (%d)", err);
+    IRCServer_t        *server;
+
+    if( verbose || 1 ) {
+        server = (IRCServer_t *)I->User;
+
+        LogPrint( LOG_DEBUG, "Event Error : %s (%d) : Server %s", 
+                             strerror(err), err, server->server );
     }
 }
 

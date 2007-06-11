@@ -50,7 +50,11 @@ typedef unsigned int bool;
 #define false 0
 #define true 1
 
+#if 0
 #define BN_SOCKET_TIMEOUT 300 /* Wait for data up to 5 min... else time out */
+#else
+#define BN_SOCKET_TIMEOUT 450 /* Wait for data up to 7.5 min... else time out */
+#endif
 
 #define BN_LOW_PRIORITY      0
 #define BN_HIGH_PRIORITY     1
