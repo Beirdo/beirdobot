@@ -316,7 +316,7 @@ void *mailbox_thread(void *arg)
             db_update_lastpoll( mailbox->mailboxId, now.tv_sec );
 
             if( !mail_ping( mailbox->stream ) ) {
-                mail_open( mailbox->stream, mailbox->serverSpec, OP_HALFOPEN );
+                mail_open( mailbox->stream, mailbox->serverSpec, 0 );
             }
             mail_status( mailbox->stream, mailbox->serverSpec, 
                          SA_MESSAGES | SA_RECENT | SA_UNSEEN );
@@ -451,7 +451,6 @@ static void result_load_mailboxes( MYSQL_RES *res, MYSQL_BIND *input,
 #endif
 
     for( i = 0; i < count; i++ ) {
-        LogPrint( LOG_CRIT, "Loop, i=%d, count=%d", i, count );
         row = mysql_fetch_row(res);
 
         mailbox = (Mailbox_t *)malloc(sizeof(Mailbox_t));
@@ -516,16 +515,21 @@ static void result_load_mailboxes( MYSQL_RES *res, MYSQL_BIND *input,
         mail_valid_net_parse( mailbox->serverSpec, &mailbox->netmbx );
 
         /* Setup the MAILSTREAM structure */
-        mailbox->stream = mail_open( NULL, mailbox->serverSpec, OP_HALFOPEN );
+        mailbox->stream = mail_open( NULL, mailbox->serverSpec, 0 );
 
-        item = (BalancedBTreeItem_t *)malloc(sizeof(BalancedBTreeItem_t));
-        item->item = (void *)mailbox;
-        item->key  = (void *)&mailbox->stream->mailbox;
-        BalancedBTreeAdd( mailboxStreamTree, item, UNLOCKED, FALSE );
+        if( mailbox->stream ) {
+            item = (BalancedBTreeItem_t *)malloc(sizeof(BalancedBTreeItem_t));
+            item->item = (void *)mailbox;
+            item->key  = (void *)&mailbox->stream->mailbox;
+            BalancedBTreeAdd( mailboxStreamTree, item, UNLOCKED, FALSE );
 
-        mail_status( mailbox->stream, mailbox->serverSpec, 
-                     SA_MESSAGES | SA_RECENT | SA_UNSEEN );
-        LogPrint( LOG_CRIT, "Looping, i=%d", i );
+            mail_status( mailbox->stream, mailbox->serverSpec, 
+                         SA_MESSAGES | SA_RECENT | SA_UNSEEN );
+        } else {
+            LogPrint( LOG_CRIT, "Mailbox: Mailbox %d failed", 
+                                mailbox->mailboxId );
+            mailbox->enabled = FALSE;
+        }
     }
 
     BalancedBTreeAdd( mailboxTree, NULL, LOCKED, TRUE );
