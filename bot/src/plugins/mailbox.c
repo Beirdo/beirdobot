@@ -58,15 +58,20 @@ static char ident[] _UNUSED_ =
 typedef struct {
     int         mailboxId;
     char       *server;
+    int         port;
     char       *user;
     char       *password;
     char       *protocol;
     char       *options;
+    char       *mailbox;
     int         interval;
     int         lastCheck;
     int         lastRead;
     time_t      nextPoll;
     bool        enabled;
+    char       *serverSpec;
+    NETMBX      netmbx;
+    MAILSTREAM *stream;
 } Mailbox_t;
 
 typedef QueryTable_t SchemaUpgrade_t[MAX_SCHEMA_QUERY];
@@ -76,9 +81,11 @@ static QueryTable_t defSchema[] = {
     "    `mailboxId` INT NULL AUTO_INCREMENT PRIMARY KEY ,\n"
     "    `server` VARCHAR( 255 ) NOT NULL ,\n"
     "    `user` VARCHAR( 255 ) NOT NULL ,\n"
+    "    `port` INT NOT NULL DEFAULT '0',\n"
     "    `password` VARCHAR( 255 ) NOT NULL ,\n"
     "    `protocol` VARCHAR( 32 ) NOT NULL ,\n"
     "    `options` VARCHAR( 255 ) NOT NULL ,\n"
+    "    `mailbox` VARCHAR( 255 ) NOT NULL ,\n"
     "    `pollInterval` INT NOT NULL DEFAULT '600',\n"
     "    `lastCheck` INT NOT NULL DEFAULT '0',\n"
     "    `lastRead` INT NOT NULL DEFAULT '0'\n"
@@ -93,13 +100,12 @@ static SchemaUpgrade_t schemaUpgrade[CURRENT_SCHEMA_MAILBOX] = {
 
 static QueryTable_t mailboxQueryTable[] = {
     /* 0 */
-    { "SELECT mailboxId, server, user, password, protocol, options, "
-      "pollInterval, lastCheck, lastRead FROM `plugin_mailbox` ORDER BY "
-      "`mailboxId` ASC", NULL, NULL, FALSE },
+    { "SELECT mailboxId, server, port, user, password, protocol, options, "
+      "mailbox, pollInterval, lastCheck, lastRead FROM `plugin_mailbox` "
+      "ORDER BY `mailboxId` ASC", NULL, NULL, FALSE },
     /* 1 */
-    { "UPDATE `plugin_mailbox` SET `lastCheck` = ?, `lastRead` = ? "
-      "WHERE `mailboxId` = ?", NULL,
-      NULL, FALSE }
+    { "UPDATE `plugin_mailbox` SET `lastCheck` = ? WHERE `mailboxId` = ?", 
+      NULL, NULL, FALSE }
 };
 
 
@@ -114,6 +120,11 @@ static void result_load_mailboxes( MYSQL_RES *res, MYSQL_BIND *input,
                                    void *args );
 void mailboxFindUnconflictingTime( BalancedBTree_t *tree, time_t *key );
 char *botMailboxDump( BalancedBTreeItem_t *item );
+Mailbox_t *mailboxFindByNetmbx( NETMBX *netmbx );
+Mailbox_t *mailboxFindByStream( MAILSTREAM *stream );
+BalancedBTreeItem_t *mailboxRecurseFindNetmbx( BalancedBTreeItem_t *node, 
+                                               NETMBX *netmbx );
+void db_update_lastpoll( int mailboxId, int lastPoll );
 
 
 /* INTERNAL VARIABLES  */
@@ -124,6 +135,7 @@ static pthread_mutex_t  signalMutex;
 static pthread_cond_t   kickCond;
 BalancedBTree_t        *mailboxTree;
 BalancedBTree_t        *mailboxActiveTree;
+BalancedBTree_t        *mailboxStreamTree;
 
 
 void plugin_initialize( char *args )
@@ -159,18 +171,19 @@ void plugin_initialize( char *args )
         }
     } while( ver < CURRENT_SCHEMA_MAILBOX );
 
-    db_load_mailboxes();
-
     pthread_mutex_init( &shutdownMutex, NULL );
     pthread_mutex_init( &signalMutex, NULL );
     pthread_cond_init( &kickCond, NULL );
 
-    thread_create( &mailboxThreadId, mailbox_thread, NULL, "mailbox_rssfeed" );
+    thread_create( &mailboxThreadId, mailbox_thread, NULL, "thread_mailbox" );
     botCmd_add( (const char **)&command, botCmdMailbox, botHelpMailbox, NULL );
 }
 
 void plugin_shutdown( void )
 {
+    Mailbox_t              *mailbox;
+    BalancedBTreeItem_t    *item;
+
     LogPrintNoArg( LOG_NOTICE, "Removing mailbox..." );
     botCmd_remove( "mailbox" );
 
@@ -190,21 +203,143 @@ void plugin_shutdown( void )
     pthread_cond_destroy( &kickCond );
     pthread_mutex_destroy( &signalMutex );
 
+    /* Need to free the items too! */
+    BalancedBTreeLock( mailboxStreamTree );
+    BalancedBTreeDestroy( mailboxStreamTree );
+
+    BalancedBTreeLock( mailboxActiveTree );
+    while( mailboxActiveTree->root ) {
+        item = mailboxActiveTree->root;
+        mailbox = (Mailbox_t *)item->item;
+        mail_close( mailbox->stream );
+        BalancedBTreeRemove( mailboxActiveTree, item, LOCKED, FALSE );
+        free( item );
+    }
+    BalancedBTreeDestroy( mailboxActiveTree );
+
+    BalancedBTreeLock( mailboxTree );
+    while( mailboxTree->root ) {
+        item = mailboxTree->root;
+        mailbox = (Mailbox_t *)item->item;
+        free( mailbox->server );
+        free( mailbox->user );
+        free( mailbox->password );
+        free( mailbox->protocol );
+        free( mailbox->options );
+        free( mailbox->mailbox );
+        free( mailbox->serverSpec );
+        BalancedBTreeRemove( mailboxTree, item, LOCKED, FALSE );
+        free( item );
+    }
+    BalancedBTreeDestroy( mailboxTree );
+
     thread_deregister( mailboxThreadId );
 }
 
 void *mailbox_thread(void *arg)
 {
+    time_t                  nextpoll;
+    struct timeval          now;
+    time_t                  delta;
+    BalancedBTreeItem_t    *item;
+    Mailbox_t              *mailbox;
+    struct tm               tm;
+    int                     retval;
+    bool                    done;
+    long                    localoffset;
+    struct timespec         ts;
 
     pthread_mutex_lock( &shutdownMutex );
     db_thread_init();
 
     LogPrintNoArg( LOG_NOTICE, "Starting Mailbox thread" );
 
+    /* Include the c-client library initialization */
+    #include <c-client/linkage.c>
+
+    db_load_mailboxes();
+
     sleep(5);
 
     while( !GlobalAbort && !threadAbort ) {
-        sleep(10);
+        BalancedBTreeLock( mailboxActiveTree );
+        item = BalancedBTreeFindLeast( mailboxActiveTree->root );
+        BalancedBTreeUnlock( mailboxActiveTree );
+
+        gettimeofday( &now, NULL );
+        localtime_r( &now.tv_sec, &tm );
+        localoffset = tm.tm_gmtoff;
+
+        delta = 60;
+        if( !item ) {
+            /* Nothing configured to be active, check in 15min */
+            delta = 900;
+            goto DelayPoll;
+        } 
+        
+        mailbox = (Mailbox_t *)item->item;
+        nextpoll = mailbox->nextPoll;
+        if( nextpoll > now.tv_sec + 15 || !ServerList ) {
+            delta = nextpoll - now.tv_sec;
+            goto DelayPoll;
+        }
+
+        /* Trigger all mailboxes expired or to expire in <= 15s */
+        BalancedBTreeLock( mailboxActiveTree );
+        for( done = FALSE; item && !done && !threadAbort ; 
+             item = BalancedBTreeFindLeast( mailboxActiveTree->root ) ) {
+            gettimeofday( &now, NULL );
+            mailbox = (Mailbox_t *)item->item;
+            LogPrint( LOG_NOTICE, "Mailbox: mailbox %d poll in %lds", 
+                                  mailbox->mailboxId,
+                                  mailbox->nextPoll - now.tv_sec );
+            if( mailbox->nextPoll > now.tv_sec + 15 ) {
+                delta = mailbox->nextPoll - now.tv_sec;
+                done = TRUE;
+                continue;
+            }
+
+            /* This mailbox needs to be polled now!   Remove it, and requeue it
+             * in the tree, then poll it
+             */
+            LogPrint( LOG_NOTICE, "Mailbox: polling mailbox %d (%s)", 
+                                  mailbox->mailboxId, mailbox->serverSpec );
+
+            BalancedBTreeRemove( mailboxActiveTree, item, LOCKED, FALSE );
+
+            /* Adjust the poll time to avoid conflict */
+            mailbox->nextPoll = now.tv_sec + mailbox->interval;
+            mailboxFindUnconflictingTime( mailboxActiveTree, 
+                                          &mailbox->nextPoll );
+            BalancedBTreeAdd( mailboxActiveTree, item, LOCKED, FALSE );
+
+            db_update_lastpoll( mailbox->mailboxId, now.tv_sec );
+
+            if( !mail_ping( mailbox->stream ) ) {
+                mail_open( mailbox->stream, mailbox->serverSpec, OP_HALFOPEN );
+            }
+            mail_status( mailbox->stream, mailbox->serverSpec, 
+                         SA_MESSAGES | SA_RECENT | SA_UNSEEN );
+        }
+
+        /* Rebalance the trees */
+        BalancedBTreeAdd( mailboxActiveTree, NULL, LOCKED, TRUE );
+        BalancedBTreeUnlock( mailboxActiveTree );
+
+    DelayPoll:
+        LogPrint( LOG_NOTICE, "Mailbox: sleeping for %ds", delta );
+
+        gettimeofday( &now, NULL );
+        ts.tv_sec  = now.tv_sec + delta;
+        ts.tv_nsec = now.tv_usec * 1000;
+
+        pthread_mutex_lock( &signalMutex );
+        retval = pthread_cond_timedwait( &kickCond, &signalMutex, &ts );
+        pthread_mutex_unlock( &signalMutex );
+
+        if( retval != ETIMEDOUT ) {
+            LogPrintNoArg( LOG_NOTICE, "Mailbox: thread woken up early" );
+        }
     }
 
     LogPrintNoArg( LOG_NOTICE, "Shutting down Mailbox thread" );
@@ -261,6 +396,7 @@ static void db_load_mailboxes( void )
 
     mailboxTree       = BalancedBTreeCreate( BTREE_KEY_INT );
     mailboxActiveTree = BalancedBTreeCreate( BTREE_KEY_INT );
+    mailboxStreamTree = BalancedBTreeCreate( BTREE_KEY_STRING );
 
     mutex = (pthread_mutex_t *)malloc(sizeof(pthread_mutex_t));
     pthread_mutex_init( mutex, NULL );
@@ -270,6 +406,21 @@ static void db_load_mailboxes( void )
     pthread_mutex_unlock( mutex );
     pthread_mutex_destroy( mutex );
     free( mutex );
+}
+
+void db_update_lastpoll( int mailboxId, int lastPoll )
+{
+    MYSQL_BIND         *data;
+
+    data = (MYSQL_BIND *)malloc(2 * sizeof(MYSQL_BIND));
+    memset( data, 0, 2 * sizeof(MYSQL_BIND) );
+
+    bind_numeric( &data[0], lastPoll, MYSQL_TYPE_LONG );
+    bind_numeric( &data[1], mailboxId, MYSQL_TYPE_LONG );
+
+    LogPrint( LOG_NOTICE, "Mailbox: mailbox %d: updating lastpoll to %d", 
+                          mailboxId, lastPoll );
+    db_queue_query( 1, mailboxQueryTable, data, 2, NULL, NULL, NULL );
 }
 
 static void result_load_mailboxes( MYSQL_RES *res, MYSQL_BIND *input, 
@@ -283,6 +434,8 @@ static void result_load_mailboxes( MYSQL_RES *res, MYSQL_BIND *input,
     time_t                  nextpoll;
     char                   *message;
     Mailbox_t              *mailbox;
+    int                     len;
+    char                    port[32], user[300], service[64];
 
     if( !res || !(count = mysql_num_rows(res)) ) {
         return;
@@ -292,9 +445,13 @@ static void result_load_mailboxes( MYSQL_RES *res, MYSQL_BIND *input,
     nextpoll = tv.tv_sec;
 
     BalancedBTreeLock( mailboxTree );
+#if 0
     BalancedBTreeLock( mailboxActiveTree );
+    BalancedBTreeLock( mailboxStreamTree );
+#endif
 
     for( i = 0; i < count; i++ ) {
+        LogPrint( LOG_CRIT, "Loop, i=%d, count=%d", i, count );
         row = mysql_fetch_row(res);
 
         mailbox = (Mailbox_t *)malloc(sizeof(Mailbox_t));
@@ -302,47 +459,86 @@ static void result_load_mailboxes( MYSQL_RES *res, MYSQL_BIND *input,
 
         mailbox->mailboxId = atoi(row[0]);
         mailbox->server    = strdup(row[1]);
-        mailbox->user      = strdup(row[2]);
-        mailbox->password  = strdup(row[3]);
-        mailbox->protocol  = strdup(row[4]);
-        mailbox->options   = strdup(row[5]);
-        mailbox->interval  = atoi(row[6]);
-        mailbox->lastCheck = atol(row[7]);
-        mailbox->lastRead  = atol(row[8]);
+        mailbox->port      = atoi(row[2]);
+        mailbox->user      = strdup(row[3]);
+        mailbox->password  = strdup(row[4]);
+        mailbox->protocol  = strdup(row[5]);
+        mailbox->options   = strdup(row[6]);
+        mailbox->mailbox   = ( *row[7] ? strdup(row[7]) : strdup("INBOX") );
+        mailbox->interval  = atoi(row[8]);
+        mailbox->lastCheck = atol(row[9]);
+        mailbox->lastRead  = atol(row[10]);
         if( mailbox->lastCheck + mailbox->interval <= nextpoll + 1 ) {
             mailbox->nextPoll  = nextpoll++;
         } else {
             mailbox->nextPoll = mailbox->lastCheck + mailbox->interval;
         }
         mailbox->enabled   = TRUE;
+        len = strlen(mailbox->server) + strlen(mailbox->options) + 
+              strlen(mailbox->mailbox) + 4;
 
+        if( mailbox->port ) {
+            sprintf( port, ":%d", mailbox->port );
+        } else {
+            port[0] = '\0';
+        }
+
+        sprintf( service, "/service=%s", mailbox->protocol );
+        sprintf( user, "/user=%s", mailbox->user );
+        
+        len += strlen( port ) + strlen( service ) + strlen( user );
+        mailbox->serverSpec = (char *)malloc(len);
+        snprintf( mailbox->serverSpec, len, "{%s%s%s%s%s}%s", mailbox->server,
+                  port, user, service, mailbox->options, mailbox->mailbox );
+
+        /* Store by ID */
         item = (BalancedBTreeItem_t *)malloc(sizeof(BalancedBTreeItem_t));
         item->item = (void *)mailbox;
         item->key  = (void *)&mailbox->mailboxId;
         BalancedBTreeAdd( mailboxTree, item, LOCKED, FALSE );
 
+        /* Setup the next poll */
         item = (BalancedBTreeItem_t *)malloc(sizeof(BalancedBTreeItem_t));
         item->item = (void *)mailbox;
         item->key  = (void *)&mailbox->nextPoll;
 
         /* Adjust the poll time to avoid conflict */
+        BalancedBTreeLock( mailboxActiveTree );
         mailboxFindUnconflictingTime( mailboxActiveTree, &mailbox->nextPoll );
         BalancedBTreeAdd( mailboxActiveTree, item, LOCKED, FALSE );
+        BalancedBTreeUnlock( mailboxActiveTree );
         LogPrint( LOG_NOTICE, "Mailbox: Loaded %d: server %s, user %s, "
                               "interval %d", mailbox->mailboxId,
                               mailbox->server, mailbox->user, 
                               mailbox->interval );
+
+        /* Set up the NETMBX structure */
+        mail_valid_net_parse( mailbox->serverSpec, &mailbox->netmbx );
+
+        /* Setup the MAILSTREAM structure */
+        mailbox->stream = mail_open( NULL, mailbox->serverSpec, OP_HALFOPEN );
+
+        item = (BalancedBTreeItem_t *)malloc(sizeof(BalancedBTreeItem_t));
+        item->item = (void *)mailbox;
+        item->key  = (void *)&mailbox->stream->mailbox;
+        BalancedBTreeAdd( mailboxStreamTree, item, UNLOCKED, FALSE );
+
+        mail_status( mailbox->stream, mailbox->serverSpec, 
+                     SA_MESSAGES | SA_RECENT | SA_UNSEEN );
+        LogPrint( LOG_CRIT, "Looping, i=%d", i );
     }
 
     BalancedBTreeAdd( mailboxTree, NULL, LOCKED, TRUE );
-    BalancedBTreeAdd( mailboxActiveTree, NULL, LOCKED, TRUE );
+    BalancedBTreeAdd( mailboxStreamTree, NULL, UNLOCKED, TRUE );
 
+    BalancedBTreeLock( mailboxActiveTree );
+    BalancedBTreeAdd( mailboxActiveTree, NULL, LOCKED, TRUE );
     message = botMailboxDump( mailboxActiveTree->root );
     LogPrint( LOG_NOTICE, "Mailbox: %s", message );
     free( message );
+    BalancedBTreeUnlock( mailboxActiveTree );
 
     BalancedBTreeUnlock( mailboxTree );
-    BalancedBTreeUnlock( mailboxActiveTree );
 }
 
 void mailboxFindUnconflictingTime( BalancedBTree_t *tree, time_t *key )
@@ -383,9 +579,8 @@ char *botMailboxDump( BalancedBTreeItem_t *item )
     
     gettimeofday( &now, NULL );
     mailbox = (Mailbox_t *)item->item;
-    sprintf( buf, "%d %s@%s(%ld/%ld)", mailbox->mailboxId, mailbox->user, 
-                  mailbox->server, mailbox->nextPoll,
-                  mailbox->nextPoll - now.tv_sec );
+    sprintf( buf, "%d %s(%ld/%ld)", mailbox->mailboxId, mailbox->serverSpec, 
+                  mailbox->nextPoll, mailbox->nextPoll - now.tv_sec );
 
     submsg = buf;
     message = (char *)realloc(message, len + 2 + strlen(submsg) + 2);
@@ -409,69 +604,317 @@ char *botMailboxDump( BalancedBTreeItem_t *item )
     return( message );
 }
 
+BalancedBTreeItem_t *mailboxRecurseFindNetmbx( BalancedBTreeItem_t *node, 
+                                               NETMBX *netmbx )
+{
+    Mailbox_t              *mailbox;
+    NETMBX                 *mbx;
+    BalancedBTreeItem_t    *item;
+
+    if( !node ) {
+        return( NULL );
+    }
+
+    mailbox = (Mailbox_t *)node->item;
+    mbx = &mailbox->netmbx;
+    if( !strcasecmp( mbx->host,    netmbx->host) &&
+        !strcasecmp( mbx->user,    netmbx->user) &&
+        !strcasecmp( mbx->mailbox, netmbx->mailbox) &&
+        !strcasecmp( mbx->service, netmbx->service) &&
+        mbx->port == netmbx->port ) {
+        /* Found it! */
+        return( node );
+    }
+
+    item = mailboxRecurseFindNetmbx( node->left, netmbx );
+    if( item ) {
+        return( item );
+    }
+
+    item = mailboxRecurseFindNetmbx( node->right, netmbx );
+    return( item );
+}
+
+Mailbox_t *mailboxFindByNetmbx( NETMBX *netmbx )
+{
+    BalancedBTreeItem_t    *item;
+    Mailbox_t              *mailbox;
+
+    BalancedBTreeLock( mailboxActiveTree );
+    item = mailboxRecurseFindNetmbx( mailboxActiveTree->root, netmbx );
+    if( !item ) {
+        BalancedBTreeUnlock( mailboxActiveTree );
+        return( NULL );
+    }
+
+    mailbox = (Mailbox_t *)item->item;
+    BalancedBTreeUnlock( mailboxActiveTree );
+    return( mailbox );
+}
+
+Mailbox_t *mailboxFindByStream( MAILSTREAM *stream )
+{
+    BalancedBTreeItem_t    *item;
+    Mailbox_t              *mailbox;
+
+    item = (BalancedBTreeItem_t *)BalancedBTreeFind( mailboxStreamTree,
+                                                     (void *)&stream->mailbox, 
+                                                     UNLOCKED );
+    if( !item ) {
+        return( NULL );
+    }
+
+    mailbox = (Mailbox_t *)item->item;
+    return( mailbox );
+}
+
 /*
  * Callbacks for the UW c-client library
  */
 
 void mm_flags( MAILSTREAM *stream, unsigned long number )
 {
+    Mailbox_t      *mailbox;
+
+    mailbox = mailboxFindByStream( stream );
+    if( !mailbox ) {
+        LogPrint( LOG_CRIT, "Mailbox: can't find stream in flags: %p", stream );
+        return;
+    }
+
+    LogPrint( LOG_CRIT, "Mailbox: Flags changed: %s message %ld",
+                        mailbox->serverSpec, number );
 }
 
 void mm_status( MAILSTREAM *stream, char *mailbox, MAILSTATUS *status )
 {
+    Mailbox_t      *mbox;
+
+    mbox = mailboxFindByStream( stream );
+    if( !mbox ) {
+        LogPrint( LOG_CRIT, "Mailbox: can't find stream in flags: %p", stream );
+        return;
+    }
+
+    if( status->flags & SA_MESSAGES ) {
+        LogPrint( LOG_CRIT, "Mailbox: %s - Messages %ld",
+                            mailbox, status->messages );
+    }
+
+    if( status->flags & SA_RECENT ) {
+        LogPrint( LOG_CRIT, "Mailbox: %s - Recent Messages %ld", 
+                            mailbox, status->recent );
+    }
+
+    if( status->flags & SA_UNSEEN ) {
+        LogPrint( LOG_CRIT, "Mailbox: %s - Unseen Messages %ld", 
+                            mailbox, status->unseen );
+    }
+
+    if( status->flags & SA_UIDNEXT ) {
+        LogPrint( LOG_CRIT, "Mailbox: %s - Next UID %ld", 
+                            mailbox, status->uidnext );
+    }
+
+    if( status->flags & SA_UIDVALIDITY ) {
+        LogPrint( LOG_CRIT, "Mailbox: %s - UID validity %ld", 
+                            mailbox, status->uidvalidity );
+    }
 }
 
 void mm_searched( MAILSTREAM *stream, unsigned long number )
 {
+    Mailbox_t      *mailbox;
+
+    mailbox = mailboxFindByStream( stream );
+    if( !mailbox ) {
+        LogPrint( LOG_CRIT, "Mailbox: can't find stream in searched: %p", 
+                            stream );
+        return;
+    }
+
+    LogPrint( LOG_CRIT, "Mailbox: %s found message at %ld", 
+                        mailbox->serverSpec, number );
 }
 
 void mm_exists( MAILSTREAM *stream, unsigned long number )
 {
+#if 0
+    Mailbox_t      *mailbox;
+
+    mailbox = mailboxFindByStream( stream );
+    if( !mailbox ) {
+        LogPrint( LOG_CRIT, "Mailbox: can't find stream in exists: %p", 
+                            stream );
+        return;
+    }
+
+    LogPrint( LOG_CRIT, "Mailbox: %s last message is %ld", 
+                        mailbox->serverSpec, number );
+#endif
+    LogPrint( LOG_CRIT, "Mailbox: %s last message is %ld", 
+                        stream->mailbox, number );
 }
 
 void mm_expunged( MAILSTREAM *stream, unsigned long number )
 {
+    Mailbox_t      *mailbox;
+
+    mailbox = mailboxFindByStream( stream );
+    if( !mailbox ) {
+        LogPrint( LOG_CRIT, "Mailbox: can't find stream in expunged: %p", 
+                            stream );
+        return;
+    }
+
+    LogPrint( LOG_CRIT, "Mailbox: %s expunged message %ld", 
+                        mailbox->serverSpec, number );
 }
 
 void mm_list( MAILSTREAM *stream, int delimiter, char *name, long attributes )
 {
+    Mailbox_t      *mailbox;
+
+    mailbox = mailboxFindByStream( stream );
+    if( !mailbox ) {
+        LogPrint( LOG_CRIT, "Mailbox: can't find stream in list: %p", 
+                            stream );
+        return;
+    }
+
+    if( attributes & LATT_NOSELECT ) {
+        LogPrint( LOG_CRIT, "Mailbox: %s - mailbox %s is a heirarchy (%c)",
+                            mailbox->serverSpec, name, delimiter );
+    }
+
+    if( attributes & LATT_NOINFERIORS ) {
+        LogPrint( LOG_CRIT, "Mailbox: %s - mailbox %s is a file",
+                            mailbox->serverSpec, name );
+    }
+
+    if( attributes & LATT_MARKED ) {
+        LogPrint( LOG_CRIT, "Mailbox: %s - mailbox %s is marked",
+                            mailbox->serverSpec, name );
+    }
+
+    if( attributes & LATT_UNMARKED ) {
+        LogPrint( LOG_CRIT, "Mailbox: %s - mailbox %s is not marked",
+                            mailbox->serverSpec, name );
+    }
 }
 
 void mm_lsub( MAILSTREAM *stream, int delimiter, char *name, long attributes )
 {
+    Mailbox_t      *mailbox;
+
+    mailbox = mailboxFindByStream( stream );
+    if( !mailbox ) {
+        LogPrint( LOG_CRIT, "Mailbox: can't find stream in lsub: %p", 
+                            stream );
+        return;
+    }
+
+    if( attributes & LATT_NOSELECT ) {
+        LogPrint( LOG_CRIT, "Mailbox: %s - sub. mailbox %s is a heirarchy (%c)",
+                            mailbox->serverSpec, name, delimiter );
+    }
+
+    if( attributes & LATT_NOINFERIORS ) {
+        LogPrint( LOG_CRIT, "Mailbox: %s - sub. mailbox %s is a file",
+                            mailbox->serverSpec, name );
+    }
+
+    if( attributes & LATT_MARKED ) {
+        LogPrint( LOG_CRIT, "Mailbox: %s - sub. mailbox %s is marked",
+                            mailbox->serverSpec, name );
+    }
+
+    if( attributes & LATT_UNMARKED ) {
+        LogPrint( LOG_CRIT, "Mailbox: %s - sub. mailbox %s is not marked",
+                            mailbox->serverSpec, name );
+    }
 }
 
 void mm_notify( MAILSTREAM *stream, char *string, long errflg )
 {
+    LogPrint( LOG_INFO, "Mailbox: %s - %s", stream->mailbox, string );
 }
 
 void mm_log( char *string, long errflg )
 {
+    LogPrint( LOG_INFO, "Mailbox: %s", string );
 }
 
 void mm_dlog( char *string )
 {
+    LogPrint( LOG_DEBUG, "Mailbox: %s", string );
 }
 
 void mm_login( NETMBX *mb, char *user, char *pwd, long trial )
 {
+    Mailbox_t      *mailbox;
+
+    mailbox = mailboxFindByNetmbx( mb );
+    if( !mailbox ) {
+        LogPrint( LOG_CRIT, "Mailbox: can't find NETMBX for login: %p", mb );
+        user[0] = '\0';
+        pwd[0] = '\0';
+        return;
+    }
+
+    LogPrint( LOG_INFO, "Mailbox: Attempting login (try %d) - %s", trial,
+                        mailbox->serverSpec );
+    strcpy( user, mailbox->user );
+    strcpy( pwd, mailbox->password );
 }
 
 void mm_critical( MAILSTREAM *stream )
 {
+    Mailbox_t      *mailbox;
+
+    mailbox = mailboxFindByStream( stream );
+    if( !mailbox ) {
+        LogPrint( LOG_CRIT, "Mailbox: can't find stream in critical: %p",
+                            stream );
+        return;
+    }
+
+    LogPrint( LOG_CRIT, "Mailbox: Entering critical: %s", mailbox->serverSpec );
 }
 
 void mm_nocritical( MAILSTREAM *stream )
 {
+    Mailbox_t      *mailbox;
+
+    mailbox = mailboxFindByStream( stream );
+    if( !mailbox ) {
+        LogPrint( LOG_CRIT, "Mailbox: can't find stream in nocritical: %p",
+                            stream );
+        return;
+    }
+
+    LogPrint( LOG_CRIT, "Mailbox: Leaving critical: %s", mailbox->serverSpec );
 }
 
 long mm_diskerror( MAILSTREAM *stream, long errcode, long serious )
 {
+    Mailbox_t      *mailbox;
+
+    mailbox = mailboxFindByStream( stream );
+    if( !mailbox ) {
+        LogPrint( LOG_CRIT, "Mailbox: can't find stream in diskerror: %p",
+                            stream );
+        return( 1 );
+    }
+
+    LogPrint( LOG_CRIT, "Mailbox: %s had error: %s%s", mailbox->serverSpec,
+                        strerror(errcode), (serious ? " (serious!)" : "") );
     return( 0 );
 }
 
 void mm_fatal( char *string )
 {
+    LogPrint( LOG_CRIT, "Mailbox: %s", string );
 }
 
 /*

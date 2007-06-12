@@ -213,12 +213,14 @@ void plugin_shutdown( void )
     pthread_cond_destroy( &kickCond );
     pthread_mutex_destroy( &signalMutex );
 
+    /* Need to free the items too! */
     BalancedBTreeLock( rssfeedTree );
     BalancedBTreeDestroy( rssfeedTree );
 
     BalancedBTreeLock( rssfeedActiveTree);
     BalancedBTreeDestroy( rssfeedActiveTree );
     
+    /* Need to free the items too! */
     BalancedBTreeLock( rssItemTree );
     BalancedBTreeDestroy( rssItemTree );
 
