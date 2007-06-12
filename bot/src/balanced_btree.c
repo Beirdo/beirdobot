@@ -145,7 +145,7 @@ void BalancedBTreeAdd( BalancedBTree_t *btree, BalancedBTreeItem_t *item,
         }
 
         if( locked == UNLOCKED ) {
-            BalancedBTreeLock( btree );
+            BalancedBTreeUnlock( btree );
         }
         return;
     }
