@@ -55,18 +55,33 @@ static char ident[] _UNUSED_ =
 #define CURRENT_SCHEMA_MAILBOX  1
 #define MAX_SCHEMA_QUERY 100
 
+typedef struct {
+    int         mailboxId;
+    char       *server;
+    char       *user;
+    char       *password;
+    char       *protocol;
+    char       *options;
+    int         interval;
+    int         lastCheck;
+    int         lastRead;
+    time_t      nextPoll;
+    bool        enabled;
+} Mailbox_t;
+
 typedef QueryTable_t SchemaUpgrade_t[MAX_SCHEMA_QUERY];
 
 static QueryTable_t defSchema[] = {
-  { "CREATE TABLE `plugin_rssfeed` (\n"
-    "    `feedid` INT NOT NULL AUTO_INCREMENT ,\n"
-    "    `chanid` INT NOT NULL ,\n"
-    "    `url` VARCHAR( 255 ) NOT NULL ,\n"
-    "    `prefix` VARCHAR( 64 ) NOT NULL ,\n"
-    "    `timeout` INT NOT NULL ,\n"
-    "    `lastpost` INT NOT NULL ,\n"
-    "    `feedoffset` INT NOT NULL ,\n"
-    "    PRIMARY KEY ( `feedid` )\n"
+  { "CREATE TABLE `plugin_mailbox` (\n"
+    "    `mailboxId` INT NULL AUTO_INCREMENT PRIMARY KEY ,\n"
+    "    `server` VARCHAR( 255 ) NOT NULL ,\n"
+    "    `user` VARCHAR( 255 ) NOT NULL ,\n"
+    "    `password` VARCHAR( 255 ) NOT NULL ,\n"
+    "    `protocol` VARCHAR( 32 ) NOT NULL ,\n"
+    "    `options` VARCHAR( 255 ) NOT NULL ,\n"
+    "    `pollInterval` INT NOT NULL DEFAULT '600',\n"
+    "    `lastCheck` INT NOT NULL DEFAULT '0',\n"
+    "    `lastRead` INT NOT NULL DEFAULT '0'\n"
     ") TYPE = MYISAM\n", NULL, NULL, FALSE }
 };
 static int defSchemaCount = NELEMENTS(defSchema);
@@ -78,12 +93,12 @@ static SchemaUpgrade_t schemaUpgrade[CURRENT_SCHEMA_MAILBOX] = {
 
 static QueryTable_t mailboxQueryTable[] = {
     /* 0 */
-    { "SELECT a.`feedid`, a.`chanid`, b.`serverid`, a.`url`, a.`prefix`, "
-      "a.`timeout`, a.`lastpost`, a.`feedoffset` FROM `plugin_rssfeed` AS a, "
-      "`channels` AS b WHERE a.`chanid` = b.`chanid` ORDER BY a.`feedid` ASC",
-      NULL, NULL, FALSE },
+    { "SELECT mailboxId, server, user, password, protocol, options, "
+      "pollInterval, lastCheck, lastRead FROM `plugin_mailbox` ORDER BY "
+      "`mailboxId` ASC", NULL, NULL, FALSE },
     /* 1 */
-    { "UPDATE `plugin_rssfeed` SET `lastpost` = ? WHERE `feedid` = ?", NULL,
+    { "UPDATE `plugin_mailbox` SET `lastCheck` = ?, `lastRead` = ? "
+      "WHERE `mailboxId` = ?", NULL,
       NULL, FALSE }
 };
 
@@ -97,6 +112,8 @@ static int db_upgrade_schema( int current, int goal );
 static void db_load_mailboxes( void );
 static void result_load_mailboxes( MYSQL_RES *res, MYSQL_BIND *input, 
                                    void *args );
+void mailboxFindUnconflictingTime( BalancedBTree_t *tree, time_t *key );
+char *botMailboxDump( BalancedBTreeItem_t *item );
 
 
 /* INTERNAL VARIABLES  */
@@ -105,6 +122,8 @@ static bool             threadAbort = FALSE;
 static pthread_mutex_t  shutdownMutex;
 static pthread_mutex_t  signalMutex;
 static pthread_cond_t   kickCond;
+BalancedBTree_t        *mailboxTree;
+BalancedBTree_t        *mailboxActiveTree;
 
 
 void plugin_initialize( char *args )
@@ -238,13 +257,156 @@ static int db_upgrade_schema( int current, int goal )
 
 static void db_load_mailboxes( void )
 {
-    (void)mailboxQueryTable;
-    (void)result_load_mailboxes;
+    pthread_mutex_t        *mutex;
+
+    mailboxTree       = BalancedBTreeCreate( BTREE_KEY_INT );
+    mailboxActiveTree = BalancedBTreeCreate( BTREE_KEY_INT );
+
+    mutex = (pthread_mutex_t *)malloc(sizeof(pthread_mutex_t));
+    pthread_mutex_init( mutex, NULL );
+
+    db_queue_query( 0, mailboxQueryTable, NULL, 0, result_load_mailboxes,
+                    NULL, mutex );
+    pthread_mutex_unlock( mutex );
+    pthread_mutex_destroy( mutex );
+    free( mutex );
 }
 
 static void result_load_mailboxes( MYSQL_RES *res, MYSQL_BIND *input, 
                                    void *args )
 {
+    int                     count;
+    int                     i;
+    MYSQL_ROW               row;
+    BalancedBTreeItem_t    *item;
+    struct timeval          tv;
+    time_t                  nextpoll;
+    char                   *message;
+    Mailbox_t              *mailbox;
+
+    if( !res || !(count = mysql_num_rows(res)) ) {
+        return;
+    }
+
+    gettimeofday( &tv, NULL );
+    nextpoll = tv.tv_sec;
+
+    BalancedBTreeLock( mailboxTree );
+    BalancedBTreeLock( mailboxActiveTree );
+
+    for( i = 0; i < count; i++ ) {
+        row = mysql_fetch_row(res);
+
+        mailbox = (Mailbox_t *)malloc(sizeof(Mailbox_t));
+        memset( mailbox, 0x00, sizeof(Mailbox_t) );
+
+        mailbox->mailboxId = atoi(row[0]);
+        mailbox->server    = strdup(row[1]);
+        mailbox->user      = strdup(row[2]);
+        mailbox->password  = strdup(row[3]);
+        mailbox->protocol  = strdup(row[4]);
+        mailbox->options   = strdup(row[5]);
+        mailbox->interval  = atoi(row[6]);
+        mailbox->lastCheck = atol(row[7]);
+        mailbox->lastRead  = atol(row[8]);
+        if( mailbox->lastCheck + mailbox->interval <= nextpoll + 1 ) {
+            mailbox->nextPoll  = nextpoll++;
+        } else {
+            mailbox->nextPoll = mailbox->lastCheck + mailbox->interval;
+        }
+        mailbox->enabled   = TRUE;
+
+        item = (BalancedBTreeItem_t *)malloc(sizeof(BalancedBTreeItem_t));
+        item->item = (void *)mailbox;
+        item->key  = (void *)&mailbox->mailboxId;
+        BalancedBTreeAdd( mailboxTree, item, LOCKED, FALSE );
+
+        item = (BalancedBTreeItem_t *)malloc(sizeof(BalancedBTreeItem_t));
+        item->item = (void *)mailbox;
+        item->key  = (void *)&mailbox->nextPoll;
+
+        /* Adjust the poll time to avoid conflict */
+        mailboxFindUnconflictingTime( mailboxActiveTree, &mailbox->nextPoll );
+        BalancedBTreeAdd( mailboxActiveTree, item, LOCKED, FALSE );
+        LogPrint( LOG_NOTICE, "Mailbox: Loaded %d: server %s, user %s, "
+                              "interval %d", mailbox->mailboxId,
+                              mailbox->server, mailbox->user, 
+                              mailbox->interval );
+    }
+
+    BalancedBTreeAdd( mailboxTree, NULL, LOCKED, TRUE );
+    BalancedBTreeAdd( mailboxActiveTree, NULL, LOCKED, TRUE );
+
+    message = botMailboxDump( mailboxActiveTree->root );
+    LogPrint( LOG_NOTICE, "Mailbox: %s", message );
+    free( message );
+
+    BalancedBTreeUnlock( mailboxTree );
+    BalancedBTreeUnlock( mailboxActiveTree );
+}
+
+void mailboxFindUnconflictingTime( BalancedBTree_t *tree, time_t *key )
+{
+    BalancedBTreeItem_t    *item;
+
+    /* Assumes that the tree is already locked */
+    for( item = BalancedBTreeFind( tree, key, LOCKED) ; item ;
+         item = BalancedBTreeFind( tree, key, LOCKED) ) {
+        (*key)++;
+    }
+}
+
+char *botMailboxDump( BalancedBTreeItem_t *item )
+{
+    static char     buf[256];
+    char           *message;
+    char           *oldmsg;
+    char           *submsg;
+    int             len;
+    Mailbox_t      *mailbox;
+    struct timeval  now;
+
+    message = NULL;
+
+    if( !item ) {
+        return( message );
+    }
+
+    submsg = botMailboxDump( item->left );
+    message = submsg;
+    oldmsg  = message;
+    if( message ) {
+        len = strlen(message);
+    } else {
+        len = -2;
+    }
+    
+    gettimeofday( &now, NULL );
+    mailbox = (Mailbox_t *)item->item;
+    sprintf( buf, "%d %s@%s(%ld/%ld)", mailbox->mailboxId, mailbox->user, 
+                  mailbox->server, mailbox->nextPoll,
+                  mailbox->nextPoll - now.tv_sec );
+
+    submsg = buf;
+    message = (char *)realloc(message, len + 2 + strlen(submsg) + 2);
+    if( oldmsg ) {
+        strcat( message, ", " );
+    } else {
+        message[0] = '\0';
+    }
+    strcat( message, submsg );
+
+    submsg = botMailboxDump( item->right );
+    if( submsg ) {
+        len = strlen( message );
+
+        message = (char *)realloc(message, len + 2 + strlen(submsg) + 2);
+        strcat( message, ", " );
+        strcat( message, submsg );
+        free( submsg );
+    }
+
+    return( message );
 }
 
 /*
