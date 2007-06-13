@@ -55,7 +55,8 @@ ${DEPS}:	Makefile
 
 %.d: %.c
 	@echo "Making $@ (dependencies for $<)"
-	@${CC} -MM ${CFLAGS} ${CFLAGS_${<:%.c=%}} $< | sed 's,\($*\)\.o[ :]*,\1.o $@ : ,g'  > $@
+	@${CC} -MM ${CFLAGS} ${CFLAGS_${<:%.c=%}} $< | \
+	 sed 's,\($*\)\.o[ :]*,\1.o $@ : ,g'  > $@
 
 clean:
 	${RM} ${OBJS}
