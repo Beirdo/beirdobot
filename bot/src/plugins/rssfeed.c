@@ -194,6 +194,10 @@ void plugin_initialize( char *args )
 
 void plugin_shutdown( void )
 {
+    BalancedBTreeItem_t    *item;
+    RssFeed_t              *feed;
+    RssItem_t              *rssitem;
+
     LogPrintNoArg( LOG_NOTICE, "Removing rssfeed..." );
     botCmd_remove( "rssfeed" );
 
@@ -213,15 +217,33 @@ void plugin_shutdown( void )
     pthread_cond_destroy( &kickCond );
     pthread_mutex_destroy( &signalMutex );
 
-    /* Need to free the items too! */
-    BalancedBTreeLock( rssfeedTree );
-    BalancedBTreeDestroy( rssfeedTree );
-
     BalancedBTreeLock( rssfeedActiveTree);
     BalancedBTreeDestroy( rssfeedActiveTree );
     
     /* Need to free the items too! */
+    BalancedBTreeLock( rssfeedTree );
+    while( rssfeedTree->root ) {
+        item = rssfeedTree->root;
+        BalancedBTreeRemove( rssfeedTree, item, LOCKED, FALSE );
+        feed = (RssFeed_t *)item->item;
+        free( feed->url );
+        free( feed->prefix );
+        free( feed );
+        free( item );
+    }
+    BalancedBTreeDestroy( rssfeedTree );
+
+    /* Need to free the items too! */
     BalancedBTreeLock( rssItemTree );
+    while( rssItemTree->root ) {
+        item = rssItemTree->root;
+        BalancedBTreeRemove( rssItemTree, item, LOCKED, FALSE );
+        rssitem = (RssItem_t *)item->item;
+        free( rssitem->title );
+        free( rssitem->link );
+        free( rssitem );
+        free( item );
+    }
     BalancedBTreeDestroy( rssItemTree );
 
     thread_deregister( rssfeedThreadId );
