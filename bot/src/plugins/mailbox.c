@@ -52,27 +52,47 @@
 static char ident[] _UNUSED_ = 
     "$Id$";
 
-#define CURRENT_SCHEMA_MAILBOX  1
+#define CURRENT_SCHEMA_MAILBOX  2
 #define MAX_SCHEMA_QUERY 100
 
 typedef struct {
-    int         mailboxId;
-    char       *server;
-    int         port;
-    char       *user;
-    char       *password;
-    char       *protocol;
-    char       *options;
-    char       *mailbox;
-    int         interval;
-    int         lastCheck;
-    int         lastRead;
-    time_t      nextPoll;
-    bool        enabled;
-    char       *serverSpec;
-    NETMBX      netmbx;
-    MAILSTREAM *stream;
+    int                 mailboxId;
+    char               *server;
+    int                 port;
+    char               *user;
+    char               *password;
+    char               *protocol;
+    char               *options;
+    char               *mailbox;
+    int                 interval;
+    int                 lastCheck;
+    int                 lastRead;
+    time_t              nextPoll;
+    bool                enabled;
+    char               *serverSpec;
+    int                 newMessages;
+    int                 recentMessages;
+    int                 totalMessages;
+    LinkedList_t       *messageList;
+    NETMBX              netmbx;
+    MAILSTREAM         *stream;
+    LinkedList_t       *reports;
 } Mailbox_t;
+
+typedef struct {
+    LinkedListItem_t    linkage;
+    int                 serverId;
+    int                 channelId;
+    IRCServer_t        *server;
+    IRCChannel_t       *channel;
+    char               *nick;
+    char               *format;
+} MailboxReport_t;
+
+typedef struct {
+    LinkedListItem_t    linkage;
+    unsigned long       uid;
+} MailboxUID_t;
 
 typedef QueryTable_t SchemaUpgrade_t[MAX_SCHEMA_QUERY];
 
@@ -89,13 +109,28 @@ static QueryTable_t defSchema[] = {
     "    `pollInterval` INT NOT NULL DEFAULT '600',\n"
     "    `lastCheck` INT NOT NULL DEFAULT '0',\n"
     "    `lastRead` INT NOT NULL DEFAULT '0'\n"
+    ") TYPE = MYISAM\n", NULL, NULL, FALSE },
+  { "CREATE TABLE `plugin_mailbox_report` (\n"
+    "  `mailboxId` INT NOT NULL ,\n"
+    "  `channelId` INT NOT NULL ,\n"
+    "  `serverId` INT NOT NULL ,\n"
+    "  `nick` VARCHAR( 64 ) NOT NULL ,\n"
+    "  `format` TEXT NOT NULL\n"
     ") TYPE = MYISAM\n", NULL, NULL, FALSE }
 };
 static int defSchemaCount = NELEMENTS(defSchema);
 
 static SchemaUpgrade_t schemaUpgrade[CURRENT_SCHEMA_MAILBOX] = {
     /* 0 -> 1 */
-    { { NULL, NULL, NULL, FALSE } }
+    { { NULL, NULL, NULL, FALSE } },
+    /* 1 -> 2 */
+    { { "CREATE TABLE `plugin_mailbox_report` (\n"
+        "  `mailboxId` INT NOT NULL ,\n"
+        "  `channelId` INT NOT NULL ,\n"
+        "  `serverId` INT NOT NULL ,\n"
+        "  `nick` VARCHAR( 64 ) NOT NULL ,\n"
+        "  `format` TEXT NOT NULL\n"
+        ") TYPE = MYISAM\n", NULL, NULL, FALSE } }
 };
 
 static QueryTable_t mailboxQueryTable[] = {
@@ -105,7 +140,10 @@ static QueryTable_t mailboxQueryTable[] = {
       "ORDER BY `mailboxId` ASC", NULL, NULL, FALSE },
     /* 1 */
     { "UPDATE `plugin_mailbox` SET `lastCheck` = ? WHERE `mailboxId` = ?", 
-      NULL, NULL, FALSE }
+      NULL, NULL, FALSE },
+    /* 2 */
+    { "SELECT channelId, serverId, nick, format FROM `plugin_mailbox_report` "
+      "WHERE mailboxId = ?", NULL, NULL, FALSE }
 };
 
 
@@ -116,7 +154,11 @@ char *botHelpMailbox( void *tag );
 void *mailbox_thread(void *arg);
 static int db_upgrade_schema( int current, int goal );
 static void db_load_mailboxes( void );
+void db_update_lastpoll( int mailboxId, int lastPoll );
+static void db_load_reports( void );
 static void result_load_mailboxes( MYSQL_RES *res, MYSQL_BIND *input, 
+                                   void *args );
+static void result_load_reports( MYSQL_RES *res, MYSQL_BIND *input, 
                                    void *args );
 void mailboxFindUnconflictingTime( BalancedBTree_t *tree, time_t *key );
 char *botMailboxDump( BalancedBTreeItem_t *item );
@@ -124,7 +166,9 @@ Mailbox_t *mailboxFindByNetmbx( NETMBX *netmbx );
 Mailbox_t *mailboxFindByStream( MAILSTREAM *stream );
 BalancedBTreeItem_t *mailboxRecurseFindNetmbx( BalancedBTreeItem_t *node, 
                                                NETMBX *netmbx );
-void db_update_lastpoll( int mailboxId, int lastPoll );
+static void dbRecurseReports( BalancedBTreeItem_t *node, 
+                              pthread_mutex_t *mutex );
+void mailboxReport( Mailbox_t *mailbox, MailboxReport_t *report );
 
 
 /* INTERNAL VARIABLES  */
@@ -183,6 +227,7 @@ void plugin_shutdown( void )
 {
     Mailbox_t              *mailbox;
     BalancedBTreeItem_t    *item;
+    MailboxReport_t        *report;
 
     LogPrintNoArg( LOG_NOTICE, "Removing mailbox..." );
     botCmd_remove( "mailbox" );
@@ -228,6 +273,18 @@ void plugin_shutdown( void )
         free( mailbox->options );
         free( mailbox->mailbox );
         free( mailbox->serverSpec );
+
+        LinkedListLock( mailbox->reports );
+        while( mailbox->reports->head ) {
+            report = (MailboxReport_t *)mailbox->reports->head;
+            free( report->nick );
+            free( report->format );
+            LinkedListRemove( mailbox->reports, (LinkedListItem_t *)report,
+                              LOCKED );
+            free( report );
+        }
+        LinkedListDestroy( mailbox->reports );
+
         BalancedBTreeRemove( mailboxTree, item, LOCKED, FALSE );
         free( item );
     }
@@ -242,22 +299,31 @@ void *mailbox_thread(void *arg)
     struct timeval          now;
     time_t                  delta;
     BalancedBTreeItem_t    *item;
+    LinkedListItem_t       *listItem, *rptItem;
     Mailbox_t              *mailbox;
     struct tm               tm;
     int                     retval;
     bool                    done;
     long                    localoffset;
     struct timespec         ts;
+    MailboxReport_t        *report;
+    bool                    found;
+    IRCServer_t            *server;
+    SEARCHPGM               searchProgram;
 
     pthread_mutex_lock( &shutdownMutex );
     db_thread_init();
 
     LogPrintNoArg( LOG_NOTICE, "Starting Mailbox thread" );
 
+    memset( &searchProgram, 0x00, sizeof(SEARCHPGM) );
+    searchProgram.unseen = 1;
+
     /* Include the c-client library initialization */
     #include <c-client/linkage.c>
 
     db_load_mailboxes();
+    db_load_reports();
 
     sleep(5);
 
@@ -319,7 +385,60 @@ void *mailbox_thread(void *arg)
                 mail_open( mailbox->stream, mailbox->serverSpec, 0 );
             }
             mail_status( mailbox->stream, mailbox->serverSpec, 
-                         SA_MESSAGES | SA_RECENT | SA_UNSEEN );
+                         SA_MESSAGES | SA_UNSEEN );
+
+            if( mailbox->newMessages ) {
+                if( !mailbox->messageList ) {
+                    mailbox->messageList = LinkedListCreate();
+                }
+                mail_search_full( mailbox->stream, NULL, &searchProgram, 
+                                  SE_UID );
+
+                LinkedListLock( mailbox->reports );
+                for( rptItem = mailbox->reports->head; rptItem; 
+                     rptItem = rptItem->next ) {
+                    report = (MailboxReport_t *)rptItem;
+
+                    /* 
+                     * If the server info isn't initialized, 
+                     * but is ready to be... 
+                     */
+                    if( !report->server && ServerList ) {
+                        LinkedListLock( ServerList );
+                        for( listItem = ServerList->head, found = FALSE;
+                             listItem && !found; listItem = listItem->next ) {
+                            server = (IRCServer_t *)listItem;
+                            if( server->serverId == report->serverId ) {
+                                found = TRUE;
+                                report->server = server;
+                            }
+                        }
+                        LinkedListUnlock( ServerList );
+
+                        if( report->channelId > 0 ) {
+                            report->channel = 
+                                FindChannelNum( report->server, 
+                                                report->channelId );
+                        }
+                    }
+
+                    if( !report->server ) {
+                        continue;
+                    }
+
+                    /* Do the report! */
+                    mailboxReport( mailbox, report );
+                }
+                LinkedListUnlock( mailbox->reports );
+            }
+
+            LinkedListLock( mailbox->messageList );
+            while( mailbox->messageList->head ) {
+                listItem = mailbox->messageList->head;
+                LinkedListRemove( mailbox->messageList, listItem, LOCKED );
+                free( listItem );
+            }
+            LinkedListUnlock( mailbox->messageList );
         }
 
         /* Rebalance the trees */
@@ -423,6 +542,49 @@ void db_update_lastpoll( int mailboxId, int lastPoll )
     db_queue_query( 1, mailboxQueryTable, data, 2, NULL, NULL, NULL );
 }
 
+static void db_load_reports( void )
+{
+    pthread_mutex_t        *mutex;
+
+    mutex = (pthread_mutex_t *)malloc(sizeof(pthread_mutex_t));
+    pthread_mutex_init( mutex, NULL );
+
+    BalancedBTreeLock( mailboxActiveTree );
+    dbRecurseReports( mailboxActiveTree->root, mutex );
+    BalancedBTreeUnlock( mailboxActiveTree );
+
+    pthread_mutex_destroy( mutex );
+    free( mutex );
+}
+
+static void dbRecurseReports( BalancedBTreeItem_t *node, 
+                              pthread_mutex_t *mutex )
+{
+    Mailbox_t              *mailbox;
+    MYSQL_BIND             *data;
+
+    if( !node ) {
+        return;
+    }
+    dbRecurseReports( node->left, mutex );
+
+    mailbox = (Mailbox_t *)node->item;
+
+    mailbox->reports = LinkedListCreate();
+
+    data = (MYSQL_BIND *)malloc(1 * sizeof(MYSQL_BIND));
+    memset( data, 0, 1 * sizeof(MYSQL_BIND) );
+
+    bind_numeric( &data[0], mailbox->mailboxId, MYSQL_TYPE_LONG );
+
+    db_queue_query( 2, mailboxQueryTable, data, 1, result_load_reports,
+                    mailbox, mutex );
+    pthread_mutex_unlock( mutex );
+
+    dbRecurseReports( node->right, mutex );
+}
+
+
 static void result_load_mailboxes( MYSQL_RES *res, MYSQL_BIND *input, 
                                    void *args )
 {
@@ -445,10 +607,6 @@ static void result_load_mailboxes( MYSQL_RES *res, MYSQL_BIND *input,
     nextpoll = tv.tv_sec;
 
     BalancedBTreeLock( mailboxTree );
-#if 0
-    BalancedBTreeLock( mailboxActiveTree );
-    BalancedBTreeLock( mailboxStreamTree );
-#endif
 
     for( i = 0; i < count; i++ ) {
         row = mysql_fetch_row(res);
@@ -522,9 +680,6 @@ static void result_load_mailboxes( MYSQL_RES *res, MYSQL_BIND *input,
             item->item = (void *)mailbox;
             item->key  = (void *)&mailbox->stream->mailbox;
             BalancedBTreeAdd( mailboxStreamTree, item, UNLOCKED, FALSE );
-
-            mail_status( mailbox->stream, mailbox->serverSpec, 
-                         SA_MESSAGES | SA_RECENT | SA_UNSEEN );
         } else {
             LogPrint( LOG_CRIT, "Mailbox: Mailbox %d failed", 
                                 mailbox->mailboxId );
@@ -543,6 +698,44 @@ static void result_load_mailboxes( MYSQL_RES *res, MYSQL_BIND *input,
     BalancedBTreeUnlock( mailboxActiveTree );
 
     BalancedBTreeUnlock( mailboxTree );
+}
+
+static void result_load_reports( MYSQL_RES *res, MYSQL_BIND *input, 
+                                   void *args )
+{
+    int                     count;
+    int                     i;
+    MYSQL_ROW               row;
+    Mailbox_t              *mailbox;
+    MailboxReport_t        *report;
+
+    mailbox = (Mailbox_t *)args;
+    if( !mailbox ) {
+        return;
+    }
+
+    if( !res || !(count = mysql_num_rows(res)) ) {
+        return;
+    }
+
+    LinkedListLock( mailbox->reports );
+
+    for( i = 0; i < count; i++ ) {
+        row = mysql_fetch_row(res);
+
+        report = (MailboxReport_t *)malloc(sizeof(MailboxReport_t));
+        memset( report, 0x00, sizeof(MailboxReport_t) );
+
+        report->channelId = atoi(row[0]);
+        report->serverId  = atoi(row[1]);
+        report->nick      = strdup(row[2]);
+        report->format    = strdup(row[3]);
+
+        LinkedListAdd( mailbox->reports, (LinkedListItem_t *)report, LOCKED,
+                       AT_TAIL );
+    }
+
+    LinkedListUnlock( mailbox->reports );
 }
 
 void mailboxFindUnconflictingTime( BalancedBTree_t *tree, time_t *key )
@@ -672,6 +865,33 @@ Mailbox_t *mailboxFindByStream( MAILSTREAM *stream )
     return( mailbox );
 }
 
+void mailboxReport( Mailbox_t *mailbox, MailboxReport_t *report )
+{
+    MailboxUID_t       *msg;
+    LinkedListItem_t   *item;
+
+    LinkedListLock( mailbox->messageList );
+
+    for( item = mailbox->messageList->head; item; item = item->next ) {
+        msg = (MailboxUID_t *)item;
+
+        LogPrint( LOG_INFO, "Mailbox %s - Server %p, Channel %p, nick \"%s\", "
+                            "Format %s, UID %08X", mailbox->serverSpec, 
+                            report->server, report->channel, report->nick, 
+                            report->format, msg->uid );
+
+        if( !report->channel ) {
+            transmitMsg( report->server, TX_PRIVMSG, report->nick,
+                         report->format );
+        } else {
+            LoggedChannelMessage( report->server, report->channel, 
+                                  report->format );
+        }
+    }
+
+    LinkedListUnlock( mailbox->messageList );
+}
+
 /*
  * Callbacks for the UW c-client library
  */
@@ -692,7 +912,7 @@ void mm_flags( MAILSTREAM *stream, unsigned long number )
 
 void mm_status( MAILSTREAM *stream, char *mailbox, MAILSTATUS *status )
 {
-    Mailbox_t      *mbox;
+    Mailbox_t              *mbox;
 
     mbox = mailboxFindByStream( stream );
     if( !mbox ) {
@@ -703,16 +923,20 @@ void mm_status( MAILSTREAM *stream, char *mailbox, MAILSTATUS *status )
     if( status->flags & SA_MESSAGES ) {
         LogPrint( LOG_CRIT, "Mailbox: %s - Messages %ld",
                             mailbox, status->messages );
+        mbox->totalMessages = status->messages;
     }
 
     if( status->flags & SA_RECENT ) {
         LogPrint( LOG_CRIT, "Mailbox: %s - Recent Messages %ld", 
                             mailbox, status->recent );
+        mbox->recentMessages = status->recent;
     }
 
     if( status->flags & SA_UNSEEN ) {
         LogPrint( LOG_CRIT, "Mailbox: %s - Unseen Messages %ld", 
                             mailbox, status->unseen );
+
+        mbox->newMessages = status->unseen;
     }
 
     if( status->flags & SA_UIDNEXT ) {
@@ -729,6 +953,7 @@ void mm_status( MAILSTREAM *stream, char *mailbox, MAILSTATUS *status )
 void mm_searched( MAILSTREAM *stream, unsigned long number )
 {
     Mailbox_t      *mailbox;
+    MailboxUID_t   *msg;
 
     mailbox = mailboxFindByStream( stream );
     if( !mailbox ) {
@@ -739,6 +964,12 @@ void mm_searched( MAILSTREAM *stream, unsigned long number )
 
     LogPrint( LOG_CRIT, "Mailbox: %s found message at %ld", 
                         mailbox->serverSpec, number );
+
+    msg = (MailboxUID_t *)malloc(sizeof(MailboxUID_t));
+    msg->uid = number;
+
+    LinkedListAdd( mailbox->messageList, (LinkedListItem_t *)msg, UNLOCKED, 
+                   AT_TAIL );
 }
 
 void mm_exists( MAILSTREAM *stream, unsigned long number )
@@ -851,7 +1082,7 @@ void mm_log( char *string, long errflg )
 
 void mm_dlog( char *string )
 {
-    LogPrint( LOG_DEBUG, "Mailbox: %s", string );
+    LogPrint( LOG_DEBUG, "Mailbox: DEBUG: %s", string );
 }
 
 void mm_login( NETMBX *mb, char *user, char *pwd, long trial )
@@ -918,7 +1149,7 @@ long mm_diskerror( MAILSTREAM *stream, long errcode, long serious )
 
 void mm_fatal( char *string )
 {
-    LogPrint( LOG_CRIT, "Mailbox: %s", string );
+    LogPrint( LOG_CRIT, "Mailbox: FATAL: %s", string );
 }
 
 /*
