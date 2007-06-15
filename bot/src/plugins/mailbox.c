@@ -435,19 +435,21 @@ void *mailbox_thread(void *arg)
                 LinkedListUnlock( mailbox->reports );
             }
 
-            LinkedListLock( mailbox->messageList );
-            while( mailbox->messageList->head ) {
-                listItem = mailbox->messageList->head;
-                msg = (MailboxUID_t *)listItem;
+            if( mailbox->messageList ) {
+                LinkedListLock( mailbox->messageList );
+                while( mailbox->messageList->head ) {
+                    listItem = mailbox->messageList->head;
+                    msg = (MailboxUID_t *)listItem;
 
-                snprintf( sequence, 200, "%ld", msg->uid );
-                mail_setflag_full( mailbox->stream, sequence, "\\Seen", 
-                                   ST_UID );
+                    snprintf( sequence, 200, "%ld", msg->uid );
+                    mail_setflag_full( mailbox->stream, sequence, "\\Seen", 
+                                       ST_UID );
 
-                LinkedListRemove( mailbox->messageList, listItem, LOCKED );
-                free( listItem );
+                    LinkedListRemove( mailbox->messageList, listItem, LOCKED );
+                    free( listItem );
+                }
+                LinkedListUnlock( mailbox->messageList );
             }
-            LinkedListUnlock( mailbox->messageList );
         }
 
         /* Rebalance the trees */
