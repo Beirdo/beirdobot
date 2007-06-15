@@ -143,7 +143,10 @@ static QueryTable_t mailboxQueryTable[] = {
       NULL, NULL, FALSE },
     /* 2 */
     { "SELECT channelId, serverId, nick, format FROM `plugin_mailbox_report` "
-      "WHERE mailboxId = ?", NULL, NULL, FALSE }
+      "WHERE mailboxId = ?", NULL, NULL, FALSE },
+    /* 3 */
+    { "UPDATE `plugin_mailbox` SET `lastRead` = ? WHERE `mailboxId` = ?", 
+      NULL, NULL, FALSE }
 };
 
 
@@ -155,6 +158,7 @@ void *mailbox_thread(void *arg);
 static int db_upgrade_schema( int current, int goal );
 static void db_load_mailboxes( void );
 void db_update_lastpoll( int mailboxId, int lastPoll );
+void db_update_lastread( int mailboxId, int lastRead );
 static void db_load_reports( void );
 static void result_load_mailboxes( MYSQL_RES *res, MYSQL_BIND *input, 
                                    void *args );
@@ -170,6 +174,9 @@ static void dbRecurseReports( BalancedBTreeItem_t *node,
                               pthread_mutex_t *mutex );
 void mailboxReport( Mailbox_t *mailbox, MailboxReport_t *report );
 char *mailboxReportExpand( char *format, ENVELOPE *envelope, BODY *body );
+char *botMailboxDepthFirst( BalancedBTreeItem_t *item, IRCServer_t *server,
+                            IRCChannel_t *channel, bool filter );
+char *mailboxShowDetails( Mailbox_t *mailbox );
 
 
 /* INTERNAL VARIABLES  */
@@ -305,7 +312,6 @@ void *mailbox_thread(void *arg)
     struct tm               tm;
     int                     retval;
     bool                    done;
-    long                    localoffset;
     struct timespec         ts;
     MailboxReport_t        *report;
     bool                    found;
@@ -337,7 +343,6 @@ void *mailbox_thread(void *arg)
 
         gettimeofday( &now, NULL );
         localtime_r( &now.tv_sec, &tm );
-        localoffset = tm.tm_gmtoff;
 
         delta = 60;
         if( !item ) {
@@ -431,6 +436,10 @@ void *mailbox_thread(void *arg)
 
                     /* Do the report! */
                     mailboxReport( mailbox, report );
+
+                    gettimeofday( &now, NULL );
+                    mailbox->lastRead = now.tv_sec;
+                    db_update_lastread( mailbox->mailboxId, now.tv_sec );
                 }
                 LinkedListUnlock( mailbox->reports );
             }
@@ -480,11 +489,152 @@ void *mailbox_thread(void *arg)
 void botCmdMailbox( IRCServer_t *server, IRCChannel_t *channel, char *who, 
                     char *msg, void *tag )
 {
+    static char            *notauth = "You are not authorized, you can't do "
+                                      "that!";
+    char                   *line;
+    char                   *command;
+    char                   *message;
+    int                     mailboxNum;
+    BalancedBTreeItem_t    *item;
+    Mailbox_t              *mailbox;
+    struct timeval          tv;
+
+    command = CommandLineParse( msg, &line );
+    if( !command ) {
+        return;
+    }
+
+    if( !strcmp( command, "list" ) ) {
+        BalancedBTreeLock( mailboxTree );
+        if( line && !strcmp( line, "all" ) ) {
+            message = botMailboxDepthFirst( mailboxTree->root, server, channel,
+                                            false );
+        } else if ( line && !strcmp( line, "timeout" ) ) {
+            BalancedBTreeLock( mailboxActiveTree );
+            message = botMailboxDump( mailboxActiveTree->root );
+            BalancedBTreeUnlock( mailboxActiveTree );
+        } else {
+            message = botMailboxDepthFirst( mailboxTree->root, server, channel,
+                                            true );
+        }
+        BalancedBTreeUnlock( mailboxTree );
+    } else if( !strcmp( command, "show" ) && line ) {
+        mailboxNum = atoi(line);
+        item = BalancedBTreeFind( mailboxTree, &mailboxNum, UNLOCKED );
+        if( !item ) {
+            message = strdup( "No such mailbox!" );
+        } else {
+            mailbox = (Mailbox_t *)item->item;
+            message = mailboxShowDetails( mailbox );
+        }
+    } else {
+        /* Private message only */
+        if( channel ) {
+            free( command );
+            return;
+        }
+
+        if( !authenticate_check( server, who ) ) {
+            transmitMsg( server, TX_PRIVMSG, who, notauth);
+            free( command );
+            return;
+        }
+        
+        if( !strcmp( command, "enable" ) && line ) {
+            mailboxNum = atoi(line);
+            item = BalancedBTreeFind( mailboxTree, &mailboxNum, UNLOCKED );
+            if( !item ) {
+                message = strdup( "No such mailbox!" );
+            } else {
+                mailbox = (Mailbox_t *)item->item;
+
+                message = (char *)malloc(strlen(mailbox->serverSpec) + 32 );
+                if( !mailbox->enabled ) {
+                    mailbox->enabled = TRUE;
+                    item = (BalancedBTreeItem_t *)
+                               malloc(sizeof(BalancedBTreeItem_t));
+                    item->item = (void *)mailbox;
+                    gettimeofday( &tv, NULL );
+                    mailbox->nextPoll = tv.tv_sec;
+                    item->key  = (void *)&mailbox->nextPoll;
+
+                    /* Adjust the poll time to avoid conflict */
+                    BalancedBTreeLock( mailboxActiveTree );
+                    mailboxFindUnconflictingTime( mailboxActiveTree, 
+                                                  &mailbox->nextPoll );
+                    BalancedBTreeAdd( mailboxActiveTree, item, LOCKED, TRUE );
+                    BalancedBTreeUnlock( mailboxActiveTree );
+
+                    sprintf( message, "Enabled mailbox %d - %s", 
+                                      mailbox->mailboxId,
+                                      mailbox->serverSpec );
+                    LogPrint( LOG_NOTICE, "Mailbox: %s", message );
+
+                    pthread_mutex_lock( &signalMutex );
+                    pthread_cond_broadcast( &kickCond );
+                    pthread_mutex_unlock( &signalMutex );
+                } else {
+                    sprintf( message, "Mailbox %d already enabled", 
+                                      mailbox->mailboxId );
+                }
+            }
+        } else if( !strcmp( command, "disable" ) && line ) {
+            mailboxNum = atoi(line);
+            item = BalancedBTreeFind( mailboxTree, &mailboxNum, UNLOCKED );
+            if( !item ) {
+                message = strdup( "No such feed!" );
+            } else {
+                mailbox = (Mailbox_t *)item->item;
+
+                message = (char *)malloc(strlen(mailbox->serverSpec) + 32 );
+
+                if( mailbox->enabled ) {
+                    mailbox->enabled = FALSE;
+                    BalancedBTreeLock( mailboxActiveTree );
+                    item = BalancedBTreeFind( mailboxActiveTree, 
+                                              &mailbox->nextPoll, LOCKED );
+                    BalancedBTreeRemove( mailboxActiveTree, item, LOCKED, 
+                                         TRUE );
+                    BalancedBTreeUnlock( mailboxActiveTree );
+
+                    sprintf( message, "Disabled mailbox %d - %s", 
+                                      mailbox->mailboxId, mailbox->serverSpec );
+                    LogPrint( LOG_NOTICE, "Mailbox: %s", message );
+
+                    pthread_mutex_lock( &signalMutex );
+                    pthread_cond_broadcast( &kickCond );
+                    pthread_mutex_unlock( &signalMutex );
+                } else {
+                    sprintf( message, "Mailbox %d already disabled", 
+                                      mailbox->mailboxId );
+                }
+            }
+        } else {
+            message = NULL;
+            free( command );
+            return;
+        }
+    }
+
+    if( channel ) {
+        LoggedChannelMessage( server, channel, message );
+    } else {
+        transmitMsg( server, TX_PRIVMSG, who, message);
+    }
+
+    free( message );
+    free( command );
 }
 
 char *botHelpMailbox( void *tag )
 {
-    return( NULL );
+    static char *help = "Enable/disable/list/show mailbox polling.  "
+                        "Must be authenticated to use enable/disable.  "
+                        "Syntax: (in channel) mailbox list | mailbox show num "
+                        " (in privmsg) mailbox enable num | "
+                        "mailbox disable num | mailbox list | mailbox show num";
+    
+    return( help );
 }
 
 static int db_upgrade_schema( int current, int goal )
@@ -593,6 +743,22 @@ static void dbRecurseReports( BalancedBTreeItem_t *node,
     pthread_mutex_unlock( mutex );
 
     dbRecurseReports( node->right, mutex );
+}
+
+
+void db_update_lastread( int mailboxId, int lastRead )
+{
+    MYSQL_BIND         *data;
+
+    data = (MYSQL_BIND *)malloc(2 * sizeof(MYSQL_BIND));
+    memset( data, 0, 2 * sizeof(MYSQL_BIND) );
+
+    bind_numeric( &data[0], lastRead, MYSQL_TYPE_LONG );
+    bind_numeric( &data[1], mailboxId, MYSQL_TYPE_LONG );
+
+    LogPrint( LOG_NOTICE, "Mailbox: mailbox %d: updating lastread to %d", 
+                          mailboxId, lastRead );
+    db_queue_query( 3, mailboxQueryTable, data, 2, NULL, NULL, NULL );
 }
 
 
@@ -760,6 +926,58 @@ void mailboxFindUnconflictingTime( BalancedBTree_t *tree, time_t *key )
     }
 }
 
+char *botMailboxDepthFirst( BalancedBTreeItem_t *item, IRCServer_t *server,
+                            IRCChannel_t *channel, bool filter )
+{
+    static char buf[256];
+    char       *message;
+    char       *oldmsg;
+    char       *submsg;
+    int         len;
+    Mailbox_t  *mailbox;
+
+    message = NULL;
+
+    if( !item || !server ) {
+        return( message );
+    }
+
+    submsg = botMailboxDepthFirst( item->left, server, channel, filter );
+    message = submsg;
+    oldmsg  = message;
+    if( message ) {
+        len = strlen(message);
+    } else {
+        len = -2;
+    }
+    
+    mailbox = (Mailbox_t *)item->item;
+    if( !filter || mailbox->enabled ) {
+        sprintf( buf, "%d-%s", mailbox->mailboxId, mailbox->serverSpec );
+
+        submsg = buf;
+        message = (char *)realloc(message, len + 2 + strlen(submsg) + 2);
+        if( oldmsg ) {
+            strcat( message, ", " );
+        } else {
+            message[0] = '\0';
+        }
+        strcat( message, submsg );
+    }
+
+    submsg = botMailboxDepthFirst( item->right, server, channel, filter );
+    if( submsg ) {
+        len = strlen( message );
+
+        message = (char *)realloc(message, len + 2 + strlen(submsg) + 2);
+        strcat( message, ", " );
+        strcat( message, submsg );
+        free( submsg );
+    }
+
+    return( message );
+}
+
 char *botMailboxDump( BalancedBTreeItem_t *item )
 {
     static char     buf[256];
@@ -811,6 +1029,40 @@ char *botMailboxDump( BalancedBTreeItem_t *item )
 
     return( message );
 }
+
+char *mailboxShowDetails( Mailbox_t *mailbox )
+{
+    char           *message;
+    char            buf[1024];
+    char            date[32];
+    struct tm       tm;
+
+    localtime_r((const time_t *)&mailbox->lastCheck, &tm);
+    strftime(date, 32, "%a, %e %b %Y %H:%M:%S %Z", &tm);
+
+    sprintf( buf, "Mailbox: mailbox %d%s: %s, poll interval %ds, last "
+                  "checked %s, last read ", 
+                  mailbox->mailboxId, (mailbox->enabled ? "" : " (disabled)"), 
+                  mailbox->serverSpec, mailbox->interval,
+                  (mailbox->lastCheck == 0 ? "never" : date) );
+
+    if( mailbox->lastRead ) {
+        localtime_r((const time_t *)&mailbox->lastRead, &tm);
+        strftime(date, 32, "%a, %e %b %Y %H:%M:%S %Z", &tm);
+    } else {
+        strcpy( date, "never" );
+    }
+    strcat( buf, date );
+
+    strcat( buf, ", next poll " );
+    localtime_r((const time_t *)&mailbox->nextPoll, &tm);
+    strftime(date, 32, "%a, %e %b %Y %H:%M:%S %Z", &tm);
+    strcat( buf, date );
+
+    message = strdup(buf);
+    return( message );
+}
+
 
 BalancedBTreeItem_t *mailboxRecurseFindNetmbx( BalancedBTreeItem_t *node, 
                                                NETMBX *netmbx )

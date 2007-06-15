@@ -522,7 +522,9 @@ void botCmdRssfeed( IRCServer_t *server, IRCChannel_t *channel, char *who,
             message = botRssfeedDepthFirst( rssfeedTree->root, server, channel,
                                             false );
         } else if ( line && !strcmp( line, "timeout" ) ) {
+            BalancedBTreeLock( rssfeedActiveTree );
             message = botRssfeedDump( rssfeedActiveTree->root );
+            BalancedBTreeUnlock( rssfeedActiveTree );
         } else {
             message = botRssfeedDepthFirst( rssfeedTree->root, server, channel,
                                             true );
