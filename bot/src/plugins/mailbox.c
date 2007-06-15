@@ -887,20 +887,22 @@ void mailboxReport( Mailbox_t *mailbox, MailboxReport_t *report )
     for( item = mailbox->messageList->head; item; item = item->next ) {
         msg = (MailboxUID_t *)item;
 
-        LogPrint( LOG_INFO, "Mailbox %s - Server %p, Channel %p, nick \"%s\", "
-                            "Format %s, UID %08X", mailbox->serverSpec, 
-                            report->server, report->channel, report->nick, 
-                            report->format, msg->uid );
-
         envelope = mail_fetchstructure_full( mailbox->stream, msg->uid, &body,
                                              FT_UID );
 
         message = mailboxReportExpand( report->format, envelope, body );
 
-        if( !report->channel ) {
-            transmitMsg( report->server, TX_PRIVMSG, report->nick, message );
-        } else {
+        if( report->channel ) {
+            LogPrint( LOG_INFO, "Mailbox %d - %s, UID %08X, \"%s\"", 
+                                mailbox->mailboxId, report->channel->fullspec,
+                                msg->uid, message );
             LoggedChannelMessage( report->server, report->channel, message );
+        } else {
+            LogPrint( LOG_INFO, "Mailbox %d - %s@%s:%d->%s, UID %08X, \"%s\"", 
+                                mailbox->mailboxId, report->server->nick,
+                                report->server->server, report->server->port,
+                                report->nick, msg->uid, message );
+            transmitMsg( report->server, TX_PRIVMSG, report->nick, message );
         }
 
         free( message );
@@ -1039,7 +1041,7 @@ void mm_searched( MAILSTREAM *stream, unsigned long number )
         return;
     }
 
-    LogPrint( LOG_CRIT, "Mailbox: %s found message at %ld", 
+    LogPrint( LOG_CRIT, "Mailbox: %s found message at UID %08X", 
                         mailbox->serverSpec, number );
 
     msg = (MailboxUID_t *)malloc(sizeof(MailboxUID_t));
