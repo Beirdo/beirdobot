@@ -56,7 +56,7 @@ static char ident[] _UNUSED_ =
 #define DATEMSK_PATH "../lib"
 #endif
 #define DATEMSK_FILE DATEMSK_PATH "/datemsk.txt"
-#define CURRENT_SCHEMA_RSSFEED 2
+#define CURRENT_SCHEMA_RSSFEED 3
 #define MAX_SCHEMA_QUERY 100
 typedef QueryTable_t SchemaUpgrade_t[MAX_SCHEMA_QUERY];
 
@@ -65,6 +65,8 @@ static QueryTable_t defSchema[] = {
     "    `feedid` INT NOT NULL AUTO_INCREMENT ,\n"
     "    `chanid` INT NOT NULL ,\n"
     "    `url` VARCHAR( 255 ) NOT NULL ,\n"
+    "    `userpasswd` VARCHAR( 255 ) NOT NULL ,\n"
+    "    `authtype` INT NOT NULL ,\n"
     "    `prefix` VARCHAR( 64 ) NOT NULL ,\n"
     "    `timeout` INT NOT NULL ,\n"
     "    `lastpost` INT NOT NULL ,\n"
@@ -80,12 +82,18 @@ static SchemaUpgrade_t schemaUpgrade[CURRENT_SCHEMA_RSSFEED] = {
     /* 1 -> 2 */
     { { "ALTER TABLE `plugin_rssfeed` ADD `feedoffset` INT NOT NULL ;", NULL,
         NULL, FALSE },
+      { NULL, NULL, NULL, FALSE } },
+    /* 2 -> 3 */
+    { { "ALTER TABLE `plugin_rssfeed` ADD `userpasswd` VARCHAR( 255 ) NOT NULL "
+        "AFTER `url` , ADD `authtype` INT NOT NULL AFTER `userpasswd` ;", NULL,
+        NULL, FALSE },
       { NULL, NULL, NULL, FALSE } }
 };
 
 static QueryTable_t rssfeedQueryTable[] = {
     /* 0 */
-    { "SELECT a.`feedid`, a.`chanid`, b.`serverid`, a.`url`, a.`prefix`, "
+    { "SELECT a.`feedid`, a.`chanid`, b.`serverid`, a.`url`, a.`userpasswd`, "
+      "a.`authtype`, a.`prefix`, "
       "a.`timeout`, a.`lastpost`, a.`feedoffset` FROM `plugin_rssfeed` AS a, "
       "`channels` AS b WHERE a.`chanid` = b.`chanid` ORDER BY a.`feedid` ASC",
       NULL, NULL, FALSE },
@@ -100,6 +108,8 @@ typedef struct {
     int             serverId;
     int             chanId;
     char           *url;
+    char           *userpass;
+    long int        authtype;
     char           *prefix;
     time_t          timeout;
     time_t          lastPost;
@@ -116,6 +126,12 @@ typedef struct {
     char       *title;
     char       *link;
 } RssItem_t;
+
+typedef struct {
+    char       *userpass;
+    long        authtype;
+} RssAuth_t;
+
 
 /* INTERNAL FUNCTION PROTOTYPES */
 void botCmdRssfeed( IRCServer_t *server, IRCChannel_t *channel, char *who, 
@@ -227,6 +243,9 @@ void plugin_shutdown( void )
         BalancedBTreeRemove( rssfeedTree, item, LOCKED, FALSE );
         feed = (RssFeed_t *)item->item;
         free( feed->url );
+        if( feed->userpass ) {
+            free( feed->userpass );
+        }
         free( feed->prefix );
         free( feed );
         free( item );
@@ -359,7 +378,8 @@ void *rssfeed_thread(void *arg)
 
             lastPost = feed->lastPost;
 
-            ret = mrss_parse_url( feed->url, &data );
+            ret = mrss_parse_url_auth( feed->url, &data, feed->userpass, 
+                                       feed->authtype );
             if( ret ) {
                 LogPrint( LOG_NOTICE, "RSS feed %d: error %s", feed->feedId,
                                       mrss_strerror(ret) );
@@ -738,10 +758,12 @@ static void result_load_rssfeeds( MYSQL_RES *res, MYSQL_BIND *input,
         data->chanId   = atoi(row[1]);
         data->serverId = atoi(row[2]);
         data->url      = strdup(row[3]);
-        data->prefix   = strdup(row[4]);
-        data->timeout  = atoi(row[5]);
-        data->lastPost = atoi(row[6]);
-        data->offset   = atol(row[7]);
+        data->userpass = (*row[4] ? strdup(row[4]) : NULL);
+        data->authtype = atol(row[5]);
+        data->prefix   = strdup(row[6]);
+        data->timeout  = atoi(row[7]);
+        data->lastPost = atoi(row[8]);
+        data->offset   = atol(row[9]);
         data->nextpoll = nextpoll++;
         data->enabled  = TRUE;
 
