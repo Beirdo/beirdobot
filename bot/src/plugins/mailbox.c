@@ -130,7 +130,8 @@ static SchemaUpgrade_t schemaUpgrade[CURRENT_SCHEMA_MAILBOX] = {
         "  `serverId` INT NOT NULL ,\n"
         "  `nick` VARCHAR( 64 ) NOT NULL ,\n"
         "  `format` TEXT NOT NULL\n"
-        ") TYPE = MYISAM\n", NULL, NULL, FALSE } }
+        ") TYPE = MYISAM\n", NULL, NULL, FALSE },
+      { NULL, NULL, NULL, FALSE } }
 };
 
 static QueryTable_t mailboxQueryTable[] = {
