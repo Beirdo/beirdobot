@@ -173,7 +173,8 @@ BalancedBTreeItem_t *mailboxRecurseFindNetmbx( BalancedBTreeItem_t *node,
 static void dbRecurseReports( BalancedBTreeItem_t *node, 
                               pthread_mutex_t *mutex );
 void mailboxReport( Mailbox_t *mailbox, MailboxReport_t *report );
-char *mailboxReportExpand( char *format, ENVELOPE *envelope, BODY *body );
+char *mailboxReportExpand( char *format, ENVELOPE *envelope, char *body,
+                           unsigned long bodyLen );
 char *botMailboxDepthFirst( BalancedBTreeItem_t *item, IRCServer_t *server,
                             IRCChannel_t *channel, bool filter );
 char *mailboxShowDetails( Mailbox_t *mailbox );
@@ -236,6 +237,7 @@ void plugin_shutdown( void )
     Mailbox_t              *mailbox;
     BalancedBTreeItem_t    *item;
     MailboxReport_t        *report;
+    MailboxUID_t           *msg;
 
     LogPrintNoArg( LOG_NOTICE, "Removing mailbox..." );
     botCmd_remove( "mailbox" );
@@ -282,16 +284,29 @@ void plugin_shutdown( void )
         free( mailbox->mailbox );
         free( mailbox->serverSpec );
 
-        LinkedListLock( mailbox->reports );
-        while( mailbox->reports->head ) {
-            report = (MailboxReport_t *)mailbox->reports->head;
-            free( report->nick );
-            free( report->format );
-            LinkedListRemove( mailbox->reports, (LinkedListItem_t *)report,
-                              LOCKED );
-            free( report );
+        if( mailbox->reports ) {
+            LinkedListLock( mailbox->reports );
+            while( mailbox->reports->head ) {
+                report = (MailboxReport_t *)mailbox->reports->head;
+                free( report->nick );
+                free( report->format );
+                LinkedListRemove( mailbox->reports, (LinkedListItem_t *)report,
+                                  LOCKED );
+                free( report );
+            }
+            LinkedListDestroy( mailbox->reports );
         }
-        LinkedListDestroy( mailbox->reports );
+
+        if( mailbox->messageList ) {
+            LinkedListLock( mailbox->messageList );
+            while( mailbox->messageList->head ) {
+                msg = (MailboxUID_t *)mailbox->messageList->head;
+                LinkedListRemove( mailbox->messageList, 
+                                  (LinkedListItem_t *)msg, LOCKED );
+                free( msg );
+            }
+            LinkedListDestroy( mailbox->messageList );
+        }
 
         BalancedBTreeRemove( mailboxTree, item, LOCKED, FALSE );
         free( item );
@@ -1134,18 +1149,23 @@ void mailboxReport( Mailbox_t *mailbox, MailboxReport_t *report )
     MailboxUID_t       *msg;
     LinkedListItem_t   *item;
     ENVELOPE           *envelope;
-    BODY               *body;
     char               *message;
+    char               *body;
+    unsigned long       bodyLen;
 
     LinkedListLock( mailbox->messageList );
 
     for( item = mailbox->messageList->head; item; item = item->next ) {
         msg = (MailboxUID_t *)item;
 
-        envelope = mail_fetchstructure_full( mailbox->stream, msg->uid, &body,
+        envelope = mail_fetchstructure_full( mailbox->stream, msg->uid, NULL,
                                              FT_UID );
 
-        message = mailboxReportExpand( report->format, envelope, body );
+        body = mail_fetchtext_full( mailbox->stream, msg->uid, &bodyLen, 
+                                    FT_UID );
+
+        message = mailboxReportExpand( report->format, envelope, body, 
+                                       bodyLen );
 
         if( report->channel ) {
             LogPrint( LOG_INFO, "Mailbox %d - %s, UID %08X, \"%s\"", 
@@ -1166,7 +1186,8 @@ void mailboxReport( Mailbox_t *mailbox, MailboxReport_t *report )
     LinkedListUnlock( mailbox->messageList );
 }
 
-char *mailboxReportExpand( char *format, ENVELOPE *envelope, BODY *body )
+char *mailboxReportExpand( char *format, ENVELOPE *envelope, char *body,
+                           unsigned long bodyLen )
 {
     char           *message;
     char           *origmessage;
@@ -1174,8 +1195,11 @@ char *mailboxReportExpand( char *format, ENVELOPE *envelope, BODY *body )
     char           *field;
     int             len;
     int             offset;
+    char           *origbody;
+    bool            bodyProcessed;
 
-    len = strlen(format);
+    bodyProcessed = FALSE;
+    len = strlen(format) + 1;
     message = (char *)malloc(len);
     origmessage = message;
 
@@ -1210,6 +1234,57 @@ char *mailboxReportExpand( char *format, ENVELOPE *envelope, BODY *body )
                     message = origmessage + offset;
                     *message = '\0';
                     strcat( message, envelope->subject );
+                    message += strlen(message);
+                } else if( !strcasecmp( field, "to" ) ) {
+                    offset = message - origmessage;
+                    len += strlen( envelope->to->mailbox ) + 1 + 
+                           strlen( envelope->to->host ) - 4;
+                    origmessage = realloc( origmessage, len );
+                    message = origmessage + offset;
+                    *message = '\0';
+                    strcat( message, envelope->to->mailbox );
+                    strcat( message, "@" );
+                    strcat( message, envelope->to->host );
+                    message += strlen( message );
+                } else if( !strcasecmp( field, "date" ) ) {
+                    offset = message - origmessage;
+                    len += strlen( envelope->date ) - 6;
+                    origmessage = realloc( origmessage, len );
+                    message = origmessage + offset;
+                    *message = '\0';
+                    strcat( message, envelope->date );
+                    message += strlen(message);
+                } else if( !strcasecmp( field, "messageid" ) ) {
+                    offset = message - origmessage;
+                    len += strlen( envelope->message_id ) - 11;
+                    origmessage = realloc( origmessage, len );
+                    message = origmessage + offset;
+                    *message = '\0';
+                    strcat( message, envelope->message_id );
+                    message += strlen(message);
+                } else if( !strcasecmp( field, "body" ) ) {
+                    if( !bodyProcessed ) {
+                        origbody = body;
+                        while( *body ) {
+                            if( *body == '\n' || *body == '\r' ) {
+                                *body = ' ';
+                            }
+                            body++;
+                        }
+                        body = origbody;
+
+                        if( bodyLen > 200 ) {
+                            bodyLen = 200;
+                        }
+                        bodyProcessed = TRUE;
+                    }
+
+                    offset = message - origmessage;
+                    len += bodyLen - 6;
+                    origmessage = realloc( origmessage, len );
+                    message = origmessage + offset;
+                    *message = '\0';
+                    strncat( message, body, bodyLen );
                     message += strlen(message);
                 } else {
                     *message = '\0';
