@@ -65,8 +65,8 @@ typedef struct {
     char               *options;
     char               *mailbox;
     int                 interval;
-    int                 lastCheck;
-    int                 lastRead;
+    time_t              lastCheck;
+    time_t              lastRead;
     time_t              nextPoll;
     bool                enabled;
     char               *serverSpec;
@@ -387,6 +387,7 @@ void *mailbox_thread(void *arg)
                                           &mailbox->nextPoll );
             BalancedBTreeAdd( mailboxActiveTree, item, LOCKED, FALSE );
 
+            mailbox->lastCheck = now.tv_sec;
             db_update_lastpoll( mailbox->mailboxId, now.tv_sec );
 
             if( !mail_ping( mailbox->stream ) ) {
