@@ -348,6 +348,9 @@ struct mrss_t {
 mrss_error_t	mrss_parse_url		(char *		url,
 					 mrss_t **	mrss);
 
+mrss_error_t mrss_parse_url_auth(char *url, mrss_t ** ret, char *userpass,
+				 long int authtype);
+
 /** 
  * Parses a file and creates the data struct of the feed RSS url
  * \param file The file to be parsed

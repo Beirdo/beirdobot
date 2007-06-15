@@ -39,6 +39,9 @@ struct __mrss_download_t__
 };
 
 __mrss_download_t *	__mrss_download_file	(char *, int timeout);
+__mrss_download_t * __mrss_download_file_auth(char *fl, int timeout, 
+                                              char *userpass, 
+					      long int authtype);
 
 #endif
 

@@ -97,4 +97,57 @@ __mrss_download_file (char *fl, int timeout)
   return chunk;
 }
 
+
+__mrss_download_t * __mrss_download_file_auth(char *fl, int timeout, 
+                                              char *userpass, 
+					      long int authtype)
+{
+    __mrss_download_t *chunk;
+    CURL           *curl;
+
+    if (!(chunk = (__mrss_download_t *) malloc(sizeof(__mrss_download_t))))
+        return NULL;
+
+    chunk->mm = NULL;
+    chunk->size = 0;
+
+    curl_global_init(CURL_GLOBAL_DEFAULT);
+    if (!(curl = curl_easy_init())) {
+        if (chunk->mm)
+            free(chunk->mm);
+
+        free(chunk);
+        return NULL;
+    }
+
+    curl_easy_setopt(curl, CURLOPT_URL, fl);
+    curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, __mrss_memorize_file);
+    curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1);
+    curl_easy_setopt(curl, CURLOPT_FILE, (void *) chunk);
+    if( userpass ) {
+        curl_easy_setopt(curl, CURLOPT_USERPWD, userpass);
+        curl_easy_setopt(curl, CURLOPT_HTTPAUTH, authtype);
+    }
+
+    if (timeout > 0)
+        curl_easy_setopt(curl, CURLOPT_TIMEOUT, timeout);
+    else if (timeout < 0)
+        curl_easy_setopt(curl, CURLOPT_TIMEOUT, 10);
+
+    if (curl_easy_perform(curl)) {
+        if (chunk->mm)
+            free(chunk->mm);
+
+        free(chunk);
+
+        curl_easy_cleanup(curl);
+        return NULL;
+    }
+
+    curl_easy_cleanup(curl);
+
+    return chunk;
+}
+
+
 /* EOF */

@@ -665,6 +665,58 @@ mrss_parse_url (char *url, mrss_t ** ret)
   return err;
 }
 
+mrss_error_t mrss_parse_url_auth(char *url, mrss_t ** ret, char *userpass,
+				 long int authtype)
+{
+    __mrss_download_t *download;
+    nxml_t         *doc;
+    mrss_error_t    err;
+
+    if (!url || !ret) {
+        return MRSS_ERR_DATA;
+    }
+
+    if (!(download = __mrss_download_file_auth(url, __mrss_timeout, userpass,
+				               authtype))) {
+        return MRSS_ERR_POSIX;
+    }
+
+    if (nxml_new(&doc) != NXML_OK) {
+        return MRSS_ERR_POSIX;
+    }
+
+    if (nxml_parse_buffer(doc, download->mm, download->size) != NXML_OK) {
+        free(download->mm);
+        free(download);
+
+        nxml_free(doc);
+
+        return MRSS_ERR_PARSER;
+    }
+
+    if (!(err = __mrss_parser(doc, ret))) {
+        if (!((*ret)->file = strdup(url))) {
+            free(download->mm);
+            free(download);
+
+            mrss_free(*ret);
+            nxml_free(doc);
+
+            return MRSS_ERR_POSIX;
+        }
+
+        (*ret)->size = download->size;
+    }
+
+    free(download->mm);
+    free(download);
+
+    nxml_free(doc);
+
+    return err;
+}
+
+
 mrss_error_t
 mrss_parse_file (char *file, mrss_t ** ret)
 {
