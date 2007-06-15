@@ -731,6 +731,10 @@ IRCChannel_t *FindChannelNum( IRCServer_t *server, int channum )
     BalancedBTreeItem_t    *item;
     IRCChannel_t           *channel;
 
+    if( !server ) {
+        return( NULL );
+    }
+
     item = BalancedBTreeFind( server->channelNum, (int *)&channum, UNLOCKED );
     if( !item ) {
         return( NULL );
