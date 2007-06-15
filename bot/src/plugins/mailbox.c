@@ -169,6 +169,7 @@ BalancedBTreeItem_t *mailboxRecurseFindNetmbx( BalancedBTreeItem_t *node,
 static void dbRecurseReports( BalancedBTreeItem_t *node, 
                               pthread_mutex_t *mutex );
 void mailboxReport( Mailbox_t *mailbox, MailboxReport_t *report );
+char *mailboxReportExpand( char *format, ENVELOPE *envelope, BODY *body );
 
 
 /* INTERNAL VARIABLES  */
@@ -310,6 +311,8 @@ void *mailbox_thread(void *arg)
     bool                    found;
     IRCServer_t            *server;
     SEARCHPGM               searchProgram;
+    static char             sequence[200];
+    MailboxUID_t           *msg;
 
     pthread_mutex_lock( &shutdownMutex );
     db_thread_init();
@@ -435,6 +438,12 @@ void *mailbox_thread(void *arg)
             LinkedListLock( mailbox->messageList );
             while( mailbox->messageList->head ) {
                 listItem = mailbox->messageList->head;
+                msg = (MailboxUID_t *)listItem;
+
+                snprintf( sequence, 200, "%ld", msg->uid );
+                mail_setflag_full( mailbox->stream, sequence, "\\Seen", 
+                                   ST_UID );
+
                 LinkedListRemove( mailbox->messageList, listItem, LOCKED );
                 free( listItem );
             }
@@ -869,6 +878,9 @@ void mailboxReport( Mailbox_t *mailbox, MailboxReport_t *report )
 {
     MailboxUID_t       *msg;
     LinkedListItem_t   *item;
+    ENVELOPE           *envelope;
+    BODY               *body;
+    char               *message;
 
     LinkedListLock( mailbox->messageList );
 
@@ -880,16 +892,81 @@ void mailboxReport( Mailbox_t *mailbox, MailboxReport_t *report )
                             report->server, report->channel, report->nick, 
                             report->format, msg->uid );
 
+        envelope = mail_fetchstructure_full( mailbox->stream, msg->uid, &body,
+                                             FT_UID );
+
+        message = mailboxReportExpand( report->format, envelope, body );
+
         if( !report->channel ) {
-            transmitMsg( report->server, TX_PRIVMSG, report->nick,
-                         report->format );
+            transmitMsg( report->server, TX_PRIVMSG, report->nick, message );
         } else {
-            LoggedChannelMessage( report->server, report->channel, 
-                                  report->format );
+            LoggedChannelMessage( report->server, report->channel, message );
         }
+
+        free( message );
     }
 
     LinkedListUnlock( mailbox->messageList );
+}
+
+char *mailboxReportExpand( char *format, ENVELOPE *envelope, BODY *body )
+{
+    char           *message;
+    char           *origmessage;
+    char           *fieldEnd;
+    char           *field;
+    int             len;
+    int             offset;
+
+    len = strlen(format);
+    message = (char *)malloc(len);
+    origmessage = message;
+
+    for( ; *format; ) {
+        if( *format != '$' ) {
+            *(message++) = *(format++);
+        } else {
+            format++;
+            fieldEnd = strchr( format, '$' );
+            if( !fieldEnd ) {
+                *(message++) = '$';
+            } else {
+                *fieldEnd = '\0';
+                field = format;
+                format = ++fieldEnd;
+
+                if( !strcasecmp( field, "from" ) ) {
+                    offset = message - origmessage;
+                    len += strlen( envelope->from->mailbox ) + 1 + 
+                           strlen( envelope->from->host ) - 6;
+                    origmessage = realloc( origmessage, len );
+                    message = origmessage + offset;
+                    *message = '\0';
+                    strcat( message, envelope->from->mailbox );
+                    strcat( message, "@" );
+                    strcat( message, envelope->from->host );
+                    message += strlen( message );
+                } else if( !strcasecmp( field, "subject" ) ) {
+                    offset = message - origmessage;
+                    len += strlen( envelope->subject ) - 9;
+                    origmessage = realloc( origmessage, len );
+                    message = origmessage + offset;
+                    *message = '\0';
+                    strcat( message, envelope->subject );
+                    message += strlen(message);
+                } else {
+                    *message = '\0';
+                    strcat( message, "$" );
+                    strcat( message, field );
+                    strcat( message, "$" );
+                    message += strlen( message );
+                }
+            }
+        }
+    }
+
+    *message = '\0';
+    return( origmessage );
 }
 
 /*
