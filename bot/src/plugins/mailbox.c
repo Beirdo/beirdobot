@@ -1198,6 +1198,7 @@ char *mailboxReportExpand( char *format, ENVELOPE *envelope, char *body,
     int             offset;
     char           *origbody;
     bool            bodyProcessed;
+    int             fieldLen;
 
     bodyProcessed = FALSE;
     len = strlen(format) + 1;
@@ -1213,8 +1214,8 @@ char *mailboxReportExpand( char *format, ENVELOPE *envelope, char *body,
             if( !fieldEnd ) {
                 *(message++) = '$';
             } else {
-                *fieldEnd = '\0';
-                field = format;
+                fieldLen = fieldEnd - format;
+                field = strndup( format, fieldLen );
                 format = ++fieldEnd;
 
                 if( !strcasecmp( field, "from" ) ) {
@@ -1294,6 +1295,8 @@ char *mailboxReportExpand( char *format, ENVELOPE *envelope, char *body,
                     strcat( message, "$" );
                     message += strlen( message );
                 }
+
+                free( field );
             }
         }
     }
