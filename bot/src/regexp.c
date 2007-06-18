@@ -180,6 +180,18 @@ void regexp_parse( IRCServer_t *server, IRCChannel_t *channel, char *who,
     LinkedListUnlock( regexpList );
 }
 
+char *regexp_substring( char *msg, int *ovector, int stringcount,
+                        int stringnum )
+{
+    char        *string;
+
+    if( pcre_get_substring( msg, ovector, stringcount, stringnum, 
+                            (const char **)&string ) < 0 ) {
+        return( NULL );
+    } else {
+        return( string );
+    }
+}
 
 
 /*

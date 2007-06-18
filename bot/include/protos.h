@@ -105,6 +105,8 @@ void regexp_add( const char *channelRegexp, const char *contentRegexp,
 void regexp_remove( char *channelRegexp, char *contentRegexp );
 void regexp_parse( IRCServer_t *server, IRCChannel_t *channel, char *who, 
                    char *msg, IRCMsgType_t type );
+char *regexp_substring( char *msg, int *ovector, int stringcount,
+                        int stringnum );
 
 void LoggedChannelMessage( IRCServer_t *server, IRCChannel_t *channel,
                            char *message );
