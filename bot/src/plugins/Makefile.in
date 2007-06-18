@@ -36,7 +36,7 @@ DLLIBS_rssfeed += -lcurl
 DLLIBS_luascript = $(shell ${LUACFG} --libs)
 DLLIBS_mailbox	= -lc-client
 
-SRCS	= trout.c fart.c core.c dns.c rssfeed.c luascript.c mailbox.c
+SRCS	= trout.c fart.c core.c dns.c rssfeed.c luascript.c mailbox.c trac.c
 OBJS	= ${SRCS:%.c=plugin_%.so}
 DEPS	= ${SRCS:.c=.d}
 
