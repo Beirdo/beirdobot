@@ -330,8 +330,6 @@ void *mailbox_thread(void *arg)
     bool                    done;
     struct timespec         ts;
     MailboxReport_t        *report;
-    bool                    found;
-    IRCServer_t            *server;
     SEARCHPGM               searchProgram;
     static char             sequence[200];
     MailboxUID_t           *msg;
@@ -369,7 +367,7 @@ void *mailbox_thread(void *arg)
         
         mailbox = (Mailbox_t *)item->item;
         nextpoll = mailbox->nextPoll;
-        if( nextpoll > now.tv_sec + 15 || !ServerList ) {
+        if( nextpoll > now.tv_sec + 15 || !ChannelsLoaded ) {
             delta = nextpoll - now.tv_sec;
             goto DelayPoll;
         }
@@ -428,17 +426,8 @@ void *mailbox_thread(void *arg)
                      * If the server info isn't initialized, 
                      * but is ready to be... 
                      */
-                    if( !report->server && ServerList ) {
-                        LinkedListLock( ServerList );
-                        for( listItem = ServerList->head, found = FALSE;
-                             listItem && !found; listItem = listItem->next ) {
-                            server = (IRCServer_t *)listItem;
-                            if( server->serverId == report->serverId ) {
-                                found = TRUE;
-                                report->server = server;
-                            }
-                        }
-                        LinkedListUnlock( ServerList );
+                    if( !report->server && ChannelsLoaded ) {
+                        report->server  = FindServerNum( report->serverId );
 
                         if( report->channelId > 0 ) {
                             report->channel = 

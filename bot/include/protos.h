@@ -48,6 +48,7 @@ extern bool Debug;
 extern bool Daemon;
 extern bool GlobalAbort;
 extern bool BotDone;
+extern bool ChannelsLoaded;
 
 
 /* Prototypes */
@@ -80,6 +81,7 @@ void db_check_plugins( PluginDef_t *plugins, int count );
 
 IRCChannel_t *FindChannelNum( IRCServer_t *server, int channum );
 IRCChannel_t *FindChannel(IRCServer_t *server, const char *channame);
+IRCServer_t *FindServerNum( int serverId );
 
 void botCmd_initialize( void );
 void botCmd_add( const char **command, BotCmdFunc_t func,

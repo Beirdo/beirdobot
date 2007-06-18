@@ -284,9 +284,6 @@ void *rssfeed_thread(void *arg)
     time_t                  lastPost;
     static char             buf[255];
     static char             message[1024];
-    LinkedListItem_t       *listItem;
-    bool                    found;
-    IRCServer_t            *server;
     int                     count;
     int                     retval;
     bool                    done;
@@ -319,7 +316,7 @@ void *rssfeed_thread(void *arg)
         
         feed = (RssFeed_t *)item->item;
         nextpoll = feed->nextpoll;
-        if( nextpoll > now.tv_sec + 15 || !ServerList ) {
+        if( nextpoll > now.tv_sec + 15 || !ChannelsLoaded ) {
             delta = nextpoll - now.tv_sec;
             goto DelayPoll;
         }
@@ -339,18 +336,8 @@ void *rssfeed_thread(void *arg)
                 continue;
             }
 
-            if( (!feed->server || !feed->channel) && ServerList ) {
-                LinkedListLock( ServerList );
-                for( listItem = ServerList->head, found = FALSE; 
-                     listItem && !found; listItem = listItem->next ) {
-                    server = (IRCServer_t *)listItem;
-                    if( server->serverId == feed->serverId ) {
-                        found = TRUE;
-                        feed->server = server;
-                    }
-                }
-                LinkedListUnlock( ServerList );
-
+            if( (!feed->server || !feed->channel) && ChannelsLoaded ) {
+                feed->server  = FindServerNum( feed->serverId );
                 feed->channel = FindChannelNum( feed->server, feed->chanId );
             }
 

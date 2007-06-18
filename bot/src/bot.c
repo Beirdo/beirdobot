@@ -55,6 +55,7 @@ static char ident[] _UNUSED_ =
     "$Id$";
 
 LinkedList_t   *ServerList;
+bool            ChannelsLoaded = FALSE;
 
 void *bot_server_thread(void *arg);
 
@@ -587,6 +588,8 @@ void bot_start(void)
     /* Read the list of channels */
     db_load_channels();
 
+    ChannelsLoaded = TRUE;
+
     LinkedListLock( ServerList );
     for( item = ServerList->head; item; item = item->next ) {
         server = (IRCServer_t *)item;
@@ -716,6 +719,10 @@ IRCChannel_t *FindChannel(IRCServer_t *server, const char *channame)
     BalancedBTreeItem_t    *item;
     IRCChannel_t           *channel;
 
+    if( !server || !ChannelsLoaded ) {
+        return( NULL );
+    }
+
     item = BalancedBTreeFind( server->channelName, (char **)&channame, 
                               UNLOCKED );
     if( !item ) {
@@ -731,7 +738,7 @@ IRCChannel_t *FindChannelNum( IRCServer_t *server, int channum )
     BalancedBTreeItem_t    *item;
     IRCChannel_t           *channel;
 
-    if( !server ) {
+    if( !server || !ChannelsLoaded ) {
         return( NULL );
     }
 
@@ -742,6 +749,33 @@ IRCChannel_t *FindChannelNum( IRCServer_t *server, int channum )
 
     channel = (IRCChannel_t *)item->item;
     return( channel );
+}
+
+IRCServer_t *FindServerNum( int serverId )
+{
+    IRCServer_t            *server;
+    IRCServer_t            *retServer;
+    bool                    found;
+    LinkedListItem_t       *listItem;
+
+    if( !ChannelsLoaded ) {
+        return( NULL );
+    }
+
+    retServer = NULL;
+
+    LinkedListLock( ServerList );
+    for( listItem = ServerList->head, found = FALSE;
+         listItem && !found; listItem = listItem->next ) {
+        server = (IRCServer_t *)listItem;
+        if( server->serverId == serverId ) {
+            found = TRUE;
+            retServer = server;
+        }
+    }
+    LinkedListUnlock( ServerList );
+
+    return( retServer );
 }
 
 void LoggedChannelMessage( IRCServer_t *server, IRCChannel_t *channel,
