@@ -38,6 +38,7 @@ authentication for 30min, then timeout.
 
 you can "authenticate logoff" if you are done sooner
 
+-------------------------------------------------------------------------------
 
 When you are running low on OTPs left (i.e. the number after the opt-md5 is low)
 you will need to rekey.  You can either directly manipulate the database again
