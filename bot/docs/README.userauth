@@ -38,3 +38,32 @@ authentication for 30min, then timeout.
 
 you can "authenticate logoff" if you are done sooner
 
+
+When you are running low on OTPs left (i.e. the number after the opt-md5 is low)
+you will need to rekey.  You can either directly manipulate the database again
+like you did to create the userauth entry, OR...
+
+run:
+donkey -f md5 -i
+
+Once again, enter the user's nick, a new sequence number (the higher it is, the
+less soon you will need to re-key), any random text seed (preferrably different
+from the old one), then choose a passphrase.
+
+It will give you a line like:
+kazu 0345 ho22726          da28793e42026839  Jun 18,2007 23:12:22
+SHAY VIE AVID FOLK MA I
+
+this time, when you authenticate to the bot use
+authenticate init-word:WINK SEAM GRAB ROAD HELL FEST:md5 345 ho22726:SHAY VIE AVID FOLK MA I
+
+(please note that is all one line of input!!!)
+
+You are indicating that you are re-initializing using words, then the first set
+of words is the OTP for the challenge you were sent, then the algorithm (MD5), 
+the new sequence number, the new text seed, and finally the new OTP for the
+new key.
+
+This will then update the record in the database, and next time you are 
+authenticating, it will use the new key sequence.
+

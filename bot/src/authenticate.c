@@ -112,6 +112,7 @@ bool auth_user_verify( AuthData_t **pAuth, char *nick, char *response )
     struct _rtrans *r;
     AuthData_t     *auth;
     int             alg;
+    char           *newseed;
 
     if (!nick || !response) {
         return( false );
@@ -222,10 +223,13 @@ bool auth_user_verify( AuthData_t **pAuth, char *nick, char *response )
 
         *(c2++) = 0;
 
-        if (__opieparsechallenge(c, &j, &(auth->count), &(auth->seed), &k) ||
+        if (__opieparsechallenge(c, &j, &(auth->count), &(newseed), &k) ||
             (j != alg) || k) {
             return( false );
         }
+
+        free( auth->seed );
+        auth->seed = strdup(newseed);
 
         if (i == RESPONSE_INIT_HEX) {
             if (!opieatob8(key, c2)) {
