@@ -39,6 +39,11 @@
 #include "protos.h"
 #include "logging.h"
 #include "balanced_btree.h"
+#include <svn_client.h>
+#include <svn_auth.h>
+#include <svn_pools.h>
+#include <svn_config.h>
+#include <svn_cmdline.h>
 
 /* INTERNAL FUNCTION PROTOTYPES */
 void regexpFuncTicket( IRCServer_t *server, IRCChannel_t *channel, char *who, 
@@ -47,18 +52,35 @@ void regexpFuncTicket( IRCServer_t *server, IRCChannel_t *channel, char *who,
 void regexpFuncChangeset( IRCServer_t *server, IRCChannel_t *channel, 
                           char *who, char *msg, IRCMsgType_t type, 
                           int *ovector, int ovecsize, void *tag );
+void botCmdTrac( IRCServer_t *server, IRCChannel_t *channel, char *who, 
+                 char *msg, void *tag );
+char *botHelpTrac( void *tag );
 static int db_upgrade_schema( int current, int goal );
 static void db_load_channel_regexp( void );
 static void result_load_channel_regexp( MYSQL_RES *res, MYSQL_BIND *input, 
                                         void *args );
 void *trac_thread(void *arg);
 char *tracRecurseBuildChannelRegexp( BalancedBTreeItem_t *node );
+void log_svn_error( svn_error_t *error );
+static svn_error_t *simple_prompt_callback( svn_auth_cred_simple_t **cred,
+                                            void *baton, const char *realm,
+                                            const char *username,
+                                            svn_boolean_t may_save,
+                                            apr_pool_t *pool );
+static svn_error_t *user_prompt_callback( svn_auth_cred_username_t **cred,
+                                          void *baton, const char *realm,
+                                          svn_boolean_t may_save,
+                                          apr_pool_t *pool );
+static svn_error_t *my_svn_receiver( void *baton, apr_hash_t *changed_paths, 
+                                     svn_revnum_t revision, const char *author, 
+                                     const char *date, const char *message, 
+                                     apr_pool_t *pool );
 
 /* CVS generated ID string */
 static char ident[] _UNUSED_ = 
     "$Id$";
 
-#define CURRENT_SCHEMA_TRAC 1
+#define CURRENT_SCHEMA_TRAC 2
 #define MAX_SCHEMA_QUERY 100
 
 typedef QueryTable_t SchemaUpgrade_t[MAX_SCHEMA_QUERY];
@@ -68,6 +90,9 @@ static QueryTable_t defSchema[] = {
     "  `serverid` int(11) NOT NULL default '0',\n"
     "  `chanid` int(11) NOT NULL default '0',\n"
     "  `url` varchar(255) NOT NULL default '',\n"
+    "  `svnUrl` varchar(255) NOT NULL default '',\n"
+    "  `svnUser` varchar(64) NOT NULL default '',\n"
+    "  `svnPasswd` varchar(64) NOT NULL default '',\n"
     "  PRIMARY KEY  (`serverid`, `chanid`)\n"
     ") TYPE = MyISAM\n", NULL, NULL, FALSE }
 };
@@ -75,23 +100,39 @@ static int defSchemaCount = NELEMENTS(defSchema);
 
 static SchemaUpgrade_t schemaUpgrade[CURRENT_SCHEMA_TRAC] = {
     /* 0 -> 1 */
-    { { NULL, NULL, NULL, FALSE } }
+    { { NULL, NULL, NULL, FALSE } },
+    /* 1 -> 2 */
+    { { "ALTER TABLE `plugin_trac` ADD `svnUrl` VARCHAR( 255 ) NOT NULL "
+        "AFTER `url`, ADD `svnUser` VARCHAR( 64 ) NOT NULL AFTER `svnUrl`, "
+        "ADD `svnPasswd` VARCHAR( 64 ) NOT NULL AFTER `svnUser`", NULL, NULL, 
+        FALSE },
+      { NULL, NULL, NULL, FALSE } }
 };
 
 static QueryTable_t tracQueryTable[] = {
     /* 0 */
-    { "SELECT serverid, chanid, url FROM `plugin_trac` ORDER BY `chanid` ASC", 
-      NULL, NULL, FALSE }
+    { "SELECT serverid, chanid, url, svnUrl, svnUser, svnPasswd "
+      "FROM `plugin_trac` ORDER BY `chanid` ASC", NULL, NULL, FALSE }
 };
 
 typedef struct {
-    int             serverId;
-    int             chanId;
-    IRCServer_t    *server;
-    IRCChannel_t   *channel;
-    char           *url;
+    int                 serverId;
+    int                 chanId;
+    IRCServer_t        *server;
+    IRCChannel_t       *channel;
+    char               *url;
+    char               *svnUrl;
+    char               *svnUser;
+    char               *svnPasswd;
+    apr_pool_t         *svnPool;
+    svn_client_ctx_t   *svnContext;
 } TracURL_t;
 
+typedef struct {
+    TracURL_t      *item;
+    apr_pool_t     *pool;
+    char           *message;
+} TracSVNLog_t;
 
 static char    *ticketRegexp = "(?i)(?:\\s|^)\\#(\\d+)(?:\\s|$)";
 static char    *changesetRegexp = "(?i)(?:\\s|^)\\[(\\d+)\\](?:\\s|$)";
@@ -101,11 +142,13 @@ pthread_t           tracThreadId;
 static bool         threadAbort = FALSE;
 BalancedBTree_t    *urlTree;
 
+int my_svn_initialize( TracURL_t *tracItem );
+
 void plugin_initialize( char *args )
 {
-    char                   *verString;
-    int                     ver;
-    int                     printed;
+    char                           *verString;
+    int                             ver;
+    int                             printed;
 
     LogPrintNoArg( LOG_NOTICE, "Initializing trac..." );
 
@@ -134,6 +177,7 @@ void plugin_initialize( char *args )
     } while( ver < CURRENT_SCHEMA_TRAC );
 
     db_load_channel_regexp();
+
     thread_create( &tracThreadId, trac_thread, NULL, "thread_trac" );
 }
 
@@ -142,8 +186,10 @@ void plugin_shutdown( void )
     BalancedBTreeItem_t    *item;
     TracURL_t              *tracItem;
 
+
     LogPrintNoArg( LOG_NOTICE, "Removing trac..." );
     if( channelRegexp ) {
+        botCmd_remove( "trac" );
         regexp_remove( channelRegexp, ticketRegexp );
         regexp_remove( channelRegexp, changesetRegexp );
         free( channelRegexp );
@@ -157,6 +203,12 @@ void plugin_shutdown( void )
             item = urlTree->root;
             tracItem = (TracURL_t *)item->item;
             free( tracItem->url );
+            free( tracItem->svnUrl );
+            free( tracItem->svnUser );
+            free( tracItem->svnPasswd );
+            if( tracItem->svnPool ) {
+                svn_pool_destroy( tracItem->svnPool );
+            }
             free( tracItem );
             BalancedBTreeRemove( urlTree, item, LOCKED, FALSE );
             free( item );
@@ -169,6 +221,7 @@ void *trac_thread(void *arg)
 {
     char                   *string;
     int                     len;
+    static char            *command = "trac";
 
     while( !threadAbort ) {
         if( !ChannelsLoaded ) {
@@ -207,6 +260,7 @@ void *trac_thread(void *arg)
                     regexpFuncTicket, NULL );
         regexp_add( (const char *)channelRegexp, (const char *)changesetRegexp,
                     regexpFuncChangeset, NULL );
+        botCmd_add( (const char **)&command, botCmdTrac, botHelpTrac, NULL );
     }
 
     return( NULL );
@@ -345,9 +399,20 @@ static void result_load_channel_regexp( MYSQL_RES *res, MYSQL_BIND *input,
 
         memset( tracItem, 0x00, sizeof(TracURL_t) );
 
-        tracItem->serverId = atoi(row[0]);
-        tracItem->chanId   = atoi(row[1]);
-        tracItem->url      = strdup(row[2]);
+        tracItem->serverId  = atoi(row[0]);
+        tracItem->chanId    = atoi(row[1]);
+        tracItem->url       = strdup(row[2]);
+        tracItem->svnUrl    = strdup(row[3]);
+        tracItem->svnUser   = strdup(row[3]);
+        tracItem->svnPasswd = strdup(row[3]);
+
+        if( my_svn_initialize( tracItem ) != EXIT_SUCCESS ) {
+            LogPrintNoArg( LOG_CRIT, "Trac: SVN Initialization error!" );
+            if( tracItem->svnPool ) {
+                svn_pool_destroy( tracItem->svnPool );
+                tracItem->svnPool = NULL;
+            }
+        }
 
         item->item = (void *)tracItem;
         item->key  = (void *)&tracItem->chanId;
@@ -406,6 +471,276 @@ char *tracRecurseBuildChannelRegexp( BalancedBTreeItem_t *node )
     }
 
     return( message );
+}
+
+void log_svn_error( svn_error_t *error )
+{
+    svn_error_t    *itr;
+    char            buffer[256];
+
+    for( itr = error; itr; itr = itr->child ) {
+        *buffer = '\0';
+        LogPrint( LOG_INFO, "SVN error (%d) %s: %s", itr->apr_err,
+                            svn_strerror( itr->apr_err, buffer, 
+                                          sizeof(buffer) ), itr->message );
+    }
+
+    svn_error_clear( error );
+}
+
+static svn_error_t *simple_prompt_callback( svn_auth_cred_simple_t **cred,
+                                            void *baton, const char *realm,
+                                            const char *username,
+                                            svn_boolean_t may_save,
+                                            apr_pool_t *pool )
+{
+    svn_auth_cred_simple_t *ret = apr_pcalloc( pool, sizeof(*ret) );
+    TracURL_t *tracItem;
+
+    tracItem = (TracURL_t *)baton;
+
+    if( username ) {
+        ret->username = apr_pstrdup( pool, username );
+    } else {
+        ret->username = apr_pstrdup( pool, tracItem->svnUser );
+    }
+
+    ret->password = apr_pstrdup( pool, tracItem->svnPasswd );
+
+    *cred = ret;
+    return( SVN_NO_ERROR );
+}
+
+static svn_error_t *user_prompt_callback( svn_auth_cred_username_t **cred,
+                                          void *baton, const char *realm,
+                                          svn_boolean_t may_save,
+                                          apr_pool_t *pool )
+{
+    svn_auth_cred_username_t *ret = apr_pcalloc( pool, sizeof(*ret) );
+    TracURL_t *tracItem;
+
+    tracItem = (TracURL_t *)baton;
+
+    ret->username = apr_pstrdup( pool, tracItem->svnUser );
+
+    *cred = ret;
+    return( SVN_NO_ERROR );
+}
+
+int my_svn_initialize( TracURL_t *tracItem ) 
+{
+    int                             retval;
+    apr_pool_t                     *pool;
+    svn_client_ctx_t               *ctx;
+    svn_error_t                    *error;
+    apr_array_header_t             *providers;
+    svn_auth_provider_object_t     *provider;
+
+    if( (retval = svn_cmdline_init( "plugin_trac", NULL ) ) != EXIT_SUCCESS ) {
+        return( retval );
+    }
+
+    tracItem->svnPool = svn_pool_create(NULL);
+    pool = tracItem->svnPool;
+
+    if( (error = svn_config_ensure( NULL, pool )) ) {
+        log_svn_error( error );
+        return( EXIT_FAILURE );
+    }
+    
+    if( (error = svn_client_create_context( &tracItem->svnContext, pool )) ) {
+        log_svn_error( error );
+        return( EXIT_FAILURE );
+    }
+
+    ctx = tracItem->svnContext;
+        
+    if( (error = svn_config_get_config( &ctx->config, NULL, pool )) ) {
+        log_svn_error( error );
+        return( EXIT_FAILURE );
+    }
+
+    providers = apr_array_make( pool, 2, sizeof(svn_auth_provider_object_t *));
+
+#if ( SVN_VER_MAJOR == 1 && SVN_VER_MINOR == 3 )
+    svn_client_get_simple_prompt_provider( &provider, simple_prompt_callback,
+                                           (void *)tracItem, 2, pool );
+#else
+    svn_auth_get_simple_prompt_provider( &provider, simple_prompt_callback,
+                                         (void *)tracItem, 2, pool );
+#endif
+    APR_ARRAY_PUSH( providers, svn_auth_provider_object_t *) = provider;
+
+#if ( SVN_VER_MAJOR == 1 && SVN_VER_MINOR == 3 )
+    svn_client_get_username_prompt_provider( &provider, 
+                                             user_prompt_callback,
+                                            (void *)tracItem, 2, pool );
+#else
+    svn_auth_get_username_prompt_provider( &provider, 
+                                           user_prompt_callback,
+                                          (void *)tracItem, 2, pool );
+#endif
+    APR_ARRAY_PUSH( providers, svn_auth_provider_object_t *) = provider;
+
+    svn_auth_open( &ctx->auth_baton, providers, pool );
+    
+    return( EXIT_SUCCESS );
+}
+
+void botCmdTrac( IRCServer_t *server, IRCChannel_t *channel, char *who, 
+                 char *msg, void *tag )
+{
+    char                   *line;
+    char                   *command;
+    char                   *which;
+    char                   *message;
+    int                     number;
+    BalancedBTreeItem_t    *item;
+    TracURL_t              *tracItem;
+    svn_error_t            *error;
+
+
+    command = CommandLineParse( msg, &line );
+    if( !command ) {
+        return;
+    }
+
+    if( !strcmp( command, "details" ) ) {
+        free( command );
+        which = CommandLineParse( line, &line );
+        if( !which ) {
+            LogPrintNoArg( LOG_CRIT, "No ticket/changeset" );
+            return;
+        }
+
+        if( channel ) {
+            item = BalancedBTreeFind( urlTree, &channel->channelId, UNLOCKED );
+            if( !item ) {
+                LogPrintNoArg( LOG_CRIT, "Channel has no Trac setup" );
+                free( which );
+                return;
+            }
+        } else {
+            IRCChannel_t       *chan;
+
+            message = CommandLineParse( line, &line );
+            if( !message ) {
+                LogPrintNoArg( LOG_CRIT, "No channel indicated" );
+                free( which );
+                return;
+            }
+            chan = FindChannel( server, message );
+            free( message );
+
+            if( !chan ) {
+                LogPrintNoArg( LOG_CRIT, "No such channel" );
+                free( which );
+                return;
+            }
+
+            item = BalancedBTreeFind( urlTree, &chan->channelId, UNLOCKED );
+            if( !item ) {
+                LogPrintNoArg( LOG_CRIT, "Channel has no Trac setup" );
+                free( which );
+                return;
+            }
+        }
+        
+        tracItem = (TracURL_t *)item->item;
+
+        if( *which == '#' ) {
+            /* This is a ticket, not implemented yet */
+            message = strdup( "Ticket details not implemented yet!" );
+        } else if( *which == '[' && which[strlen(which)-1] == ']' ) {
+            /* This is a changeset */
+
+            /* Strip off the [] */
+            line = which + 1;
+            line[strlen(line)-1] = '\0';
+            number = atoi(line);
+            free( which );
+
+            if( !number ) {
+                message = strdup( "Can't fetch logs for [0] or non-numeric" );
+            } else if( !tracItem->svnPool ) {
+                message = strdup( "SVN Repository not configured!" );
+            } else {
+                apr_pool_t             *pool;
+                svn_opt_revision_t      revision;
+                apr_array_header_t     *target;
+                char                   *url;
+                TracSVNLog_t            args;
+
+                pool = svn_pool_create( tracItem->svnPool );
+                revision.kind         = svn_opt_revision_number;
+                revision.value.number = number;
+
+                target = apr_array_make( pool, 1, sizeof(const char *));
+                url = apr_pstrdup( pool, tracItem->svnUrl );
+                APR_ARRAY_PUSH( target, const char *) = url;
+
+                args.item    = tracItem;
+                args.pool    = pool;
+                args.message = NULL;
+
+                if( (error = svn_client_log( target, &revision, &revision, 
+                                             FALSE, FALSE, my_svn_receiver, 
+                                             (void *)&args, 
+                                             tracItem->svnContext, pool ) ) ) {
+                    log_svn_error( error );
+                    return;
+                }
+
+                message = args.message;
+
+                svn_pool_destroy( pool );
+            }
+        } else {
+            free( which );
+            return;
+        }
+    } else {
+        free( command );
+        return;
+    }
+
+    LogPrint( LOG_INFO, "Trac: %s", message );
+    if( channel ) {
+        LoggedChannelMessage( server, channel, message );
+    } else {
+        transmitMsg( server, TX_PRIVMSG, who, message);
+    }
+
+    free( message );
+}
+
+char *botHelpTrac( void *tag )
+{
+    return( NULL );
+}
+
+static svn_error_t *my_svn_receiver( void *baton, apr_hash_t *changed_paths, 
+                                     svn_revnum_t revision, const char *author, 
+                                     const char *date, const char *message, 
+                                     apr_pool_t *pool )
+{
+    TracSVNLog_t       *args;
+    char               *ch;
+
+    args = (TracSVNLog_t *)baton;
+
+    args->message = (char *)malloc( 42 + strlen(author) + strlen(date) +
+                                    strlen(message) );
+    sprintf( args->message, "[%ld] Author: %s  Date: %s  Message: %s",
+                            (long int)revision, author, date, message );
+
+    for( ch = args->message; *ch; ch++ ) {
+        if( *ch == '\n' || *ch == '\r' ) {
+            *ch = ' ';
+        }
+    }
+
+    return( NULL );
 }
 
 /*

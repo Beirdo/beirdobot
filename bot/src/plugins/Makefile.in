@@ -23,6 +23,7 @@ CFLAGS_rssfeed += $(shell PKG_CONFIG_PATH=${PKGCONFIGPATH} pkg-config --cflags m
 CFLAGS_rssfeed += -DDATEMSK_PATH=\"${pkglibdir}\"
 CFLAGS_luascript  = $(shell ${LUACFG} --include)
 CFLAGS_luascript += -DPLUGIN_PATH=\"${pkglibdir}\"
+CFLAGS_trac  = -I/usr/include/subversion-1 -I/usr/include/apr-0
 
 
 LDFLAGS = -g
@@ -35,6 +36,7 @@ DLLIBS_rssfeed += $(shell PKG_CONFIG_PATH=${PKGCONFIGPATH} pkg-config --libs mrs
 DLLIBS_rssfeed += -lcurl
 DLLIBS_luascript = $(shell ${LUACFG} --libs)
 DLLIBS_mailbox	= -lc-client
+DLLIBS_trac	= -lsvn_client-1 -lapr-0 -laprutil-0
 
 SRCS	= trout.c fart.c core.c dns.c rssfeed.c luascript.c mailbox.c trac.c
 OBJS	= ${SRCS:%.c=plugin_%.so}
