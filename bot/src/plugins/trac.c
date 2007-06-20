@@ -720,7 +720,12 @@ void botCmdTrac( IRCServer_t *server, IRCChannel_t *channel, char *who,
 
 char *botHelpTrac( void *tag )
 {
-    return( NULL );
+    static char *help = "Show details for Trac tickets or changesets.  Syntax: "
+                        "(in channel) trac details #ticknum | trac details "
+                        "[chgsetnum]  (in privmsg) trac details #ticknum "
+                        "channel | trac details [chgsetnum] channel";
+
+    return( help );
 }
 
 static svn_error_t *my_svn_receiver( void *baton, apr_hash_t *changed_paths, 
@@ -775,10 +780,12 @@ char *tracDetailsTicket( TracURL_t *tracItem, int number )
 
     ret = mrss_parse_url( url, &data );
     free( url );
+
     if( ret ) {
-        LogPrint( LOG_CRIT, "Couldn't get RSS for ticket %d",
-                            number );
-        return( NULL );
+        message = (char *)malloc(60);
+        sprintf( message, "No data for ticket #%d", number );
+        LogPrint( LOG_CRIT, "%s: Couldn't get RSS", message );
+        return( message );
     }
 
     mrss_get( data, MRSS_FLAG_TITLE, &ticket->title, 
@@ -894,10 +901,11 @@ char *tracDetailsChangeset( TracURL_t *tracItem, int number )
                                  (void *)&args, 
                                  tracItem->svnContext, pool ) ) ) {
         log_svn_error( error );
-        return( NULL );
+        message = (char *)malloc(60);
+        sprintf(message, "No data for changeset [%d]", number);
+    } else {
+        message = args.message;
     }
-
-    message = args.message;
 
     svn_pool_destroy( pool );
     return( message );
