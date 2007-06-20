@@ -44,6 +44,8 @@
 #include <svn_pools.h>
 #include <svn_config.h>
 #include <svn_cmdline.h>
+#include "mrss.h"
+#include <curl/curl.h>
 
 /* INTERNAL FUNCTION PROTOTYPES */
 void regexpFuncTicket( IRCServer_t *server, IRCChannel_t *channel, char *who, 
@@ -75,6 +77,9 @@ static svn_error_t *my_svn_receiver( void *baton, apr_hash_t *changed_paths,
                                      svn_revnum_t revision, const char *author, 
                                      const char *date, const char *message, 
                                      apr_pool_t *pool );
+static size_t tracMemorizeFile(void *ptr, size_t size, size_t nmemb, 
+                               void *data);
+void tracTicketCsv( BalancedBTree_t *tree, char *page );
 
 /* CVS generated ID string */
 static char ident[] _UNUSED_ = 
@@ -134,6 +139,19 @@ typedef struct {
     char           *message;
 } TracSVNLog_t;
 
+typedef struct {
+    char               *title;
+    char               *link;
+    char               *desc;
+    int                 commentCount;
+    BalancedBTree_t    *csvTree;
+} TracTicket_t;
+
+typedef struct {
+    char               *header;
+    char               *data;
+} TracCSV_t;
+
 static char    *ticketRegexp = "(?i)(?:\\s|^)\\#(\\d+)(?:\\s|$)";
 static char    *changesetRegexp = "(?i)(?:\\s|^)\\[(\\d+)\\](?:\\s|$)";
 static char    *channelRegexp = NULL;
@@ -143,6 +161,8 @@ static bool         threadAbort = FALSE;
 BalancedBTree_t    *urlTree;
 
 int my_svn_initialize( TracURL_t *tracItem );
+char *tracDetailsTicket( TracURL_t *tracItem, int number );
+char *tracDetailsChangeset( TracURL_t *tracItem, int number );
 
 void plugin_initialize( char *args )
 {
@@ -406,7 +426,8 @@ static void result_load_channel_regexp( MYSQL_RES *res, MYSQL_BIND *input,
         tracItem->svnUser   = strdup(row[3]);
         tracItem->svnPasswd = strdup(row[3]);
 
-        if( my_svn_initialize( tracItem ) != EXIT_SUCCESS ) {
+        if( *tracItem->svnUrl && 
+            my_svn_initialize( tracItem ) != EXIT_SUCCESS ) {
             LogPrintNoArg( LOG_CRIT, "Trac: SVN Initialization error!" );
             if( tracItem->svnPool ) {
                 svn_pool_destroy( tracItem->svnPool );
@@ -597,13 +618,14 @@ void botCmdTrac( IRCServer_t *server, IRCChannel_t *channel, char *who,
     int                     number;
     BalancedBTreeItem_t    *item;
     TracURL_t              *tracItem;
-    svn_error_t            *error;
 
 
     command = CommandLineParse( msg, &line );
     if( !command ) {
         return;
     }
+
+    message = NULL;
 
     if( !strcmp( command, "details" ) ) {
         free( command );
@@ -649,8 +671,18 @@ void botCmdTrac( IRCServer_t *server, IRCChannel_t *channel, char *who,
         tracItem = (TracURL_t *)item->item;
 
         if( *which == '#' ) {
-            /* This is a ticket, not implemented yet */
-            message = strdup( "Ticket details not implemented yet!" );
+            /* This is a ticket */
+
+            /* Strip off the # */
+            line = which + 1;
+            number = atoi(line);
+            free( which );
+
+            if( !number ) {
+                message = strdup( "Can't fetch details for #0 or non-numeric" );
+            } else {
+                message = tracDetailsTicket( tracItem, number );
+            }
         } else if( *which == '[' && which[strlen(which)-1] == ']' ) {
             /* This is a changeset */
 
@@ -665,53 +697,25 @@ void botCmdTrac( IRCServer_t *server, IRCChannel_t *channel, char *who,
             } else if( !tracItem->svnPool ) {
                 message = strdup( "SVN Repository not configured!" );
             } else {
-                apr_pool_t             *pool;
-                svn_opt_revision_t      revision;
-                apr_array_header_t     *target;
-                char                   *url;
-                TracSVNLog_t            args;
-
-                pool = svn_pool_create( tracItem->svnPool );
-                revision.kind         = svn_opt_revision_number;
-                revision.value.number = number;
-
-                target = apr_array_make( pool, 1, sizeof(const char *));
-                url = apr_pstrdup( pool, tracItem->svnUrl );
-                APR_ARRAY_PUSH( target, const char *) = url;
-
-                args.item    = tracItem;
-                args.pool    = pool;
-                args.message = NULL;
-
-                if( (error = svn_client_log( target, &revision, &revision, 
-                                             FALSE, FALSE, my_svn_receiver, 
-                                             (void *)&args, 
-                                             tracItem->svnContext, pool ) ) ) {
-                    log_svn_error( error );
-                    return;
-                }
-
-                message = args.message;
-
-                svn_pool_destroy( pool );
+                message = tracDetailsChangeset( tracItem, number );
             }
         } else {
             free( which );
-            return;
         }
     } else {
         free( command );
-        return;
     }
 
-    LogPrint( LOG_INFO, "Trac: %s", message );
-    if( channel ) {
-        LoggedChannelMessage( server, channel, message );
-    } else {
-        transmitMsg( server, TX_PRIVMSG, who, message);
-    }
+    if( message ) {
+        LogPrint( LOG_INFO, "Trac: %s", message );
+        if( channel ) {
+            LoggedChannelMessage( server, channel, message );
+        } else {
+            transmitMsg( server, TX_PRIVMSG, who, message);
+        }
 
-    free( message );
+        free( message );
+    }
 }
 
 char *botHelpTrac( void *tag )
@@ -741,6 +745,227 @@ static svn_error_t *my_svn_receiver( void *baton, apr_hash_t *changed_paths,
     }
 
     return( NULL );
+}
+
+char *tracDetailsTicket( TracURL_t *tracItem, int number )
+{
+    mrss_t                 *data;
+    mrss_item_t            *rssItem;
+    mrss_error_t            ret;
+    char                   *url;
+    char                   *message;
+    TracTicket_t           *ticket;
+    BalancedBTreeItem_t    *item;
+    CURL                   *curl;
+    char                   *page;
+    TracCSV_t              *csv;
+    static char            *items[] = { "Reporter", "Owner", "Type", "Status",
+                                        "Priority", "Milestone", "Component",
+                                        "Version", "Severity", "Resolution" };
+    static int              itemCount = NELEMENTS(items);
+    int                     i;
+    int                     len;
+
+    message = NULL;
+    ticket = (TracTicket_t *)malloc(sizeof(TracTicket_t));
+    memset( ticket, 0x00, sizeof(TracTicket_t) );
+
+    url = (char *)malloc(strlen(tracItem->url) + 34);
+    sprintf( url, "%s/ticket/%d?format=rss", tracItem->url, number );
+
+    ret = mrss_parse_url( url, &data );
+    free( url );
+    if( ret ) {
+        LogPrint( LOG_CRIT, "Couldn't get RSS for ticket %d",
+                            number );
+        return( NULL );
+    }
+
+    mrss_get( data, MRSS_FLAG_TITLE, &ticket->title, 
+                    MRSS_FLAG_LINK, &ticket->link,
+                    MRSS_FLAG_DESCRIPTION, &ticket->desc, 
+                    MRSS_FLAG_END );
+
+    ticket->commentCount = 0;
+    for( rssItem = data->item; rssItem; rssItem = rssItem->next ) {
+        ticket->commentCount++;
+    }
+
+    mrss_free( data );
+
+    message = strdup(ticket->title);
+
+    len = strlen( message ) + 24;
+    message = (char *)realloc( message, len );
+    sprintf( &(message[strlen(message)]), ", Comments: %d", 
+             ticket->commentCount );
+    len = strlen( message ) + 1;
+
+    ticket->csvTree = BalancedBTreeCreate( BTREE_KEY_STRING );
+    BalancedBTreeLock( ticket->csvTree );
+
+    page = NULL;
+    curl = curl_easy_init();
+    if( curl ) {
+        url = (char *)malloc(strlen(tracItem->url) + 34);
+        sprintf( url, "%s/ticket/%d?format=csv", tracItem->url, number );
+
+        curl_easy_setopt( curl, CURLOPT_URL, url);
+        curl_easy_setopt( curl, CURLOPT_WRITEFUNCTION, tracMemorizeFile );
+        curl_easy_setopt( curl, CURLOPT_FOLLOWLOCATION, 1 );
+        curl_easy_setopt( curl, CURLOPT_FILE, (void *)&page );
+        curl_easy_setopt( curl, CURLOPT_TIMEOUT, 10 );
+
+        if( curl_easy_perform( curl ) ) {
+            if( page ) {
+                free( page );
+                page = NULL;
+            }
+        }
+
+        curl_easy_cleanup( curl );
+    }
+
+    if( page ) {
+        tracTicketCsv( ticket->csvTree, page );
+        free( page );
+    }
+
+    for( i = 0; i < itemCount; i++ ) {
+        item = BalancedBTreeFind( ticket->csvTree, &items[i], LOCKED );
+        if( item ) {
+            csv = (TracCSV_t *)item->item;
+
+            if( *csv->data ) {
+                len += strlen( items[i] ) + strlen( csv->data ) + 4;
+                message = (char *)realloc(message, len);
+                sprintf( &(message[strlen(message)]), ", %s: %s", items[i],
+                                                      csv->data );
+            }
+        }
+    }
+
+    while( ticket->csvTree->root ) {
+        item = ticket->csvTree->root;
+        csv = (TracCSV_t *)item->item;
+
+        free( csv->header );
+        free( csv->data );
+        free( csv );
+
+        BalancedBTreeRemove( ticket->csvTree, item, LOCKED, FALSE );
+        free( item );
+    }
+
+    BalancedBTreeDestroy( ticket->csvTree );
+
+    free( ticket->title );
+    free( ticket->link );
+    free( ticket->desc );
+    free( ticket );
+
+    return( message );
+}
+
+char *tracDetailsChangeset( TracURL_t *tracItem, int number )
+{
+    svn_error_t            *error;
+    apr_pool_t             *pool;
+    svn_opt_revision_t      revision;
+    apr_array_header_t     *target;
+    char                   *url;
+    TracSVNLog_t            args;
+    char                   *message;
+
+    pool = svn_pool_create( tracItem->svnPool );
+    revision.kind         = svn_opt_revision_number;
+    revision.value.number = number;
+
+    target = apr_array_make( pool, 1, sizeof(const char *));
+    url = apr_pstrdup( pool, tracItem->svnUrl );
+    APR_ARRAY_PUSH( target, const char *) = url;
+
+    args.item    = tracItem;
+    args.pool    = pool;
+    args.message = NULL;
+
+    if( (error = svn_client_log( target, &revision, &revision, 
+                                 FALSE, FALSE, my_svn_receiver, 
+                                 (void *)&args, 
+                                 tracItem->svnContext, pool ) ) ) {
+        log_svn_error( error );
+        return( NULL );
+    }
+
+    message = args.message;
+
+    svn_pool_destroy( pool );
+    return( message );
+}
+
+static size_t tracMemorizeFile(void *ptr, size_t size, size_t nmemb, 
+                               void *data)
+{
+    int    realsize;
+    char **page;
+    char  *pageData;
+
+    realsize = size * nmemb;
+    page = (char **)data;
+
+    pageData = (char *)malloc( realsize + 1 );
+    memcpy(pageData, ptr, realsize);
+
+    *page = pageData;
+    return( realsize );
+}
+
+void tracTicketCsv( BalancedBTree_t *tree, char *page )
+{
+    char                   *headers;
+    char                   *data;
+    char                   *ch;
+    TracCSV_t              *csv;
+    BalancedBTreeItem_t    *item;
+    int                     len;
+
+    ch = strchr( (const char *)page, '\n' );
+    *ch = '\0';
+    headers = page;
+
+    /* skip the \r */
+    data = ch + 1;
+    ch = strchr( (const char *)data, '\n' );
+    *ch = '\0';
+
+    for( ; *headers && *data; ) {
+        csv = (TracCSV_t *)malloc(sizeof(TracCSV_t));
+        ch = strchr( (const char *)headers, ',' );
+        if( !ch ) {
+            len = strlen( headers );
+        } else {
+            len = ch - headers;
+        }
+        csv->header = strndup( headers, len );
+        headers += len + 1;
+
+        ch = strchr( (const char *)data, ',' );
+        if( !ch ) {
+            len = strlen( data );
+        } else {
+            len = ch - data;
+        }
+        csv->data = strndup( data, len );
+        data += len + 1;
+
+        item = (BalancedBTreeItem_t *)malloc(sizeof(BalancedBTreeItem_t));
+        item->item = (void *)csv;
+        item->key  = (void *)&csv->header;
+
+        BalancedBTreeAdd( tree, item, LOCKED, FALSE );
+    }
+
+    BalancedBTreeAdd( tree, NULL, LOCKED, TRUE );
 }
 
 /*
