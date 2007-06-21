@@ -41,8 +41,10 @@ DLLIBS_trac	= -lsvn_client-1 -lapr-0 -laprutil-0
 DLLIBS_trac    += $(shell PKG_CONFIG_PATH=${PKGCONFIGPATH} pkg-config --libs nxml)
 DLLIBS_trac    += $(shell PKG_CONFIG_PATH=${PKGCONFIGPATH} pkg-config --libs mrss)
 DLLIBS_trac    += -lcurl
+DLLIBS_url      = -lcurl
 
 SRCS	= trout.c fart.c core.c dns.c rssfeed.c luascript.c mailbox.c trac.c
+SRCS   += url.c
 OBJS	= ${SRCS:%.c=plugin_%.so}
 DEPS	= ${SRCS:.c=.d}
 

@@ -47,6 +47,7 @@ static PluginDef_t DefaultPlugins[] = {
     { "luascript",  "plugin_luascript.so",  0,  "" },
     { "mailbox",    "plugin_mailbox.so",    0,  "" },
     { "trac",       "plugin_trac.so",       0,  "" },
+    { "url",        "plugin_url.so",        0,  "" },
 };
 static int DefaultPluginCount = NELEMENTS(DefaultPlugins);
 #endif
