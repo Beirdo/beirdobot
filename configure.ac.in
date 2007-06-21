@@ -39,6 +39,73 @@ else
 fi
 AC_SUBST(MYSQL_LIBS, ${ac_cv_mysql_libs})
 
+dnl HAVOK_SWITCH(arg-name, arg_name, ARG_NAME, help_LHS, help_RHS, cache_string,
+dnl              header_comment, default, not_default)
+AC_DEFUN([ENABLE_SWITCH],
+[AC_ARG_ENABLE($1, AS_HELP_STRING([$4], [$5]))
+if test "$enable_$2" = "$9"; then
+        ac_cv_option_$2=$9
+else    
+        ac_cv_option_$2=$8
+fi
+
+AC_CACHE_CHECK([$6], ac_cv_option_$2)
+if test "$ac_cv_option_$2" = "yes" ; then
+        AC_DEFINE($3, 1, [$7])
+fi
+
+AC_SUBST($3, ${ac_cv_option_$2})
+] )
+
+ENABLE_SWITCH([dns],[plugin_dns],[PLUGIN_DNS],[--disable-dns],
+              [Disable the dns plugin],
+              [to enable the compilation of the dns plugin],
+              [To enable the compilation of the dns plugin],
+              [yes],[no])
+
+ENABLE_SWITCH([fart],[plugin_fart],[PLUGIN_FART],[--disable-fart],
+              [Disable the fart plugin],
+              [to enable the compilation of the fart plugin],
+              [To enable the compilation of the fart plugin],
+              [yes],[no])
+
+ENABLE_SWITCH([luascript],[plugin_luascript],[PLUGIN_LUASCRIPT],
+	      [--disable-luascript],[Disable the luascript plugin],
+              [to enable the compilation of the luascript plugin],
+              [To enable the compilation of the luascript plugin],
+              [yes],[no])
+
+ENABLE_SWITCH([mailbox],[plugin_mailbox],[PLUGIN_MAILBOX],[--disable-mailbox],
+              [Disable the mailbox plugin],
+              [to enable the compilation of the mailbox plugin],
+              [To enable the compilation of the mailbox plugin],
+              [yes],[no])
+
+ENABLE_SWITCH([rssfeed],[plugin_rssfeed],[PLUGIN_RSSFEED],[--disable-rssfeed],
+              [Disable the rssfeed plugin],
+              [to enable the compilation of the rssfeed plugin],
+              [To enable the compilation of the rssfeed plugin],
+              [yes],[no])
+
+ENABLE_SWITCH([trac],[plugin_trac],[PLUGIN_TRAC],[--disable-trac],
+              [Disable the trac plugin],
+              [to enable the compilation of the trac plugin],
+              [To enable the compilation of the trac plugin],
+              [yes],[no])
+
+ENABLE_SWITCH([trout],[plugin_trout],[PLUGIN_TROUT],[--disable-trout],
+              [Disable the trout plugin],
+              [to enable the compilation of the trout plugin],
+              [To enable the compilation of the trout plugin],
+              [yes],[no])
+
+ENABLE_SWITCH([url],[plugin_url],[PLUGIN_URL],[--disable-url],
+              [Disable the url plugin],
+              [to enable the compilation of the url plugin],
+              [To enable the compilation of the url plugin],
+              [yes],[no])
+
+
 # Checks for header files.
 #AC_HEADER_DIRENT
 #AC_HEADER_STDC

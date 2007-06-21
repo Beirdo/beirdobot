@@ -18,38 +18,75 @@ CFLAGS	= -O6 -g -Wall -Werror -I../../include -std=c99 -pedantic
 CFLAGS	+= $(shell ${MYSQLCFG} --cflags)
 CFLAGS  += $(shell ${BOTNETCFG} --cflags)
 
-CFLAGS_rssfeed  = $(shell PKG_CONFIG_PATH=${PKGCONFIGPATH} pkg-config --cflags nxml)
-CFLAGS_rssfeed += $(shell PKG_CONFIG_PATH=${PKGCONFIGPATH} pkg-config --cflags mrss)
-CFLAGS_luascript  = $(shell ${LUACFG} --include)
-CFLAGS_luascript += -DPLUGIN_PATH=\"${pkglibdir}\"
-CFLAGS_trac  = -I/usr/include/subversion-1 -I/usr/include/apr-0
-CFLAGS_trac += $(shell PKG_CONFIG_PATH=${PKGCONFIGPATH} pkg-config --cflags nxml)
-CFLAGS_trac += $(shell PKG_CONFIG_PATH=${PKGCONFIGPATH} pkg-config --cflags mrss)
-
-
 LDFLAGS = -g
 LIBS	= $(shell ${MYSQLCFG} --libs_r)
 LIBS	+= $(shell ${BOTNETCFG} --libs-static)
 
-DLLIBS_dns	= -lresolv
-DLLIBS_rssfeed	= $(shell PKG_CONFIG_PATH=${PKGCONFIGPATH} pkg-config --libs nxml)
-DLLIBS_rssfeed += $(shell PKG_CONFIG_PATH=${PKGCONFIGPATH} pkg-config --libs mrss)
-DLLIBS_rssfeed += -lcurl
-DLLIBS_luascript = $(shell ${LUACFG} --libs)
-DLLIBS_mailbox	= -lc-client
-DLLIBS_trac	= -lsvn_client-1 -lapr-0 -laprutil-0
-DLLIBS_trac    += $(shell PKG_CONFIG_PATH=${PKGCONFIGPATH} pkg-config --libs nxml)
-DLLIBS_trac    += $(shell PKG_CONFIG_PATH=${PKGCONFIGPATH} pkg-config --libs mrss)
-DLLIBS_trac    += -lcurl
-DLLIBS_url      = -lcurl
+SRCS    = core.c
 
-SRCS	= trout.c fart.c core.c dns.c rssfeed.c luascript.c mailbox.c trac.c
-SRCS   += url.c
+PLUGIN_DNS       = @PLUGIN_DNS@
+ifeq (${PLUGIN_DNS},yes)
+ SRCS  += dns.c
+ DLLIBS_dns	= -lresolv
+endif
+
+PLUGIN_FART      = @PLUGIN_FART@
+ifeq (${PLUGIN_FART},yes)
+ SRCS  += fart.c
+endif
+
+PLUGIN_LUASCRIPT = @PLUGIN_LUASCRIPT@
+ifeq (${PLUGIN_LUASCRIPT},yes)
+ SRCS  += luascript.c
+ CFLAGS_luascript  = $(shell ${LUACFG} --include)
+ CFLAGS_luascript += -DPLUGIN_PATH=\"${pkglibdir}\"
+ DLLIBS_luascript  = $(shell ${LUACFG} --libs)
+ LUASCRIPTS = burp.lua
+endif
+
+PLUGIN_MAILBOX   = @PLUGIN_MAILBOX@
+ifeq (${PLUGIN_MAILBOX},yes)
+ SRCS  += mailbox.c
+ DLLIBS_mailbox	= -lc-client
+endif
+
+PLUGIN_RSSFEED   = @PLUGIN_RSSFEED@
+ifeq (${PLUGIN_RSSFEED},yes)
+ SRCS  += rssfeed.c
+ CFLAGS_rssfeed  = $(shell PKG_CONFIG_PATH=${PKGCONFIGPATH} pkg-config --cflags nxml)
+ CFLAGS_rssfeed += $(shell PKG_CONFIG_PATH=${PKGCONFIGPATH} pkg-config --cflags mrss)
+ DLLIBS_rssfeed  = $(shell PKG_CONFIG_PATH=${PKGCONFIGPATH} pkg-config --libs nxml)
+ DLLIBS_rssfeed += $(shell PKG_CONFIG_PATH=${PKGCONFIGPATH} pkg-config --libs mrss)
+ DLLIBS_rssfeed += -lcurl
+endif
+
+PLUGIN_TRAC      = @PLUGIN_TRAC@
+ifeq (${PLUGIN_TRAC},yes)
+ SRCS  += trac.c
+ CFLAGS_trac  = -I/usr/include/subversion-1 -I/usr/include/apr-0
+ CFLAGS_trac += $(shell PKG_CONFIG_PATH=${PKGCONFIGPATH} pkg-config --cflags nxml)
+ CFLAGS_trac += $(shell PKG_CONFIG_PATH=${PKGCONFIGPATH} pkg-config --cflags mrss)
+ DLLIBS_trac  = -lsvn_client-1 -lapr-0 -laprutil-0
+ DLLIBS_trac += $(shell PKG_CONFIG_PATH=${PKGCONFIGPATH} pkg-config --libs nxml)
+ DLLIBS_trac += $(shell PKG_CONFIG_PATH=${PKGCONFIGPATH} pkg-config --libs mrss)
+ DLLIBS_trac += -lcurl
+endif
+
+PLUGIN_TROUT     = @PLUGIN_TROUT@
+ifeq (${PLUGIN_TROUT},yes)
+ SRCS  += trout.c 
+endif
+
+PLUGIN_URL       = @PLUGIN_URL@
+ifeq (${PLUGIN_URL},yes)
+ SRCS  += url.c
+ DLLIBS_url      = -lcurl
+endif
+
 OBJS	= ${SRCS:%.c=plugin_%.so}
 DEPS	= ${SRCS:.c=.d}
 
 EXTRAS	= 
-LUASCRIPTS = burp.lua
 
 .PHONY:	clean cleanall ${EMPTY_AUTOMAKE_TARGETS}
 
@@ -67,7 +104,7 @@ ${DEPS}:	Makefile
 	 sed 's,\($*\)\.o[ :]*,\1.o $@ : ,g'  > $@
 
 clean:
-	${RM} ${OBJS}
+	[ "${OBJS} != "" ] && ${RM} ${OBJS}
 
 cleanall:	clean
 	${RM} ${DEPS}
@@ -75,17 +112,20 @@ cleanall:	clean
 install:	install-data install-exec
 
 install-exec:
+	[ "${OBJS}" != "" ] && \
 	for i in ${OBJS} ; do \
 		@INSTALL@ -D -m 755 $$i ${DESTDIR}${pkglibdir}/$$i ; \
 	done
 
 install-data:
+	[ "${LUASCRIPTS} ${EXTRAS}" != " " ] && \
 	for i in ${LUASCRIPTS} ${EXTRAS} ; do \
 		@INSTALL@ -D -m 644 $$i ${DESTDIR}${pkglibdir}/$$i ; \
 	done
 
 uninstall:
-	for i in ${OBJS} ${EXTRAS} ; do \
+	[ "${OBJS} ${LUASCRIPTS} ${EXTRAS}" != "  " ] && \
+	for i in ${OBJS} ${LUASCRIPTS} ${EXTRAS} ; do \
 		${RM} ${DESTDIR}${pkglibdir}/$$i ; \
 	done
 

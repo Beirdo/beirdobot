@@ -311,7 +311,7 @@ ac_includes_default="\
 # include <unistd.h>
 #endif"
 
-ac_subst_vars='SHELL PATH_SEPARATOR PACKAGE_NAME PACKAGE_TARNAME PACKAGE_VERSION PACKAGE_STRING PACKAGE_BUGREPORT exec_prefix prefix program_transform_name bindir sbindir libexecdir datadir sysconfdir sharedstatedir localstatedir libdir includedir oldincludedir infodir mandir build_alias host_alias target_alias DEFS ECHO_C ECHO_N ECHO_T LIBS build build_cpu build_vendor build_os host host_cpu host_vendor host_os target target_cpu target_vendor target_os INSTALL_PROGRAM INSTALL_SCRIPT INSTALL_DATA CYGPATH_W PACKAGE VERSION ACLOCAL AUTOCONF AUTOMAKE AUTOHEADER MAKEINFO install_sh STRIP ac_ct_STRIP INSTALL_STRIP_PROGRAM mkdir_p AWK SET_MAKE am__leading_dot AMTAR am__tar am__untar CUT CC CFLAGS LDFLAGS CPPFLAGS ac_ct_CC EXEEXT OBJEXT DEPDIR am__include am__quote AMDEP_TRUE AMDEP_FALSE AMDEPBACKSLASH CCDEPMODE am__fastdepCC_TRUE am__fastdepCC_FALSE MYSQL_LIBS CPP EGREP LIBOBJS LTLIBOBJS'
+ac_subst_vars='SHELL PATH_SEPARATOR PACKAGE_NAME PACKAGE_TARNAME PACKAGE_VERSION PACKAGE_STRING PACKAGE_BUGREPORT exec_prefix prefix program_transform_name bindir sbindir libexecdir datadir sysconfdir sharedstatedir localstatedir libdir includedir oldincludedir infodir mandir build_alias host_alias target_alias DEFS ECHO_C ECHO_N ECHO_T LIBS build build_cpu build_vendor build_os host host_cpu host_vendor host_os target target_cpu target_vendor target_os INSTALL_PROGRAM INSTALL_SCRIPT INSTALL_DATA CYGPATH_W PACKAGE VERSION ACLOCAL AUTOCONF AUTOMAKE AUTOHEADER MAKEINFO install_sh STRIP ac_ct_STRIP INSTALL_STRIP_PROGRAM mkdir_p AWK SET_MAKE am__leading_dot AMTAR am__tar am__untar CUT CC CFLAGS LDFLAGS CPPFLAGS ac_ct_CC EXEEXT OBJEXT DEPDIR am__include am__quote AMDEP_TRUE AMDEP_FALSE AMDEPBACKSLASH CCDEPMODE am__fastdepCC_TRUE am__fastdepCC_FALSE MYSQL_LIBS PLUGIN_DNS PLUGIN_FART PLUGIN_LUASCRIPT PLUGIN_MAILBOX PLUGIN_RSSFEED PLUGIN_TRAC PLUGIN_TROUT PLUGIN_URL CPP EGREP LIBOBJS LTLIBOBJS'
 ac_subst_files=''
 
 # Initialize some variables set by options.
@@ -860,6 +860,14 @@ Optional Features:
   --enable-FEATURE[=ARG]  include FEATURE [ARG=yes]
   --disable-dependency-tracking  speeds up one-time build
   --enable-dependency-tracking   do not reject slow dependency extractors
+  --disable-dns           Disable the dns plugin
+  --disable-fart          Disable the fart plugin
+  --disable-luascript     Disable the luascript plugin
+  --disable-mailbox       Disable the mailbox plugin
+  --disable-rssfeed       Disable the rssfeed plugin
+  --disable-trac          Disable the trac plugin
+  --disable-trout         Disable the trout plugin
+  --disable-url           Disable the url plugin
 
 Some influential environment variables:
   CUT         location of the cut command
@@ -3232,6 +3240,249 @@ else
 	ac_cv_mysql_libs="--libs"
 fi
 MYSQL_LIBS=${ac_cv_mysql_libs}
+
+
+
+
+# Check whether --enable-dns or --disable-dns was given.
+if test "${enable_dns+set}" = set; then
+  enableval="$enable_dns"
+
+fi;
+if test "$enable_plugin_dns" = "no"; then
+        ac_cv_option_plugin_dns=no
+else
+        ac_cv_option_plugin_dns=yes
+fi
+
+echo "$as_me:$LINENO: checking to enable the compilation of the dns plugin" >&5
+echo $ECHO_N "checking to enable the compilation of the dns plugin... $ECHO_C" >&6
+if test "${ac_cv_option_plugin_dns+set}" = set; then
+  echo $ECHO_N "(cached) $ECHO_C" >&6
+fi
+echo "$as_me:$LINENO: result: $ac_cv_option_plugin_dns" >&5
+echo "${ECHO_T}$ac_cv_option_plugin_dns" >&6
+if test "$ac_cv_option_plugin_dns" = "yes" ; then
+
+cat >>confdefs.h <<\_ACEOF
+#define PLUGIN_DNS 1
+_ACEOF
+
+fi
+
+PLUGIN_DNS=${ac_cv_option_plugin_dns}
+
+
+
+# Check whether --enable-fart or --disable-fart was given.
+if test "${enable_fart+set}" = set; then
+  enableval="$enable_fart"
+
+fi;
+if test "$enable_plugin_fart" = "no"; then
+        ac_cv_option_plugin_fart=no
+else
+        ac_cv_option_plugin_fart=yes
+fi
+
+echo "$as_me:$LINENO: checking to enable the compilation of the fart plugin" >&5
+echo $ECHO_N "checking to enable the compilation of the fart plugin... $ECHO_C" >&6
+if test "${ac_cv_option_plugin_fart+set}" = set; then
+  echo $ECHO_N "(cached) $ECHO_C" >&6
+fi
+echo "$as_me:$LINENO: result: $ac_cv_option_plugin_fart" >&5
+echo "${ECHO_T}$ac_cv_option_plugin_fart" >&6
+if test "$ac_cv_option_plugin_fart" = "yes" ; then
+
+cat >>confdefs.h <<\_ACEOF
+#define PLUGIN_FART 1
+_ACEOF
+
+fi
+
+PLUGIN_FART=${ac_cv_option_plugin_fart}
+
+
+
+# Check whether --enable-luascript or --disable-luascript was given.
+if test "${enable_luascript+set}" = set; then
+  enableval="$enable_luascript"
+
+fi;
+if test "$enable_plugin_luascript" = "no"; then
+        ac_cv_option_plugin_luascript=no
+else
+        ac_cv_option_plugin_luascript=yes
+fi
+
+echo "$as_me:$LINENO: checking to enable the compilation of the luascript plugin" >&5
+echo $ECHO_N "checking to enable the compilation of the luascript plugin... $ECHO_C" >&6
+if test "${ac_cv_option_plugin_luascript+set}" = set; then
+  echo $ECHO_N "(cached) $ECHO_C" >&6
+fi
+echo "$as_me:$LINENO: result: $ac_cv_option_plugin_luascript" >&5
+echo "${ECHO_T}$ac_cv_option_plugin_luascript" >&6
+if test "$ac_cv_option_plugin_luascript" = "yes" ; then
+
+cat >>confdefs.h <<\_ACEOF
+#define PLUGIN_LUASCRIPT 1
+_ACEOF
+
+fi
+
+PLUGIN_LUASCRIPT=${ac_cv_option_plugin_luascript}
+
+
+
+# Check whether --enable-mailbox or --disable-mailbox was given.
+if test "${enable_mailbox+set}" = set; then
+  enableval="$enable_mailbox"
+
+fi;
+if test "$enable_plugin_mailbox" = "no"; then
+        ac_cv_option_plugin_mailbox=no
+else
+        ac_cv_option_plugin_mailbox=yes
+fi
+
+echo "$as_me:$LINENO: checking to enable the compilation of the mailbox plugin" >&5
+echo $ECHO_N "checking to enable the compilation of the mailbox plugin... $ECHO_C" >&6
+if test "${ac_cv_option_plugin_mailbox+set}" = set; then
+  echo $ECHO_N "(cached) $ECHO_C" >&6
+fi
+echo "$as_me:$LINENO: result: $ac_cv_option_plugin_mailbox" >&5
+echo "${ECHO_T}$ac_cv_option_plugin_mailbox" >&6
+if test "$ac_cv_option_plugin_mailbox" = "yes" ; then
+
+cat >>confdefs.h <<\_ACEOF
+#define PLUGIN_MAILBOX 1
+_ACEOF
+
+fi
+
+PLUGIN_MAILBOX=${ac_cv_option_plugin_mailbox}
+
+
+
+# Check whether --enable-rssfeed or --disable-rssfeed was given.
+if test "${enable_rssfeed+set}" = set; then
+  enableval="$enable_rssfeed"
+
+fi;
+if test "$enable_plugin_rssfeed" = "no"; then
+        ac_cv_option_plugin_rssfeed=no
+else
+        ac_cv_option_plugin_rssfeed=yes
+fi
+
+echo "$as_me:$LINENO: checking to enable the compilation of the rssfeed plugin" >&5
+echo $ECHO_N "checking to enable the compilation of the rssfeed plugin... $ECHO_C" >&6
+if test "${ac_cv_option_plugin_rssfeed+set}" = set; then
+  echo $ECHO_N "(cached) $ECHO_C" >&6
+fi
+echo "$as_me:$LINENO: result: $ac_cv_option_plugin_rssfeed" >&5
+echo "${ECHO_T}$ac_cv_option_plugin_rssfeed" >&6
+if test "$ac_cv_option_plugin_rssfeed" = "yes" ; then
+
+cat >>confdefs.h <<\_ACEOF
+#define PLUGIN_RSSFEED 1
+_ACEOF
+
+fi
+
+PLUGIN_RSSFEED=${ac_cv_option_plugin_rssfeed}
+
+
+
+# Check whether --enable-trac or --disable-trac was given.
+if test "${enable_trac+set}" = set; then
+  enableval="$enable_trac"
+
+fi;
+if test "$enable_plugin_trac" = "no"; then
+        ac_cv_option_plugin_trac=no
+else
+        ac_cv_option_plugin_trac=yes
+fi
+
+echo "$as_me:$LINENO: checking to enable the compilation of the trac plugin" >&5
+echo $ECHO_N "checking to enable the compilation of the trac plugin... $ECHO_C" >&6
+if test "${ac_cv_option_plugin_trac+set}" = set; then
+  echo $ECHO_N "(cached) $ECHO_C" >&6
+fi
+echo "$as_me:$LINENO: result: $ac_cv_option_plugin_trac" >&5
+echo "${ECHO_T}$ac_cv_option_plugin_trac" >&6
+if test "$ac_cv_option_plugin_trac" = "yes" ; then
+
+cat >>confdefs.h <<\_ACEOF
+#define PLUGIN_TRAC 1
+_ACEOF
+
+fi
+
+PLUGIN_TRAC=${ac_cv_option_plugin_trac}
+
+
+
+# Check whether --enable-trout or --disable-trout was given.
+if test "${enable_trout+set}" = set; then
+  enableval="$enable_trout"
+
+fi;
+if test "$enable_plugin_trout" = "no"; then
+        ac_cv_option_plugin_trout=no
+else
+        ac_cv_option_plugin_trout=yes
+fi
+
+echo "$as_me:$LINENO: checking to enable the compilation of the trout plugin" >&5
+echo $ECHO_N "checking to enable the compilation of the trout plugin... $ECHO_C" >&6
+if test "${ac_cv_option_plugin_trout+set}" = set; then
+  echo $ECHO_N "(cached) $ECHO_C" >&6
+fi
+echo "$as_me:$LINENO: result: $ac_cv_option_plugin_trout" >&5
+echo "${ECHO_T}$ac_cv_option_plugin_trout" >&6
+if test "$ac_cv_option_plugin_trout" = "yes" ; then
+
+cat >>confdefs.h <<\_ACEOF
+#define PLUGIN_TROUT 1
+_ACEOF
+
+fi
+
+PLUGIN_TROUT=${ac_cv_option_plugin_trout}
+
+
+
+# Check whether --enable-url or --disable-url was given.
+if test "${enable_url+set}" = set; then
+  enableval="$enable_url"
+
+fi;
+if test "$enable_plugin_url" = "no"; then
+        ac_cv_option_plugin_url=no
+else
+        ac_cv_option_plugin_url=yes
+fi
+
+echo "$as_me:$LINENO: checking to enable the compilation of the url plugin" >&5
+echo $ECHO_N "checking to enable the compilation of the url plugin... $ECHO_C" >&6
+if test "${ac_cv_option_plugin_url+set}" = set; then
+  echo $ECHO_N "(cached) $ECHO_C" >&6
+fi
+echo "$as_me:$LINENO: result: $ac_cv_option_plugin_url" >&5
+echo "${ECHO_T}$ac_cv_option_plugin_url" >&6
+if test "$ac_cv_option_plugin_url" = "yes" ; then
+
+cat >>confdefs.h <<\_ACEOF
+#define PLUGIN_URL 1
+_ACEOF
+
+fi
+
+PLUGIN_URL=${ac_cv_option_plugin_url}
+
+
 
 
 # Checks for header files.
@@ -5766,6 +6017,14 @@ s,@CCDEPMODE@,$CCDEPMODE,;t t
 s,@am__fastdepCC_TRUE@,$am__fastdepCC_TRUE,;t t
 s,@am__fastdepCC_FALSE@,$am__fastdepCC_FALSE,;t t
 s,@MYSQL_LIBS@,$MYSQL_LIBS,;t t
+s,@PLUGIN_DNS@,$PLUGIN_DNS,;t t
+s,@PLUGIN_FART@,$PLUGIN_FART,;t t
+s,@PLUGIN_LUASCRIPT@,$PLUGIN_LUASCRIPT,;t t
+s,@PLUGIN_MAILBOX@,$PLUGIN_MAILBOX,;t t
+s,@PLUGIN_RSSFEED@,$PLUGIN_RSSFEED,;t t
+s,@PLUGIN_TRAC@,$PLUGIN_TRAC,;t t
+s,@PLUGIN_TROUT@,$PLUGIN_TROUT,;t t
+s,@PLUGIN_URL@,$PLUGIN_URL,;t t
 s,@CPP@,$CPP,;t t
 s,@EGREP@,$EGREP,;t t
 s,@LIBOBJS@,$LIBOBJS,;t t
