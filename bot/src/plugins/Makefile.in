@@ -20,7 +20,6 @@ CFLAGS  += $(shell ${BOTNETCFG} --cflags)
 
 CFLAGS_rssfeed  = $(shell PKG_CONFIG_PATH=${PKGCONFIGPATH} pkg-config --cflags nxml)
 CFLAGS_rssfeed += $(shell PKG_CONFIG_PATH=${PKGCONFIGPATH} pkg-config --cflags mrss)
-CFLAGS_rssfeed += -DDATEMSK_PATH=\"${pkglibdir}\"
 CFLAGS_luascript  = $(shell ${LUACFG} --include)
 CFLAGS_luascript += -DPLUGIN_PATH=\"${pkglibdir}\"
 CFLAGS_trac  = -I/usr/include/subversion-1 -I/usr/include/apr-0

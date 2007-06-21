@@ -52,11 +52,7 @@
 static char ident[] _UNUSED_ = 
     "$Id$";
 
-#ifndef DATEMSK_PATH
-#define DATEMSK_PATH "../lib"
-#endif
-#define DATEMSK_FILE DATEMSK_PATH "/datemsk.txt"
-#define CURRENT_SCHEMA_RSSFEED 3
+#define CURRENT_SCHEMA_RSSFEED 4
 #define MAX_SCHEMA_QUERY 100
 typedef QueryTable_t SchemaUpgrade_t[MAX_SCHEMA_QUERY];
 
@@ -70,6 +66,7 @@ static QueryTable_t defSchema[] = {
     "    `prefix` VARCHAR( 64 ) NOT NULL ,\n"
     "    `timeout` INT NOT NULL ,\n"
     "    `lastpost` INT NOT NULL ,\n"
+    "    `timespec` VARCHAR( 255 ) NOT NULL ,\n"
     "    `feedoffset` INT NOT NULL ,\n"
     "    PRIMARY KEY ( `feedid` )\n"
     ") TYPE = MYISAM\n", NULL, NULL, FALSE }
@@ -87,6 +84,10 @@ static SchemaUpgrade_t schemaUpgrade[CURRENT_SCHEMA_RSSFEED] = {
     { { "ALTER TABLE `plugin_rssfeed` ADD `userpasswd` VARCHAR( 255 ) NOT NULL "
         "AFTER `url` , ADD `authtype` INT NOT NULL AFTER `userpasswd` ;", NULL,
         NULL, FALSE },
+      { NULL, NULL, NULL, FALSE } },
+    /* 2 -> 3 */
+    { { "ALTER TABLE `plugin_rssfeed` ADD `timespec` VARCHAR( 255 ) NOT NULL "
+        "AFTER `lastpost` ;", NULL, NULL, FALSE },
       { NULL, NULL, NULL, FALSE } }
 };
 
@@ -94,7 +95,8 @@ static QueryTable_t rssfeedQueryTable[] = {
     /* 0 */
     { "SELECT a.`feedid`, a.`chanid`, b.`serverid`, a.`url`, a.`userpasswd`, "
       "a.`authtype`, a.`prefix`, "
-      "a.`timeout`, a.`lastpost`, a.`feedoffset` FROM `plugin_rssfeed` AS a, "
+      "a.`timeout`, a.`lastpost`, a.`timespec`, a.`feedoffset` "
+      "FROM `plugin_rssfeed` AS a, "
       "`channels` AS b WHERE a.`chanid` = b.`chanid` ORDER BY a.`feedid` ASC",
       NULL, NULL, FALSE },
     /* 1 */
@@ -117,6 +119,7 @@ typedef struct {
     IRCServer_t    *server;
     IRCChannel_t   *channel;
     bool            enabled;
+    char           *timeSpec;
     long            offset;
 } RssFeed_t;
 
@@ -169,9 +172,7 @@ void plugin_initialize( char *args )
     int                     printed;
 
     LogPrintNoArg( LOG_NOTICE, "Initializing rssfeed..." );
-    LogPrint( LOG_NOTICE, "Date Mask File: %s", DATEMSK_FILE );
 
-    setenv( "DATEMSK", DATEMSK_FILE, 1 );
     rssItemTree = BalancedBTreeCreate( BTREE_KEY_INT );
 
     ver = -1;
@@ -285,6 +286,7 @@ void *rssfeed_thread(void *arg)
     static char             buf[255];
     static char             message[1024];
     int                     count;
+    char                   *date;
     int                     retval;
     bool                    done;
     long                    localoffset;
@@ -378,20 +380,20 @@ void *rssfeed_thread(void *arg)
             count = 0;
             rssItem = data->item;
             while( rssItem ) {
-                retval = getdate_r( rssItem->pubDate, &tm );
+                date = strptime( rssItem->pubDate, feed->timeSpec, &tm );
                 pubTime = mktime( &tm );
 
                 /* Adjust for the time offset in the feed's timestamp as 
-                 * getdate assumes the date is in local timezone
+                 * strptime assumes the date is in local timezone
                  */
                 pubTime += localoffset - feed->offset;
 
-                if( retval ) {
-                    LogPrint( LOG_DEBUG, "ret: %d  pub: %s  pubTime: %ld", 
-                                         retval, rssItem->pubDate, pubTime );
+                if( !date ) {
+                    LogPrint( LOG_DEBUG, "Can't parse date: %s  format: %s", 
+                                         rssItem->pubDate, feed->timeSpec );
                 }
 
-                if( retval == 0 && pubTime > feed->lastPost ) {
+                if( date && pubTime > feed->lastPost ) {
                     itemData = (RssItem_t *)malloc(sizeof(RssItem_t));
                     itemData->feed    = feed;
                     itemData->pubTime = pubTime;
@@ -750,7 +752,8 @@ static void result_load_rssfeeds( MYSQL_RES *res, MYSQL_BIND *input,
         data->prefix   = strdup(row[6]);
         data->timeout  = atoi(row[7]);
         data->lastPost = atoi(row[8]);
-        data->offset   = atol(row[9]);
+        data->timeSpec = strdup(row[9]);
+        data->offset   = atol(row[10]);
         data->nextpoll = nextpoll++;
         data->enabled  = TRUE;
 
@@ -928,10 +931,11 @@ char *rssfeedShowDetails( RssFeed_t *feed )
     strftime(date, 32, "%a, %e %b %Y %H:%M:%S %Z", &tm);
 
     sprintf( buf, "RSS: feed %d%s: prefix [%s], channel %s, URL \"%s\", poll "
-                  "interval %lds, offset %lds, last post %s, next poll ", 
+                  "interval %lds, timespec %s, offset %lds, last post %s, "
+                  "next poll ", 
                   feed->feedId, (feed->enabled ? "" : " (disabled)"), 
                   feed->prefix, feed->channel->channel, feed->url, 
-                  feed->timeout, feed->offset,
+                  feed->timeout, feed->timeSpec, feed->offset,
                   (feed->lastPost == 0 ? "never" : date) );
     
     localtime_r(&feed->nextpoll, &tm);
