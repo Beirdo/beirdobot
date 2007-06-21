@@ -85,7 +85,7 @@ static SchemaUpgrade_t schemaUpgrade[CURRENT_SCHEMA_RSSFEED] = {
         "AFTER `url` , ADD `authtype` INT NOT NULL AFTER `userpasswd` ;", NULL,
         NULL, FALSE },
       { NULL, NULL, NULL, FALSE } },
-    /* 2 -> 3 */
+    /* 3 -> 4 */
     { { "ALTER TABLE `plugin_rssfeed` ADD `timespec` VARCHAR( 255 ) NOT NULL "
         "AFTER `lastpost` ;", NULL, NULL, FALSE },
       { NULL, NULL, NULL, FALSE } }
