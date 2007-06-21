@@ -46,7 +46,7 @@ SRCS	= trout.c fart.c core.c dns.c rssfeed.c luascript.c mailbox.c trac.c
 OBJS	= ${SRCS:%.c=plugin_%.so}
 DEPS	= ${SRCS:.c=.d}
 
-EXTRAS	= datemsk.txt
+EXTRAS	= 
 LUASCRIPTS = burp.lua
 
 .PHONY:	clean cleanall ${EMPTY_AUTOMAKE_TARGETS}
