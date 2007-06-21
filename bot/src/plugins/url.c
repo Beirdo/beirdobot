@@ -45,41 +45,85 @@
 static char ident[] _UNUSED_ = 
     "$Id$";
 
-#define CURRENT_SCHEMA_URL 1
+#define CURRENT_SCHEMA_URL 2
 #define MAX_SCHEMA_QUERY 100
 typedef QueryTable_t SchemaUpgrade_t[MAX_SCHEMA_QUERY];
 
 static QueryTable_t defSchema[] = {
   { "CREATE TABLE `plugin_url_keywords` (\n"
-    "    `serverid` INT NOT NULL ,\n"
     "    `chanid` INT NOT NULL ,\n"
     "    `keyword` VARCHAR( 255 ) NOT NULL ,\n"
     "    `url` VARCHAR( 255 ) NOT NULL ,\n"
-    "    PRIMARY KEY ( `serverid`, `chanid`, `keyword` )\n"
+    "    PRIMARY KEY ( `chanid`, `keyword` )\n"
+    ") TYPE = MYISAM\n", NULL, NULL, FALSE },
+  { "CREATE TABLE `plugin_url_log` (\n"
+    "    `urlId` INT NOT NULL AUTO_INCREMENT ,\n"
+    "    `chanid` INT NOT NULL ,\n"
+    "    `timestamp` INT NOT NULL ,\n"
+    "    `url` TEXT NOT NULL ,\n"
+    "    PRIMARY KEY ( `urlId` ) ,\n"
+    "    INDEX `chanTime` ( `chanid` , `timestamp` ) ,\n"
+    "    INDEX `url` ( `url` ( 256 ) ) \n"
     ") TYPE = MYISAM\n", NULL, NULL, FALSE }
 };
 static int defSchemaCount = NELEMENTS(defSchema);
 
 static SchemaUpgrade_t schemaUpgrade[CURRENT_SCHEMA_URL] = {
     /* 0 -> 1 */
-    { { NULL, NULL, NULL, FALSE } }
+    { { NULL, NULL, NULL, FALSE } },
+    /* 1 -> 2 */
+    { { "ALTER TABLE `plugin_url_keywords` DROP `serverid`", NULL, NULL, 
+        FALSE },
+      { "CREATE TABLE `plugin_url_log` (\n"
+        "    `urlId` INT NOT NULL AUTO_INCREMENT ,\n"
+        "    `chanid` INT NOT NULL ,\n"
+        "    `timestamp` INT NOT NULL ,\n"
+        "    `url` TEXT NOT NULL ,\n"
+        "    PRIMARY KEY ( `urlId` ) ,\n"
+        "    INDEX `chanTime` ( `chanid` , `timestamp` ) ,\n"
+        "    INDEX `url` ( `url` ( 256 ) ) \n"
+        ") TYPE = MYISAM\n", NULL, NULL, FALSE },
+      { NULL, NULL, NULL, FALSE } }
 };
 
 static QueryTable_t urlQueryTable[] = {
     /* 0 */
-    { "SELECT `url` FROM `plugin_url_keywords` WHERE `serverid` = ? AND "
-      "`chanid` = ? AND `keyword` = ?", NULL, NULL, FALSE }
+    { "SELECT `url` FROM `plugin_url_keywords` WHERE `chanid` = ? AND "
+      "`keyword` = ?", NULL, NULL, FALSE },
+    /* 1 */
+    { "INSERT INTO `plugin_url_log` (`chanid`, `timestamp`, `url`) "
+      "VALUES ( ?, ?, ? )" },
+    /* 2 */
+    { "SELECT `timestamp`, `url` FROM `plugin_url_log` WHERE `chanid` = ? "
+      "ORDER BY `timestamp` DESC LIMIT 3", NULL, NULL, FALSE },
+    /* 3 */
+    { "SELECT `timestamp`, `url` FROM `plugin_url_log` WHERE `chanid` = ? AND "
+      "`url` LIKE ? ORDER BY `timestamp` DESC LIMIT 3", NULL, NULL, FALSE }
 };
+
+typedef struct {
+    IRCServer_t        *server;
+    IRCChannel_t       *channel;
+    char               *who;
+} URLArgs_t;
 
 /* INTERNAL FUNCTION PROTOTYPES */
 void botCmdUrl( IRCServer_t *server, IRCChannel_t *channel, char *who,
                 char *msg, void *tag );
 char *botHelpUrl( void *tag );
+void regexpFuncUrl( IRCServer_t *server, IRCChannel_t *channel, char *who, 
+                    char *msg, IRCMsgType_t type, int *ovector, int ovecsize,
+                    void *tag );
 static int db_upgrade_schema( int current, int goal );
-char *db_get_url_keyword( IRCServer_t *server, IRCChannel_t *channel, 
-                          char *keyword );
+char *db_get_url_keyword( IRCChannel_t *channel, char *keyword );
 static void result_get_url_keyword( MYSQL_RES *res, MYSQL_BIND *input, 
                                     void *args );
+void db_log_url( IRCChannel_t *channel, time_t timestamp, char *url );
+void db_last_url( IRCChannel_t *channel, char *who );
+static void result_last_url( MYSQL_RES *res, MYSQL_BIND *input, void *args );
+void db_search_url( IRCChannel_t *channel, char *who, char *text );
+
+static char *urlRegexp = "(?i)(?:\\s|^)((?:https?|ftp)\\:\\/\\/\\S+)(?:\\s|$)";
 
 void plugin_initialize( char *args )
 {
@@ -115,11 +159,13 @@ void plugin_initialize( char *args )
     } while( ver < CURRENT_SCHEMA_URL );
 
     botCmd_add( (const char **)&command, botCmdUrl, botHelpUrl, NULL );
+    regexp_add( NULL, (const char *)urlRegexp, regexpFuncUrl, NULL );
 }
 
 void plugin_shutdown( void )
 {
     LogPrintNoArg( LOG_NOTICE, "Removing url plugin..." );
+    regexp_remove( NULL, urlRegexp );
     botCmd_remove( "url" );
 }
 
@@ -165,11 +211,25 @@ void botCmdUrl( IRCServer_t *server, IRCChannel_t *channel, char *who,
         privmsg = FALSE;
     }
 
+    message = NULL;
     keyword = CommandLineParse( msg, &msg );
     if( !keyword ) {
         message = strdup( "You need to specify the keyword!" );
+    } else if( *keyword == '-' ) {
+        free( keyword );
+
+        keyword = CommandLineParse( msg, &msg );
+        if( !keyword ) {
+            message = strdup( "You need to specify \"last\" or \"search\"" );
+        } else if( !strcasecmp( keyword, "last" ) ) {
+            db_last_url( channel, who );
+        } else if( !strcasecmp( keyword, "search" ) ) {
+            db_search_url( channel, who, msg );
+        } else {
+            message = strdup( "You need to specify \"last\" or \"search\"" );
+        }
     } else {
-        urlFmt = db_get_url_keyword( server, channel, keyword );
+        urlFmt = db_get_url_keyword( channel, keyword );
         if( !urlFmt ) {
             message = (char *)malloc(22 + strlen(keyword));
             sprintf( message, "No match for keyword %s", keyword );
@@ -191,16 +251,20 @@ void botCmdUrl( IRCServer_t *server, IRCChannel_t *channel, char *who,
             free( url );
         }
 
-        free( keyword );
+        if( keyword ) {
+            free( keyword );
+        }
     }
 
-    if( privmsg ) {
-        transmitMsg( server, TX_PRIVMSG, who, message);
-    } else {
-        LoggedChannelMessage(server, channel, message);
-    }
+    if( message ) {
+        if( privmsg ) {
+            transmitMsg( server, TX_PRIVMSG, who, message);
+        } else {
+            LoggedChannelMessage(server, channel, message);
+        }
 
-    free( message );
+        free( message );
+    }
 }
 
 char *botHelpUrl( void *tag )
@@ -245,28 +309,26 @@ static int db_upgrade_schema( int current, int goal )
     return( current );
 }
 
-char *db_get_url_keyword( IRCServer_t *server, IRCChannel_t *channel, 
-                          char *keyword )
+char *db_get_url_keyword( IRCChannel_t *channel, char *keyword )
 {
     pthread_mutex_t        *mutex;
     MYSQL_BIND             *data;
     char                   *urlFmt;
 
-    if( !keyword || !channel || !server ) {
+    if( !keyword || !channel ) {
         return( NULL );
     }
 
     mutex = (pthread_mutex_t *)malloc(sizeof(pthread_mutex_t));
     pthread_mutex_init( mutex, NULL );
 
-    data = (MYSQL_BIND *)malloc(3 * sizeof(MYSQL_BIND));
-    memset( data, 0, 3 * sizeof(MYSQL_BIND) );
+    data = (MYSQL_BIND *)malloc(2 * sizeof(MYSQL_BIND));
+    memset( data, 0, 2 * sizeof(MYSQL_BIND) );
 
-    bind_numeric( &data[0], server->serverId, MYSQL_TYPE_LONG );
-    bind_numeric( &data[1], channel->channelId, MYSQL_TYPE_LONG );
-    bind_string( &data[2], keyword, MYSQL_TYPE_VAR_STRING );
+    bind_numeric( &data[0], channel->channelId, MYSQL_TYPE_LONG );
+    bind_string( &data[1], keyword, MYSQL_TYPE_VAR_STRING );
 
-    db_queue_query( 0, urlQueryTable, data, 3, result_get_url_keyword,
+    db_queue_query( 0, urlQueryTable, data, 2, result_get_url_keyword,
                     &urlFmt, mutex );
 
     pthread_mutex_unlock( mutex );
@@ -295,6 +357,132 @@ void result_get_url_keyword( MYSQL_RES *res, MYSQL_BIND *input, void *args )
     urlFmt = strdup( row[0] );
     *pUrlFmt = urlFmt;
 }
+
+void regexpFuncUrl( IRCServer_t *server, IRCChannel_t *channel, char *who, 
+                    char *msg, IRCMsgType_t type, int *ovector, int ovecsize,
+                    void *tag )
+{
+    struct timeval      now;
+    char               *string;
+
+    string = regexp_substring( msg, ovector, ovecsize, 1 );
+    gettimeofday( &now, NULL );
+
+    db_log_url( channel, now.tv_sec, string );
+
+    free( string );
+}
+
+void db_log_url( IRCChannel_t *channel, time_t timestamp, char *url )
+{
+    MYSQL_BIND             *data;
+
+    if( !url || !channel ) {
+        return;
+    }
+
+    data = (MYSQL_BIND *)malloc(3 * sizeof(MYSQL_BIND));
+    memset( data, 0, 3 * sizeof(MYSQL_BIND) );
+
+    bind_numeric( &data[0], channel->channelId, MYSQL_TYPE_LONG );
+    bind_numeric( &data[1], timestamp, MYSQL_TYPE_LONG );
+    bind_string( &data[2], url, MYSQL_TYPE_VAR_STRING );
+
+    db_queue_query( 1, urlQueryTable, data, 3, NULL, NULL, NULL );
+}
+
+void db_last_url( IRCChannel_t *channel, char *who )
+{
+    MYSQL_BIND     *data;
+    URLArgs_t      *chanArgs;
+
+    if( !who || !channel ) {
+        return;
+    }
+
+    data = (MYSQL_BIND *)malloc(1 * sizeof(MYSQL_BIND));
+    memset( data, 0, 1 * sizeof(MYSQL_BIND) );
+
+    bind_numeric( &data[0], channel->channelId, MYSQL_TYPE_LONG );
+
+    chanArgs = (URLArgs_t *)malloc(sizeof(URLArgs_t));
+    chanArgs->server  = channel->server;
+    chanArgs->channel = channel;
+    chanArgs->who     = who;
+
+    db_queue_query( 2, urlQueryTable, data, 1, result_last_url, 
+                   (void *)chanArgs, NULL );
+}
+
+static void result_last_url( MYSQL_RES *res, MYSQL_BIND *input, void *args )
+{
+    int             count;
+    int             i;
+    MYSQL_ROW       row;
+    URLArgs_t      *chanArgs;
+    static char    *none = "No matches found";
+    time_t          timestamp;
+    struct tm       tm;
+    char            date[32];
+    char            buf[1024];
+
+    chanArgs = (URLArgs_t *)args;
+
+    if( !res || !(count = mysql_num_rows(res)) ) {
+        transmitMsg( chanArgs->server, TX_PRIVMSG, chanArgs->who, none );
+        free( chanArgs );
+        return;
+    }
+
+    for( i = 0; i < count; i++ ) {
+        row = mysql_fetch_row(res);
+
+        timestamp = atol(row[0]);
+        localtime_r(&timestamp, &tm);
+        strftime( date, 32, "%a, %e %b %Y %H:%M:%S %Z", &tm );
+
+        snprintf( buf, 1024, "%s: %s", date, row[1] );
+
+        LogPrint( LOG_NOTICE, "URL: channel %d, %s", 
+                              chanArgs->channel->channelId, buf );
+        transmitMsg( chanArgs->server, TX_PRIVMSG, chanArgs->who, buf );
+    }
+
+    free( chanArgs );
+}
+
+void db_search_url( IRCChannel_t *channel, char *who, char *text )
+{
+    MYSQL_BIND     *data;
+    URLArgs_t      *chanArgs;
+    char           *like;
+
+    if( !who || !channel ) {
+        return;
+    }
+
+    if( !strchr( text, '%' ) ) {
+        like = (char *)malloc(strlen(text) + 3);
+        sprintf( like, "%%%s%%", text );
+    } else {
+        like = strdup( text );
+    }
+
+    data = (MYSQL_BIND *)malloc(2 * sizeof(MYSQL_BIND));
+    memset( data, 0, 2 * sizeof(MYSQL_BIND) );
+
+    bind_numeric( &data[0], channel->channelId, MYSQL_TYPE_LONG );
+    bind_string( &data[1], like, MYSQL_TYPE_VAR_STRING );
+
+    chanArgs = (URLArgs_t *)malloc(sizeof(URLArgs_t));
+    chanArgs->server  = channel->server;
+    chanArgs->channel = channel;
+    chanArgs->who     = who;
+
+    db_queue_query( 3, urlQueryTable, data, 2, result_last_url, 
+                    (void *)chanArgs, NULL );
+}
+
 
 /*
  * vim:ts=4:sw=4:ai:et:si:sts=4
