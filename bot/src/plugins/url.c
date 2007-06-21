@@ -281,7 +281,9 @@ char *botHelpUrl( void *tag )
 {
     static char *help = "Expands a url from a keyword (configured per-channel)"
                         "  Syntax: (in channel) url keyword [expansion]  "
-                        "(in privmsg) url #channel keyword [expansion].";
+                        "(in privmsg) url #channel keyword [expansion].  Also "
+                        "has url - list, url - last, "
+                        "url - search searchstring.";
 
     return( help );
 }
