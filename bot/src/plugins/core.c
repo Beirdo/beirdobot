@@ -190,6 +190,7 @@ void botCmdSeen( IRCServer_t *server, IRCChannel_t *channel, char *who,
                          "You must specify \"seen #channel nick\"");
             return;
         }
+        msg = message;
 
         channel = FindChannel(server, chan);
         if( !channel ) {
