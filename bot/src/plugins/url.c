@@ -98,7 +98,10 @@ static QueryTable_t urlQueryTable[] = {
       "ORDER BY `timestamp` DESC LIMIT 3", NULL, NULL, FALSE },
     /* 3 */
     { "SELECT `timestamp`, `url` FROM `plugin_url_log` WHERE `chanid` = ? AND "
-      "`url` LIKE ? ORDER BY `timestamp` DESC LIMIT 3", NULL, NULL, FALSE }
+      "`url` LIKE ? ORDER BY `timestamp` DESC LIMIT 3", NULL, NULL, FALSE },
+    /* 4 */
+    { "SELECT `keyword` FROM `plugin_url_keywords` WHERE `chanid` = ? "
+      "ORDER BY `keyword` ASC", NULL, NULL, FALSE }
 };
 
 typedef struct {
@@ -122,6 +125,9 @@ void db_log_url( IRCChannel_t *channel, time_t timestamp, char *url );
 void db_last_url( IRCChannel_t *channel, char *who );
 static void result_last_url( MYSQL_RES *res, MYSQL_BIND *input, void *args );
 void db_search_url( IRCChannel_t *channel, char *who, char *text );
+char *db_list_keywords( IRCChannel_t *channel );
+static void result_list_keywords( MYSQL_RES *res, MYSQL_BIND *input, 
+                                  void *args );
 
 static char *urlRegexp = "(?i)(?:\\s|^)((?:https?|ftp)\\:\\/\\/\\S+)(?:\\s|$)";
 
@@ -220,13 +226,17 @@ void botCmdUrl( IRCServer_t *server, IRCChannel_t *channel, char *who,
 
         keyword = CommandLineParse( msg, &msg );
         if( !keyword ) {
-            message = strdup( "You need to specify \"last\" or \"search\"" );
+            message = strdup( "You need to specify \"list\", \"last\" or "
+                              "\"search\"" );
         } else if( !strcasecmp( keyword, "last" ) ) {
             db_last_url( channel, who );
         } else if( !strcasecmp( keyword, "search" ) ) {
             db_search_url( channel, who, msg );
+        } else if( !strcasecmp( keyword, "list" ) ) {
+            message = db_list_keywords( channel );
         } else {
-            message = strdup( "You need to specify \"last\" or \"search\"" );
+            message = strdup( "You need to specify \"list\", \"last\" or "
+                              "\"search\"" );
         }
     } else {
         urlFmt = db_get_url_keyword( channel, keyword );
@@ -483,6 +493,73 @@ void db_search_url( IRCChannel_t *channel, char *who, char *text )
                     (void *)chanArgs, NULL );
 }
 
+char *db_list_keywords( IRCChannel_t *channel )
+{
+    pthread_mutex_t        *mutex;
+    MYSQL_BIND             *data;
+    char                   *keywords;
+
+    if( !channel ) {
+        return( NULL );
+    }
+
+    mutex = (pthread_mutex_t *)malloc(sizeof(pthread_mutex_t));
+    pthread_mutex_init( mutex, NULL );
+
+    data = (MYSQL_BIND *)malloc(1 * sizeof(MYSQL_BIND));
+    memset( data, 0, 1 * sizeof(MYSQL_BIND) );
+
+    bind_numeric( &data[0], channel->channelId, MYSQL_TYPE_LONG );
+
+    db_queue_query( 4, urlQueryTable, data, 1, result_list_keywords,
+                    &keywords, mutex );
+
+    pthread_mutex_unlock( mutex );
+    pthread_mutex_destroy( mutex );
+    free( mutex );
+
+    return( keywords );
+}
+
+static void result_list_keywords( MYSQL_RES *res, MYSQL_BIND *input, 
+                                  void *args )
+{
+    MYSQL_ROW       row;
+    char          **pKeywords;
+    char           *keywords;
+    char           *key;
+    int             count;
+    int             i;
+    int             len;
+
+    pKeywords = (char **)args;
+
+    if( !res || !(count = mysql_num_rows(res)) ) {
+        *pKeywords = NULL;
+        return;
+    }
+
+    keywords = NULL;
+    key = NULL;
+    len = 0;
+
+    for( i = 0; i < count; i++ ) {
+        row = mysql_fetch_row(res);
+
+        len += strlen( row[0] );
+        keywords = (char *)realloc(keywords, len + 3);
+        if( !key ) {
+            key = keywords;
+            *key = '\0';
+        } else {
+            len++;
+            strcat( keywords, " " );
+        }
+        strcat( keywords, row[0] );
+    }
+
+    *pKeywords = keywords;
+}
 
 /*
  * vim:ts=4:sw=4:ai:et:si:sts=4
