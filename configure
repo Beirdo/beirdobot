@@ -860,14 +860,17 @@ Optional Features:
   --enable-FEATURE[=ARG]  include FEATURE [ARG=yes]
   --disable-dependency-tracking  speeds up one-time build
   --enable-dependency-tracking   do not reject slow dependency extractors
-  --disable-dns           Disable the dns plugin
-  --disable-fart          Disable the fart plugin
-  --disable-luascript     Disable the luascript plugin
-  --disable-mailbox       Disable the mailbox plugin
-  --disable-rssfeed       Disable the rssfeed plugin
-  --disable-trac          Disable the trac plugin
-  --disable-trout         Disable the trout plugin
-  --disable-url           Disable the url plugin
+  --disable-plugin-dns    Disable the dns plugin
+  --disable-plugin-fart   Disable the fart plugin
+  --disable-plugin-luascript
+                          Disable the luascript plugin
+  --disable-plugin-mailbox
+                          Disable the mailbox plugin
+  --disable-plugin-rssfeed
+                          Disable the rssfeed plugin
+  --disable-plugin-trac   Disable the trac plugin
+  --disable-plugin-trout  Disable the trout plugin
+  --disable-plugin-url    Disable the url plugin
 
 Some influential environment variables:
   CUT         location of the cut command
@@ -3084,6 +3087,10 @@ _ACEOF
 
   LIBS="-lpcre $LIBS"
 
+else
+  { { echo "$as_me:$LINENO: error: libpcre not installed" >&5
+echo "$as_me: error: libpcre not installed" >&2;}
+   { (exit 1); exit 1; }; }
 fi
 
 
@@ -3244,9 +3251,9 @@ MYSQL_LIBS=${ac_cv_mysql_libs}
 
 
 
-# Check whether --enable-dns or --disable-dns was given.
-if test "${enable_dns+set}" = set; then
-  enableval="$enable_dns"
+# Check whether --enable-plugin-dns or --disable-plugin-dns was given.
+if test "${enable_plugin_dns+set}" = set; then
+  enableval="$enable_plugin_dns"
 
 fi;
 if test "$enable_plugin_dns" = "no"; then
@@ -3274,9 +3281,9 @@ PLUGIN_DNS=${ac_cv_option_plugin_dns}
 
 
 
-# Check whether --enable-fart or --disable-fart was given.
-if test "${enable_fart+set}" = set; then
-  enableval="$enable_fart"
+# Check whether --enable-plugin-fart or --disable-plugin-fart was given.
+if test "${enable_plugin_fart+set}" = set; then
+  enableval="$enable_plugin_fart"
 
 fi;
 if test "$enable_plugin_fart" = "no"; then
@@ -3304,9 +3311,9 @@ PLUGIN_FART=${ac_cv_option_plugin_fart}
 
 
 
-# Check whether --enable-luascript or --disable-luascript was given.
-if test "${enable_luascript+set}" = set; then
-  enableval="$enable_luascript"
+# Check whether --enable-plugin-luascript or --disable-plugin-luascript was given.
+if test "${enable_plugin_luascript+set}" = set; then
+  enableval="$enable_plugin_luascript"
 
 fi;
 if test "$enable_plugin_luascript" = "no"; then
@@ -3334,9 +3341,9 @@ PLUGIN_LUASCRIPT=${ac_cv_option_plugin_luascript}
 
 
 
-# Check whether --enable-mailbox or --disable-mailbox was given.
-if test "${enable_mailbox+set}" = set; then
-  enableval="$enable_mailbox"
+# Check whether --enable-plugin-mailbox or --disable-plugin-mailbox was given.
+if test "${enable_plugin_mailbox+set}" = set; then
+  enableval="$enable_plugin_mailbox"
 
 fi;
 if test "$enable_plugin_mailbox" = "no"; then
@@ -3364,9 +3371,9 @@ PLUGIN_MAILBOX=${ac_cv_option_plugin_mailbox}
 
 
 
-# Check whether --enable-rssfeed or --disable-rssfeed was given.
-if test "${enable_rssfeed+set}" = set; then
-  enableval="$enable_rssfeed"
+# Check whether --enable-plugin-rssfeed or --disable-plugin-rssfeed was given.
+if test "${enable_plugin_rssfeed+set}" = set; then
+  enableval="$enable_plugin_rssfeed"
 
 fi;
 if test "$enable_plugin_rssfeed" = "no"; then
@@ -3394,9 +3401,9 @@ PLUGIN_RSSFEED=${ac_cv_option_plugin_rssfeed}
 
 
 
-# Check whether --enable-trac or --disable-trac was given.
-if test "${enable_trac+set}" = set; then
-  enableval="$enable_trac"
+# Check whether --enable-plugin-trac or --disable-plugin-trac was given.
+if test "${enable_plugin_trac+set}" = set; then
+  enableval="$enable_plugin_trac"
 
 fi;
 if test "$enable_plugin_trac" = "no"; then
@@ -3424,9 +3431,9 @@ PLUGIN_TRAC=${ac_cv_option_plugin_trac}
 
 
 
-# Check whether --enable-trout or --disable-trout was given.
-if test "${enable_trout+set}" = set; then
-  enableval="$enable_trout"
+# Check whether --enable-plugin-trout or --disable-plugin-trout was given.
+if test "${enable_plugin_trout+set}" = set; then
+  enableval="$enable_plugin_trout"
 
 fi;
 if test "$enable_plugin_trout" = "no"; then
@@ -3454,9 +3461,9 @@ PLUGIN_TROUT=${ac_cv_option_plugin_trout}
 
 
 
-# Check whether --enable-url or --disable-url was given.
-if test "${enable_url+set}" = set; then
-  enableval="$enable_url"
+# Check whether --enable-plugin-url or --disable-plugin-url was given.
+if test "${enable_plugin_url+set}" = set; then
+  enableval="$enable_plugin_url"
 
 fi;
 if test "$enable_plugin_url" = "no"; then
