@@ -11,6 +11,8 @@ all:	include/release.h
 	${MAKE} -C src all
 
 distclean:	clean
+	${MAKE} -C src distclean
+
 clean:
 	${MAKE} -C src clean
 	${MAKE} -C src/botnet-1.6.4 -f Makefile.gjh clean

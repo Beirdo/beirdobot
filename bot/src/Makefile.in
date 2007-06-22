@@ -60,6 +60,7 @@ ${DEPS}:	Makefile
 	 sed 's,\($*\)\.o[ :]*,\1.o $@ : ,g'  > $@
 
 distclean:	clean
+	${RM} ${DEPS}
 
 clean:
 	${RM} ${OBJS} ${EXE}
