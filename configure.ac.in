@@ -28,8 +28,8 @@ AC_PROG_CC
 
 # Checks for libraries.
 AC_CHECK_LIB([pcre], [pcre_config],,[AC_MSG_ERROR(libpcre not installed)])
-AC_CHECK_LIB([curl], [Curl_connect])
-AC_CHECK_LIB([mysqlclient], [mysql_connect])
+AC_CHECK_LIB([mysqlclient], [mysql_query],,
+             [AC_MSG_ERROR(libmysqlclient not intalled)])
 
 # Check for mysql having --libs_r in mysql_config
 if mysql_config --libs_r > /dev/null ; then
@@ -39,8 +39,9 @@ else
 fi
 AC_SUBST(MYSQL_LIBS, ${ac_cv_mysql_libs})
 
-dnl HAVOK_SWITCH(arg-name, arg_name, ARG_NAME, help_LHS, help_RHS, cache_string,
-dnl              header_comment, default, not_default)
+dnl ENABLE_SWITCH(arg-name, arg_name, ARG_NAME, help_LHS, help_RHS, 
+dnl		  cache_string, header_comment, default, not_default)
+dnl		  library_checks)
 AC_DEFUN([ENABLE_SWITCH],
 [AC_ARG_ENABLE($1, AS_HELP_STRING([$4], [$5]))
 if test "$enable_$2" = "$9"; then
@@ -52,6 +53,7 @@ fi
 AC_CACHE_CHECK([$6], ac_cv_option_$2)
 if test "$ac_cv_option_$2" = "yes" ; then
         AC_DEFINE($3, 1, [$7])
+	$10
 fi
 
 AC_SUBST($3, ${ac_cv_option_$2})
@@ -61,7 +63,9 @@ ENABLE_SWITCH([plugin-dns],[plugin_dns],[PLUGIN_DNS],[--disable-plugin-dns],
               [Disable the dns plugin],
               [to enable the compilation of the dns plugin],
               [To enable the compilation of the dns plugin],
-              [yes],[no])
+              [yes],[no],
+	      [AC_CHECK_LIB([resolv], [res_gethostbyname],,
+	                    [AC_MSG_ERROR(libresolv not installed)])])
 
 ENABLE_SWITCH([plugin-fart],[plugin_fart],[PLUGIN_FART],[--disable-plugin-fart],
               [Disable the fart plugin],
@@ -73,25 +77,41 @@ ENABLE_SWITCH([plugin-luascript],[plugin_luascript],[PLUGIN_LUASCRIPT],
 	      [--disable-plugin-luascript],[Disable the luascript plugin],
               [to enable the compilation of the luascript plugin],
               [To enable the compilation of the luascript plugin],
-              [yes],[no])
+              [yes],[no],
+              [AC_SEARCH_LIBS([lua_pcall],[lua50 lua],,[liblua not installed])
+	       AC_SEARCH_LIBS([luaL_loadfile],[lualib50 lualib],,
+                              [AC_MSG_ERROR(liblualib not installed)])])
 
 ENABLE_SWITCH([plugin-mailbox],[plugin_mailbox],[PLUGIN_MAILBOX],
               [--disable-plugin-mailbox], [Disable the mailbox plugin],
               [to enable the compilation of the mailbox plugin],
               [To enable the compilation of the mailbox plugin],
               [yes],[no])
+dnl	      [AC_CHECK_LIB([c-client],[mail_status],,
+dnl		            [AC_MSG_ERROR(libc-client not installed)])])
 
 ENABLE_SWITCH([plugin-rssfeed],[plugin_rssfeed],[PLUGIN_RSSFEED],
               [--disable-plugin-rssfeed],[Disable the rssfeed plugin],
               [to enable the compilation of the rssfeed plugin],
               [To enable the compilation of the rssfeed plugin],
-              [yes],[no])
+              [yes],[no],
+ 	      [AC_CHECK_LIB([curl], [curl_escape],,
+                            [AC_MSG_ERROR(libcurl not installed)])])
 
 ENABLE_SWITCH([plugin-trac],[plugin_trac],[PLUGIN_TRAC],[--disable-plugin-trac],
               [Disable the trac plugin],
               [to enable the compilation of the trac plugin],
               [To enable the compilation of the trac plugin],
-              [yes],[no])
+              [yes],[no],
+	      [AC_CHECK_LIB([curl], [curl_escape],,
+                            [AC_MSG_ERROR(libcurl not installed)])
+	       AC_CHECK_LIB([apr-0], [apr_palloc],,
+			    [AC_MSG_ERROR(libapr-0 not installed)])
+	       AC_CHECK_LIB([aprutil-0], [apu_version],,
+			    [AC_MSG_ERROR(libaprutil-0 not installed)])
+	       AC_CHECK_LIB([svn_client-1], [svn_client_log],,
+			    [AC_MSG_ERROR(libsvn_client-1 not installed)])
+              ])
 
 ENABLE_SWITCH([plugin-trout],[plugin_trout],[PLUGIN_TROUT],
               [--disable-plugin-trout],[Disable the trout plugin],
@@ -103,7 +123,9 @@ ENABLE_SWITCH([plugin-url],[plugin_url],[PLUGIN_URL],[--disable-plugin-url],
               [Disable the url plugin],
               [to enable the compilation of the url plugin],
               [To enable the compilation of the url plugin],
-              [yes],[no])
+              [yes],[no],
+	      [AC_CHECK_LIB([curl], [curl_escape],,
+                            [AC_MSG_ERROR(libcurl not installed)])])
 
 
 # Checks for header files.
