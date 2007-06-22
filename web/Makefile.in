@@ -25,6 +25,7 @@ pkgwebdir	= ${datadir}/beirdobot/web
 all:
 
 clean:
+distclean:
 
 install:	install-exec install-data
 

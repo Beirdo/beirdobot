@@ -1,5 +1,5 @@
 EMPTY_AUTOMAKE_TARGETS  = install-info installdirs check installcheck dvi pdf
-EMPTY_AUTOMAKE_TARGETS += ps info html tags ctags distdir distclean
+EMPTY_AUTOMAKE_TARGETS += ps info html tags ctags distdir
 RECURSE_AUTOMAKE_TARGETS  = install install-exec install-data
 .PHONY:	FORCE ${EMPTY_AUTOMAKE_TARGETS} ${RECURSE_AUTOMAKE_TARGETS}
 
@@ -10,6 +10,7 @@ all:	include/release.h
 	${MAKE} -C src/opie-2.32    -f Makefile.gjh all
 	${MAKE} -C src all
 
+distclean:	clean
 clean:
 	${MAKE} -C src clean
 	${MAKE} -C src/botnet-1.6.4 -f Makefile.gjh clean

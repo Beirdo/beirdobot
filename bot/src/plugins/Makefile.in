@@ -1,5 +1,5 @@
 EMPTY_AUTOMAKE_TARGETS  = install-info installdirs check installcheck dvi pdf
-EMPTY_AUTOMAKE_TARGETS += ps info html tags ctags distdir distclean
+EMPTY_AUTOMAKE_TARGETS += ps info html tags ctags distdir
 
 BOTNETCFG	= ../../bin/botnet-config
 MYSQLCFG	= mysql_config
@@ -102,6 +102,8 @@ ${DEPS}:	Makefile
 	@echo "Making $@ (dependencies for $<)"
 	@${CC} -MM ${CFLAGS} ${CFLAGS_${<:%.c=%}} $< | \
 	 sed 's,\($*\)\.o[ :]*,\1.o $@ : ,g'  > $@
+
+distclean:	clean
 
 clean:
 	[ "${OBJS}" != "" ] && ${RM} ${OBJS}
