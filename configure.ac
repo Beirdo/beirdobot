@@ -59,6 +59,34 @@ fi
 AC_SUBST($3, ${ac_cv_option_$2})
 ] )
 
+
+dnl Since the stupid libc-client requires the callbacks to be defined, I need
+dnl a version of AC_CHECK_LIB where I can hand in the prolog to AC_LANG_CALL
+dnl (passing it in $6).  Note: also removing the library from LIBS to prevent
+dnl failure on all subsequent compile tries
+
+AC_DEFUN([AC_CHECK_LIB_PROLOG],
+[m4_ifval([$3], , [AH_CHECK_LIB([$1])])dnl
+AS_LITERAL_IF([$1],
+              [AS_VAR_PUSHDEF([ac_Lib], [ac_cv_lib_$1_$2])],
+              [AS_VAR_PUSHDEF([ac_Lib], [ac_cv_lib_$1''_$2])])dnl
+AC_CACHE_CHECK([for $2 in -l$1], ac_Lib,
+[ac_check_lib_save_LIBS=$LIBS
+LIBS="-l$1 $5 $LIBS"
+AC_LINK_IFELSE([AC_LANG_CALL([$6], [$2])],
+               [AS_VAR_SET(ac_Lib, yes)],
+               [AS_VAR_SET(ac_Lib, no)])
+LIBS=$ac_check_lib_save_LIBS])
+AS_IF([test AS_VAR_GET(ac_Lib) = yes],
+      [m4_default([$3], [AC_DEFINE_UNQUOTED(AS_TR_CPP(HAVE_LIB$1))
+  LIBS="-l$1 $LIBS"
+])],
+      [$4])dnl
+AS_VAR_POPDEF([ac_Lib])dnl
+LIBS=$ac_check_lib_save_LIBS
+])# AC_CHECK_LIB
+
+
 ENABLE_SWITCH([plugin-dns],[plugin_dns],[PLUGIN_DNS],[--disable-plugin-dns],
               [Disable the dns plugin],
               [to enable the compilation of the dns plugin],
@@ -86,9 +114,12 @@ ENABLE_SWITCH([plugin-mailbox],[plugin_mailbox],[PLUGIN_MAILBOX],
               [--disable-plugin-mailbox], [Disable the mailbox plugin],
               [to enable the compilation of the mailbox plugin],
               [To enable the compilation of the mailbox plugin],
-              [yes],[no])
-dnl	      [AC_CHECK_LIB([c-client],[mail_status],,
-dnl		            [AC_MSG_ERROR(libc-client not installed)])])
+              [yes],[no],
+	      [AC_CHECK_LIB_PROLOG([c-client],[mail_status],,
+		            [AC_MSG_ERROR(libc-client not installed)],,
+	       [char mm_expunged, mm_diskerror, mm_lsub, mm_flags, mm_fatal, 
+                     mm_nocritical, mm_notify, mm_searched, mm_status, mm_login,
+	 	     mm_list, mm_critical, mm_exists, mm_log, mm_dlog;])])
 
 ENABLE_SWITCH([plugin-rssfeed],[plugin_rssfeed],[PLUGIN_RSSFEED],
               [--disable-plugin-rssfeed],[Disable the rssfeed plugin],
