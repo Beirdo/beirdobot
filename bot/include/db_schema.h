@@ -36,7 +36,7 @@ static char db_schema_h_ident[] _UNUSED_ =
 #define CURRENT_SCHEMA  9
 
 
-static QueryTable_t defSchema[] = {
+static QueryTable_t defCoreSchema[] = {
   { "CREATE TABLE `channels` (\n"
     "  `chanid` int(11) NOT NULL auto_increment,\n"
     "  `serverid` int(11) NOT NULL default '0',\n"
@@ -126,7 +126,7 @@ static QueryTable_t defSchema[] = {
     " PRIMARY KEY ( `chanid` )\n"
     ") TYPE = MYISAM\n", NULL, NULL, FALSE }
 };
-static int defSchemaCount = NELEMENTS(defSchema);
+static int defCoreSchemaCount = NELEMENTS(defCoreSchema);
 
 #endif
 

@@ -276,6 +276,9 @@ typedef struct {
     bool                queryPrepared;
 } QueryTable_t;
 
+#define MAX_SCHEMA_QUERY 100
+typedef QueryTable_t SchemaUpgrade_t[MAX_SCHEMA_QUERY];
+
 
 typedef void (*QueryResFunc_t)( MYSQL_RES *res, MYSQL_BIND *input, void *arg );
 

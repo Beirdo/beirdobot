@@ -57,7 +57,6 @@ void regexpFuncChangeset( IRCServer_t *server, IRCChannel_t *channel,
 void botCmdTrac( IRCServer_t *server, IRCChannel_t *channel, char *who, 
                  char *msg, void *tag );
 char *botHelpTrac( void *tag );
-static int db_upgrade_schema( int current, int goal );
 static void db_load_channel_regexp( void );
 static void result_load_channel_regexp( MYSQL_RES *res, MYSQL_BIND *input, 
                                         void *args );
@@ -86,9 +85,6 @@ static char ident[] _UNUSED_ =
     "$Id$";
 
 #define CURRENT_SCHEMA_TRAC 2
-#define MAX_SCHEMA_QUERY 100
-
-typedef QueryTable_t SchemaUpgrade_t[MAX_SCHEMA_QUERY];
 
 static QueryTable_t defSchema[] = {
   { "CREATE TABLE `plugin_trac` (\n"
@@ -168,35 +164,10 @@ void uninit_apr( void );
 
 void plugin_initialize( char *args )
 {
-    char                           *verString;
-    int                             ver;
-    int                             printed;
-
     LogPrintNoArg( LOG_NOTICE, "Initializing trac..." );
 
-    ver = -1;
-    printed = FALSE;
-    do {
-        verString = db_get_setting("dbSchemaTrac");
-        if( !verString ) {
-            ver = 0;
-        } else {
-            ver = atoi( verString );
-            free( verString );
-        }
-
-        if( !printed ) {
-            LogPrint( LOG_CRIT, "Current Trac database schema version %d", 
-                                ver );
-            LogPrint( LOG_CRIT, "Code supports version %d", 
-                                CURRENT_SCHEMA_TRAC );
-            printed = TRUE;
-        }
-
-        if( ver < CURRENT_SCHEMA_TRAC ) {
-            ver = db_upgrade_schema( ver, CURRENT_SCHEMA_TRAC );
-        }
-    } while( ver < CURRENT_SCHEMA_TRAC );
+    db_check_schema( "dbSchemaTrac", "Trac", CURRENT_SCHEMA_TRAC,
+                     defSchema, defSchemaCount, schemaUpgrade );
 
     db_load_channel_regexp();
 
@@ -361,39 +332,6 @@ void regexpFuncChangeset( IRCServer_t *server, IRCChannel_t *channel,
         free( message );
         free( string );
     }
-}
-
-static int db_upgrade_schema( int current, int goal )
-{
-    int                 i;
-
-    if( current >= goal ) {
-        return( current );
-    }
-
-    if( current == 0 ) {
-        /* There is no dbSchema, assume that it is an empty database, populate
-         * with the default schema
-         */
-        LogPrint( LOG_ERR, "Initializing Trac database to schema version %d",
-                  CURRENT_SCHEMA_TRAC );
-        for( i = 0; i < defSchemaCount; i++ ) {
-            db_queue_query( i, defSchema, NULL, 0, NULL, NULL, NULL );
-        }
-        db_set_setting("dbSchemaTrac", "%d", CURRENT_SCHEMA_TRAC);
-        return( CURRENT_SCHEMA_TRAC );
-    }
-
-    LogPrint( LOG_ERR, "Upgrading Trac database from schema version %d to "
-                       "%d", current, current+1 );
-    for( i = 0; schemaUpgrade[current][i].queryPattern; i++ ) {
-        db_queue_query( i, schemaUpgrade[current], NULL, 0, NULL, NULL, NULL );
-    }
-
-    current++;
-
-    db_set_setting("dbSchemaTrac", "%d", current);
-    return( current );
 }
 
 static void db_load_channel_regexp( void )

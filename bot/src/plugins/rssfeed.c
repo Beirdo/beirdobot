@@ -53,8 +53,6 @@ static char ident[] _UNUSED_ =
     "$Id$";
 
 #define CURRENT_SCHEMA_RSSFEED 4
-#define MAX_SCHEMA_QUERY 100
-typedef QueryTable_t SchemaUpgrade_t[MAX_SCHEMA_QUERY];
 
 static QueryTable_t defSchema[] = {
   { "CREATE TABLE `plugin_rssfeed` (\n"
@@ -141,7 +139,6 @@ void botCmdRssfeed( IRCServer_t *server, IRCChannel_t *channel, char *who,
                     char *msg, void *tag );
 char *botHelpRssfeed( void *tag );
 void *rssfeed_thread(void *arg);
-static int db_upgrade_schema( int current, int goal );
 static void db_load_rssfeeds( void );
 static void result_load_rssfeeds( MYSQL_RES *res, MYSQL_BIND *input, 
                                   void *args );
@@ -167,37 +164,13 @@ static pthread_cond_t   kickCond;
 void plugin_initialize( char *args )
 {
     static char            *command = "rssfeed";
-    char                   *verString;
-    int                     ver;
-    int                     printed;
 
     LogPrintNoArg( LOG_NOTICE, "Initializing rssfeed..." );
 
     rssItemTree = BalancedBTreeCreate( BTREE_KEY_INT );
 
-    ver = -1;
-    printed = FALSE;
-    do {
-        verString = db_get_setting("dbSchemaRssfeed");
-        if( !verString ) {
-            ver = 0;
-        } else {
-            ver = atoi( verString );
-            free( verString );
-        }
-
-        if( !printed ) {
-            LogPrint( LOG_CRIT, "Current RSSfeed database schema version %d", 
-                                ver );
-            LogPrint( LOG_CRIT, "Code supports version %d", 
-                                CURRENT_SCHEMA_RSSFEED );
-            printed = TRUE;
-        }
-
-        if( ver < CURRENT_SCHEMA_RSSFEED ) {
-            ver = db_upgrade_schema( ver, CURRENT_SCHEMA_RSSFEED );
-        }
-    } while( ver < CURRENT_SCHEMA_RSSFEED );
+    db_check_schema( "dbSchemaRssfeed", "RSSfeed", CURRENT_SCHEMA_RSSFEED,
+                     defSchema, defSchemaCount, schemaUpgrade );
 
     db_load_rssfeeds();
 
@@ -663,39 +636,6 @@ char *botHelpRssfeed( void *tag )
                         "rssfeed disable num | rssfeed list | rssfeed show num";
     
     return( help );
-}
-
-static int db_upgrade_schema( int current, int goal )
-{
-    int                 i;
-
-    if( current >= goal ) {
-        return( current );
-    }
-
-    if( current == 0 ) {
-        /* There is no dbSchema, assume that it is an empty database, populate
-         * with the default schema
-         */
-        LogPrint( LOG_ERR, "Initializing RSSfeed database to schema version %d",
-                  CURRENT_SCHEMA_RSSFEED );
-        for( i = 0; i < defSchemaCount; i++ ) {
-            db_queue_query( i, defSchema, NULL, 0, NULL, NULL, NULL );
-        }
-        db_set_setting("dbSchemaRssfeed", "%d", CURRENT_SCHEMA_RSSFEED);
-        return( CURRENT_SCHEMA_RSSFEED );
-    }
-
-    LogPrint( LOG_ERR, "Upgrading RSSfeed database from schema version %d to "
-                       "%d", current, current+1 );
-    for( i = 0; schemaUpgrade[current][i].queryPattern; i++ ) {
-        db_queue_query( i, schemaUpgrade[current], NULL, 0, NULL, NULL, NULL );
-    }
-
-    current++;
-
-    db_set_setting("dbSchemaRssfeed", "%d", current);
-    return( current );
 }
 
 static void db_load_rssfeeds( void )

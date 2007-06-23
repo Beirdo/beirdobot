@@ -72,8 +72,6 @@ bool luascriptLoadItem( Luascript_t *luascript );
 void luascriptUnloadItem( Luascript_t *luascript );
 void luascriptInitializeTree( BalancedBTreeItem_t *item );
 
-static int db_upgrade_schema( int current, int goal );
-
 static int lua_LogPrint( lua_State *L );
 static int lua_transmitMsg( lua_State *L );
 static int lua_LoggedChannelMessage( lua_State *L );
@@ -99,8 +97,6 @@ static const struct luaL_reg mylib [] = {
 BalancedBTree_t *luascriptTree = NULL;
 
 #define CURRENT_SCHEMA_LUASCRIPT 1
-#define MAX_SCHEMA_QUERY 100
-typedef QueryTable_t SchemaUpgrade_t[MAX_SCHEMA_QUERY];
 
 static QueryTable_t defSchema[] = {
   { "CREATE TABLE `plugin_luascript` (\n"
@@ -156,38 +152,15 @@ static char ident[] _UNUSED_ =
 void plugin_initialize( char *args )
 {
     static char            *command = "luascript";
-    char                   *verString;
-    int                     ver;
-    int                     printed;
 
     LogPrintNoArg( LOG_NOTICE, "Initializing luascript..." );
     LogPrint( LOG_NOTICE, "Using %s", LUA_VERSION );
     LogPrint( LOG_NOTICE, "%s", LUA_COPYRIGHT );
     LogPrint( LOG_NOTICE, "Script path: %s", PLUGIN_PATH );
 
-    ver = -1;
-    printed = FALSE;
-    do {
-        verString = db_get_setting("dbSchemaLuascript");
-        if( !verString ) {
-            ver = 0;
-        } else {
-            ver = atoi( verString );
-            free( verString );
-        }
-
-        if( !printed ) {
-            LogPrint( LOG_CRIT, "Current LUAscript database schema version %d", 
-                                ver );
-            LogPrint( LOG_CRIT, "Code supports version %d", 
-                                CURRENT_SCHEMA_LUASCRIPT );
-            printed = TRUE;
-        }
-
-        if( ver < CURRENT_SCHEMA_LUASCRIPT ) {
-            ver = db_upgrade_schema( ver, CURRENT_SCHEMA_LUASCRIPT );
-        }
-    } while( ver < CURRENT_SCHEMA_LUASCRIPT );
+    db_check_schema( "dbSchemaLuascript", "LUAscript", 
+                     CURRENT_SCHEMA_LUASCRIPT, defSchema, defSchemaCount,
+                     schemaUpgrade );
 
     luascriptTree = db_get_luascripts();
     if( !luascriptTree ) {
@@ -240,40 +213,6 @@ void plugin_shutdown( void )
     }
     BalancedBTreeDestroy( luascriptTree );
 }
-
-static int db_upgrade_schema( int current, int goal )
-{
-    int                 i;
-
-    if( current >= goal ) {
-        return( current );
-    }
-
-    if( current == 0 ) {
-        /* There is no dbSchema, assume that it is an empty database, populate
-         * with the default schema
-         */
-        LogPrint( LOG_ERR, "Initializing LUAscript database to schema version "
-                           "%d", CURRENT_SCHEMA_LUASCRIPT );
-        for( i = 0; i < defSchemaCount; i++ ) {
-            db_queue_query( i, defSchema, NULL, 0, NULL, NULL, NULL );
-        }
-        db_set_setting("dbSchemaLuascript", "%d", CURRENT_SCHEMA_LUASCRIPT);
-        return( CURRENT_SCHEMA_LUASCRIPT );
-    }
-
-    LogPrint( LOG_ERR, "Upgrading RSSfeed database from schema version %d to "
-                       "%d", current, current+1 );
-    for( i = 0; schemaUpgrade[current][i].queryPattern; i++ ) {
-        db_queue_query( i, schemaUpgrade[current], NULL, 0, NULL, NULL, NULL );
-    }
-
-    current++;
-
-    db_set_setting("dbSchemaRssfeed", "%d", current);
-    return( current );
-}
-
 
 BalancedBTree_t *db_get_luascripts( void )
 {

@@ -40,10 +40,8 @@
 static char ident[] _UNUSED_ =
     "$Id$";
 
-#define MAX_SCHEMA_QUERY 100
-typedef QueryTable_t SchemaUpgrade_t[MAX_SCHEMA_QUERY];
 
-static SchemaUpgrade_t schemaUpgrade[CURRENT_SCHEMA] = {
+static SchemaUpgrade_t coreSchemaUpgrade[CURRENT_SCHEMA] = {
     /* 0 -> 1 */
     { { NULL, NULL, NULL, FALSE } },
     /* 1 -> 2 */
@@ -125,10 +123,20 @@ extern void db_queue_query( int queryId, QueryTable_t *queryTable,
                             QueryResFunc_t queryCallback, 
                             void *queryCallbackArg,
                             pthread_mutex_t *queryMutex );
-static int db_upgrade_schema( int current, int goal );
+static int db_upgrade_schema( char *setting, char *desc, 
+                              QueryTable_t *defSchema, int defSchemaCount,
+                              SchemaUpgrade_t *schemaUpgrade, int current, 
+                              int codeSupports );
 
+void db_check_schema_main( void )
+{
+    db_check_schema( "dbSchema", "core", CURRENT_SCHEMA, defCoreSchema,
+                     defCoreSchemaCount, coreSchemaUpgrade );
+}
 
-void db_check_schema(void)
+void db_check_schema( char *setting, char *desc, int codeSupports, 
+                      QueryTable_t *defSchema, int defSchemaCount, 
+                      SchemaUpgrade_t *schemaUpgrade )
 {
     char               *verString;
     int                 ver;
@@ -137,7 +145,7 @@ void db_check_schema(void)
     ver = -1;
     printed = FALSE;
     do {
-        verString = db_get_setting("dbSchema");
+        verString = db_get_setting( setting );
         if( !verString ) {
             ver = 0;
         } else {
@@ -146,22 +154,27 @@ void db_check_schema(void)
         }
 
         if( !printed ) {
-            LogPrint( LOG_CRIT, "Current database schema version %d", ver );
-            LogPrint( LOG_CRIT, "Code supports version %d", CURRENT_SCHEMA );
+            LogPrint( LOG_CRIT, "Current %s database schema version %d", desc,
+                                ver );
+            LogPrint( LOG_CRIT, "Code supports version %d", codeSupports );
             printed = TRUE;
         }
 
-        if( ver < CURRENT_SCHEMA ) {
-            ver = db_upgrade_schema( ver, CURRENT_SCHEMA );
+        if( ver < codeSupports ) {
+            ver = db_upgrade_schema( setting, desc, defSchema, defSchemaCount,
+                                     schemaUpgrade, ver, codeSupports );
         }
-    } while( ver < CURRENT_SCHEMA );
+    } while( ver < codeSupports );
 }
 
-static int db_upgrade_schema( int current, int goal )
+static int db_upgrade_schema( char *setting, char *desc, 
+                              QueryTable_t *defSchema, int defSchemaCount,
+                              SchemaUpgrade_t *schemaUpgrade, int current, 
+                              int codeSupports )
 {
     int                 i;
 
-    if( current >= goal ) {
+    if( current >= codeSupports ) {
         return( current );
     }
 
@@ -169,28 +182,26 @@ static int db_upgrade_schema( int current, int goal )
         /* There is no dbSchema, assume that it is an empty database, populate
          * with the default schema
          */
-        LogPrint( LOG_ERR, "Initializing database to schema version %d",
-                  CURRENT_SCHEMA );
+        LogPrint( LOG_ERR, "Initializing %s database to schema version %d",
+                  desc, codeSupports );
         for( i = 0; i < defSchemaCount; i++ ) {
             db_queue_query( i, defSchema, NULL, 0, NULL, NULL, NULL );
         }
-        db_set_setting("dbSchema", "%d", CURRENT_SCHEMA);
-        return( CURRENT_SCHEMA );
+        db_set_setting( setting, "%d", codeSupports );
+        return( codeSupports );
     }
 
-    LogPrint( LOG_ERR, "Upgrading database from schema version %d to %d",
-              current, current+1 );
+    LogPrint( LOG_ERR, "Upgrading %s database from schema version %d to %d",
+                       desc, current, current+1 );
     for( i = 0; schemaUpgrade[current][i].queryPattern; i++ ) {
         db_queue_query( i, schemaUpgrade[current], NULL, 0, NULL, NULL, NULL );
     }
 
     current++;
 
-    db_set_setting("dbSchema", "%d", current);
+    db_set_setting( setting, "%d", current );
     return( current );
 }
-
-
 
 /*
  * vim:ts=4:sw=4:ai:et:si:sts=4

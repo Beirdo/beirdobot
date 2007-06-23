@@ -53,7 +53,6 @@ static char ident[] _UNUSED_ =
     "$Id$";
 
 #define CURRENT_SCHEMA_MAILBOX  2
-#define MAX_SCHEMA_QUERY 100
 
 typedef struct {
     int                 mailboxId;
@@ -94,7 +93,6 @@ typedef struct {
     unsigned long       uid;
 } MailboxUID_t;
 
-typedef QueryTable_t SchemaUpgrade_t[MAX_SCHEMA_QUERY];
 
 static QueryTable_t defSchema[] = {
   { "CREATE TABLE `plugin_mailbox` (\n"
@@ -156,7 +154,6 @@ void botCmdMailbox( IRCServer_t *server, IRCChannel_t *channel, char *who,
                     char *msg, void *tag );
 char *botHelpMailbox( void *tag );
 void *mailbox_thread(void *arg);
-static int db_upgrade_schema( int current, int goal );
 static void db_load_mailboxes( void );
 void db_update_lastpoll( int mailboxId, int lastPoll );
 void db_update_lastread( int mailboxId, int lastRead );
@@ -195,35 +192,11 @@ BalancedBTree_t        *mailboxStreamTree;
 void plugin_initialize( char *args )
 {
     static char            *command = "mailbox";
-    char                   *verString;
-    int                     ver;
-    int                     printed;
 
     LogPrintNoArg( LOG_NOTICE, "Initializing mailbox..." );
 
-    ver = -1;
-    printed = FALSE;
-    do {
-        verString = db_get_setting("dbSchemaMailbox");
-        if( !verString ) {
-            ver = 0;
-        } else {
-            ver = atoi( verString );
-            free( verString );
-        }
-
-        if( !printed ) {
-            LogPrint( LOG_CRIT, "Current Mailbox database schema version %d", 
-                                ver );
-            LogPrint( LOG_CRIT, "Code supports version %d", 
-                                CURRENT_SCHEMA_MAILBOX );
-            printed = TRUE;
-        }
-
-        if( ver < CURRENT_SCHEMA_MAILBOX ) {
-            ver = db_upgrade_schema( ver, CURRENT_SCHEMA_MAILBOX );
-        }
-    } while( ver < CURRENT_SCHEMA_MAILBOX );
+    db_check_schema( "dbSchemaMailbox", "Mailbox", CURRENT_SCHEMA_MAILBOX,
+                     defSchema, defSchemaCount, schemaUpgrade );
 
     pthread_mutex_init( &shutdownMutex, NULL );
     pthread_mutex_init( &signalMutex, NULL );
@@ -643,38 +616,6 @@ char *botHelpMailbox( void *tag )
     return( help );
 }
 
-static int db_upgrade_schema( int current, int goal )
-{
-    int                 i;
-
-    if( current >= goal ) {
-        return( current );
-    }
-
-    if( current == 0 ) {
-        /* There is no dbSchema, assume that it is an empty database, populate
-         * with the default schema
-         */
-        LogPrint( LOG_ERR, "Initializing Mailbox database to schema version %d",
-                  CURRENT_SCHEMA_MAILBOX );
-        for( i = 0; i < defSchemaCount; i++ ) {
-            db_queue_query( i, defSchema, NULL, 0, NULL, NULL, NULL );
-        }
-        db_set_setting("dbSchemaMailbox", "%d", CURRENT_SCHEMA_MAILBOX);
-        return( CURRENT_SCHEMA_MAILBOX );
-    }
-
-    LogPrint( LOG_ERR, "Upgrading Mailbox database from schema version %d to "
-                       "%d", current, current+1 );
-    for( i = 0; schemaUpgrade[current][i].queryPattern; i++ ) {
-        db_queue_query( i, schemaUpgrade[current], NULL, 0, NULL, NULL, NULL );
-    }
-
-    current++;
-
-    db_set_setting("dbSchemaMailbox", "%d", current);
-    return( current );
-}
 
 static void db_load_mailboxes( void )
 {

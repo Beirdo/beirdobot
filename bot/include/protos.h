@@ -72,7 +72,10 @@ void db_notify_nick( IRCChannel_t *channel, char *nick );
 char *db_get_seen( IRCChannel_t *channel, char *nick, bool privmsg );
 char *db_get_setting( char *name );
 void db_set_setting( char *name, char *format, ... );
-void db_check_schema(void);
+void db_check_schema( char *setting, char *desc, int codeSupports, 
+                      QueryTable_t *defSchema, int defSchemaCount,
+                      SchemaUpgrade_t *schemaUpgrade );
+void db_check_schema_main(void);
 void db_nick_history( IRCChannel_t *channel, char *nick, NickHistory_t type ); 
 AuthData_t *db_get_auth( char *nick );
 void db_set_auth( char *nick, AuthData_t *auth );

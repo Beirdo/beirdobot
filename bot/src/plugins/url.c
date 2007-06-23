@@ -46,8 +46,6 @@ static char ident[] _UNUSED_ =
     "$Id$";
 
 #define CURRENT_SCHEMA_URL 2
-#define MAX_SCHEMA_QUERY 100
-typedef QueryTable_t SchemaUpgrade_t[MAX_SCHEMA_QUERY];
 
 static QueryTable_t defSchema[] = {
   { "CREATE TABLE `plugin_url_keywords` (\n"
@@ -117,7 +115,6 @@ char *botHelpUrl( void *tag );
 void regexpFuncUrl( IRCServer_t *server, IRCChannel_t *channel, char *who, 
                     char *msg, IRCMsgType_t type, int *ovector, int ovecsize,
                     void *tag );
-static int db_upgrade_schema( int current, int goal );
 char *db_get_url_keyword( IRCChannel_t *channel, char *keyword );
 static void result_get_url_keyword( MYSQL_RES *res, MYSQL_BIND *input, 
                                     void *args );
@@ -134,35 +131,11 @@ static char *urlRegexp = "(?i)(?:\\s|^)((?:https?|ftp)\\:\\/\\/\\S+)(?:\\s|$)";
 void plugin_initialize( char *args )
 {
     static char    *command = "url";
-    char           *verString;
-    int             ver;
-    int             printed;
 
     LogPrintNoArg( LOG_NOTICE, "Initializing url plugin..." );
 
-    ver = -1;
-    printed = FALSE;
-    do {
-        verString = db_get_setting("dbSchemaUrl");
-        if( !verString ) {
-            ver = 0;
-        } else {
-            ver = atoi( verString );
-            free( verString );
-        }
-
-        if( !printed ) {
-            LogPrint( LOG_CRIT, "Current URL database schema version %d", 
-                                ver );
-            LogPrint( LOG_CRIT, "Code supports version %d", 
-                                CURRENT_SCHEMA_URL );
-            printed = TRUE;
-        }
-
-        if( ver < CURRENT_SCHEMA_URL ) {
-            ver = db_upgrade_schema( ver, CURRENT_SCHEMA_URL );
-        }
-    } while( ver < CURRENT_SCHEMA_URL );
+    db_check_schema( "dbSchemaUrl", "URL", CURRENT_SCHEMA_URL, defSchema,
+                     defSchemaCount, schemaUpgrade );
 
     botCmd_add( (const char **)&command, botCmdUrl, botHelpUrl, NULL );
     regexp_add( NULL, (const char *)urlRegexp, regexpFuncUrl, NULL );
@@ -286,39 +259,6 @@ char *botHelpUrl( void *tag )
                         "url - search searchstring.";
 
     return( help );
-}
-
-static int db_upgrade_schema( int current, int goal )
-{
-    int                 i;
-
-    if( current >= goal ) {
-        return( current );
-    }
-
-    if( current == 0 ) {
-        /* There is no dbSchema, assume that it is an empty database, populate
-         * with the default schema
-         */
-        LogPrint( LOG_ERR, "Initializing URL database to schema version %d",
-                  CURRENT_SCHEMA_URL );
-        for( i = 0; i < defSchemaCount; i++ ) {
-            db_queue_query( i, defSchema, NULL, 0, NULL, NULL, NULL );
-        }
-        db_set_setting("dbSchemaUrl", "%d", CURRENT_SCHEMA_URL);
-        return( CURRENT_SCHEMA_URL );
-    }
-
-    LogPrint( LOG_ERR, "Upgrading URL database from schema version %d to "
-                       "%d", current, current+1 );
-    for( i = 0; schemaUpgrade[current][i].queryPattern; i++ ) {
-        db_queue_query( i, schemaUpgrade[current], NULL, 0, NULL, NULL, NULL );
-    }
-
-    current++;
-
-    db_set_setting("dbSchemaUrl", "%d", current);
-    return( current );
 }
 
 char *db_get_url_keyword( IRCChannel_t *channel, char *keyword )
