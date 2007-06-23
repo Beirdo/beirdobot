@@ -328,6 +328,10 @@ void MainDelayExit( void )
 
     /* Signal to all that we are aborting */
     BotDone = false;
+
+    /* Unload all plugins (which should kill all associated threads) */
+    pluginUnloadAll();
+
     GlobalAbort = true;
 
     /* Send out signals from all queues waking up anything waiting on them so

@@ -159,10 +159,12 @@ static char    *channelRegexp = NULL;
 pthread_t           tracThreadId;
 static bool         threadAbort = FALSE;
 BalancedBTree_t    *urlTree;
+static bool         apr_initialized = FALSE;
 
 int my_svn_initialize( TracURL_t *tracItem );
 char *tracDetailsTicket( TracURL_t *tracItem, int number );
 char *tracDetailsChangeset( TracURL_t *tracItem, int number );
+void uninit_apr( void );
 
 void plugin_initialize( char *args )
 {
@@ -198,6 +200,9 @@ void plugin_initialize( char *args )
 
     db_load_channel_regexp();
 
+    atexit( uninit_apr );
+    apr_initialized = TRUE;
+
     thread_create( &tracThreadId, trac_thread, NULL, "thread_trac" );
 }
 
@@ -205,7 +210,6 @@ void plugin_shutdown( void )
 {
     BalancedBTreeItem_t    *item;
     TracURL_t              *tracItem;
-
 
     LogPrintNoArg( LOG_NOTICE, "Removing trac..." );
     if( channelRegexp ) {
@@ -221,20 +225,32 @@ void plugin_shutdown( void )
         BalancedBTreeLock( urlTree );
         while( urlTree->root ) {
             item = urlTree->root;
+            BalancedBTreeRemove( urlTree, item, LOCKED, FALSE );
             tracItem = (TracURL_t *)item->item;
             free( tracItem->url );
             free( tracItem->svnUrl );
             free( tracItem->svnUser );
             free( tracItem->svnPasswd );
-            if( tracItem->svnPool ) {
-                svn_pool_destroy( tracItem->svnPool );
-            }
             free( tracItem );
-            BalancedBTreeRemove( urlTree, item, LOCKED, FALSE );
             free( item );
         }
         BalancedBTreeDestroy( urlTree );
     }
+
+    if( apr_initialized ) {
+        apr_terminate();
+        apr_initialized = FALSE;
+    }
+}
+
+void uninit_apr( void )
+{
+    /* 
+     * This is so the libsvn-registered atexit function which terminates APR
+     * can do so without us trying to do so immediately after.  This only gets
+     * called if this plugin is still loaded when the bot is being shutdown
+     */
+    apr_initialized = FALSE;
 }
 
 void *trac_thread(void *arg)
@@ -283,6 +299,7 @@ void *trac_thread(void *arg)
         botCmd_add( (const char **)&command, botCmdTrac, botHelpTrac, NULL );
     }
 
+    thread_deregister( tracThreadId );
     return( NULL );
 }
 

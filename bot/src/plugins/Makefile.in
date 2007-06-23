@@ -66,7 +66,7 @@ ifeq (${PLUGIN_TRAC},yes)
  CFLAGS_trac  = -I/usr/include/subversion-1 -I/usr/include/apr-0
  CFLAGS_trac += $(shell PKG_CONFIG_PATH=${PKGCONFIGPATH} pkg-config --cflags nxml)
  CFLAGS_trac += $(shell PKG_CONFIG_PATH=${PKGCONFIGPATH} pkg-config --cflags mrss)
- DLLIBS_trac  = -lsvn_client-1 -lapr-0 -laprutil-0
+ DLLIBS_trac  = -lsvn_client-1 -lapr-1 -laprutil-1
  DLLIBS_trac += $(shell PKG_CONFIG_PATH=${PKGCONFIGPATH} pkg-config --libs nxml)
  DLLIBS_trac += $(shell PKG_CONFIG_PATH=${PKGCONFIGPATH} pkg-config --libs mrss)
  DLLIBS_trac += -lcurl

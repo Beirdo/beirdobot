@@ -51,6 +51,7 @@ void pluginLoadItem( Plugin_t *plugin );
 void pluginUnloadItem( Plugin_t *plugin );
 void botCmdPlugin( IRCServer_t *server, IRCChannel_t *channel, char *who, 
                    char *msg, void *tag );
+void pluginUnloadTree( BalancedBTreeItem_t *node );
 
 BalancedBTree_t *pluginTree;
 
@@ -281,6 +282,32 @@ void botCmdPlugin( IRCServer_t *server, IRCChannel_t *channel, char *who,
     free( command );
 }
 
+void pluginUnloadAll( void )
+{
+    BalancedBTreeLock( pluginTree );
+    pluginUnloadTree( pluginTree->root );
+    BalancedBTreeUnlock( pluginTree );
+}
+        
+void pluginUnloadTree( BalancedBTreeItem_t *node )
+{
+    Plugin_t               *plugin;
+
+    if( !node ) {
+        return;
+    }
+
+    pluginUnloadTree( node->left );
+
+    plugin = (Plugin_t *)node->item;
+
+    if( plugin->loaded ) {
+        LogPrint( LOG_DEBUG, "Unloaded module %s", plugin->name );
+        pluginUnloadItem( plugin );
+    }
+
+    pluginUnloadTree( node->right );
+}
 
 /*
  * vim:ts=4:sw=4:ai:et:si:sts=4

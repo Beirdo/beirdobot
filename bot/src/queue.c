@@ -475,6 +475,7 @@ void QueueKillAll( void )
         pthread_cond_broadcast(queue->cNotEmpty);
         pthread_cond_broadcast(queue->cNotFull);
     }
+    LinkedListUnlock(QueueList);
 }
 
 

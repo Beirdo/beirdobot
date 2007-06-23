@@ -138,6 +138,9 @@ void plugin_shutdown( void )
 
     threadAbort = TRUE;
 
+    pthread_cond_broadcast(DnsQ->cNotEmpty);
+    pthread_cond_broadcast(DnsQ->cNotFull);
+
     pthread_mutex_lock( &shutdownMutex );
     pthread_mutex_destroy( &shutdownMutex );
 

@@ -36,6 +36,7 @@
 #endif
 #include <string.h>
 #include <strings.h>
+#include <execinfo.h>
 #include <stdio.h>
 #include <stdlib.h>
 #ifdef __unix__
@@ -143,12 +144,27 @@ void ProcOnUnknown(BN_PInfo I, const char Who[], const char Command[],
 void ProcOnError(BN_PInfo I, int err)
 {
     IRCServer_t        *server;
+    void               *array[100];
+    size_t              size;
+    char              **strings;
+    size_t              i;
 
     if( verbose || 1 ) {
         server = (IRCServer_t *)I->User;
 
         LogPrint( LOG_DEBUG, "Event Error : %s (%d) : Server %s", 
                              strerror(err), err, server->server );
+
+        size = backtrace( array, 100 );
+        strings = backtrace_symbols( array, size );
+
+        LogPrint( LOG_DEBUG, "Obtained %zd stack frames.", size );
+
+        for( i = 0; i < size; i++ ) {
+            LogPrint( LOG_DEBUG, "%s", strings[i] );
+        }
+
+        free( strings );
     }
 }
 
@@ -175,6 +191,7 @@ void ProcOnDisconnected(BN_PInfo I, const char Msg[])
         }
         LogPrint( LOG_NOTICE, "Killing thread for %s@%s:%d", server->nick, 
                   server->server, server->port );
+
         pthread_exit( NULL );
     }
 }

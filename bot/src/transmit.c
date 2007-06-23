@@ -68,6 +68,7 @@ void *transmit_thread(void *arg)
     FloodListItem_t    *floodItem;
     int                 size;
     time_t              time;
+    int                 sock;
 
     server   = (IRCServer_t *)arg;
     sendTime = 0;
@@ -193,6 +194,12 @@ void *transmit_thread(void *arg)
 
     LogPrint( LOG_NOTICE, "Ending transmit thread - %s", 
                           server->txThreadName );
+
+    /* Close the server socket to expedite killing the server thread */
+    sock = server->ircInfo.Socket;
+    server->ircInfo.Socket = 0;
+    close( sock );
+
     return(NULL);
 }
 
