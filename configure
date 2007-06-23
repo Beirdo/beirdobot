@@ -3928,13 +3928,13 @@ echo "$as_me: error: libcurl not installed" >&2;}
 fi
 
 
-echo "$as_me:$LINENO: checking for apr_palloc in -lapr-0" >&5
-echo $ECHO_N "checking for apr_palloc in -lapr-0... $ECHO_C" >&6
-if test "${ac_cv_lib_apr_0_apr_palloc+set}" = set; then
+echo "$as_me:$LINENO: checking for apr_palloc in -lapr-1" >&5
+echo $ECHO_N "checking for apr_palloc in -lapr-1... $ECHO_C" >&6
+if test "${ac_cv_lib_apr_1_apr_palloc+set}" = set; then
   echo $ECHO_N "(cached) $ECHO_C" >&6
 else
   ac_check_lib_save_LIBS=$LIBS
-LIBS="-lapr-0  $LIBS"
+LIBS="-lapr-1  $LIBS"
 cat >conftest.$ac_ext <<_ACEOF
 /* confdefs.h.  */
 _ACEOF
@@ -3978,40 +3978,40 @@ if { (eval echo "$as_me:$LINENO: \"$ac_link\"") >&5
   ac_status=$?
   echo "$as_me:$LINENO: \$? = $ac_status" >&5
   (exit $ac_status); }; }; then
-  ac_cv_lib_apr_0_apr_palloc=yes
+  ac_cv_lib_apr_1_apr_palloc=yes
 else
   echo "$as_me: failed program was:" >&5
 sed 's/^/| /' conftest.$ac_ext >&5
 
-ac_cv_lib_apr_0_apr_palloc=no
+ac_cv_lib_apr_1_apr_palloc=no
 fi
 rm -f conftest.err conftest.$ac_objext \
       conftest$ac_exeext conftest.$ac_ext
 LIBS=$ac_check_lib_save_LIBS
 fi
-echo "$as_me:$LINENO: result: $ac_cv_lib_apr_0_apr_palloc" >&5
-echo "${ECHO_T}$ac_cv_lib_apr_0_apr_palloc" >&6
-if test $ac_cv_lib_apr_0_apr_palloc = yes; then
+echo "$as_me:$LINENO: result: $ac_cv_lib_apr_1_apr_palloc" >&5
+echo "${ECHO_T}$ac_cv_lib_apr_1_apr_palloc" >&6
+if test $ac_cv_lib_apr_1_apr_palloc = yes; then
   cat >>confdefs.h <<_ACEOF
-#define HAVE_LIBAPR_0 1
+#define HAVE_LIBAPR_1 1
 _ACEOF
 
-  LIBS="-lapr-0 $LIBS"
+  LIBS="-lapr-1 $LIBS"
 
 else
-  { { echo "$as_me:$LINENO: error: libapr-0 not installed" >&5
-echo "$as_me: error: libapr-0 not installed" >&2;}
+  { { echo "$as_me:$LINENO: error: libapr-1 not installed" >&5
+echo "$as_me: error: libapr-1 not installed" >&2;}
    { (exit 1); exit 1; }; }
 fi
 
 
-echo "$as_me:$LINENO: checking for apu_version in -laprutil-0" >&5
-echo $ECHO_N "checking for apu_version in -laprutil-0... $ECHO_C" >&6
-if test "${ac_cv_lib_aprutil_0_apu_version+set}" = set; then
+echo "$as_me:$LINENO: checking for apu_version in -laprutil-1" >&5
+echo $ECHO_N "checking for apu_version in -laprutil-1... $ECHO_C" >&6
+if test "${ac_cv_lib_aprutil_1_apu_version+set}" = set; then
   echo $ECHO_N "(cached) $ECHO_C" >&6
 else
   ac_check_lib_save_LIBS=$LIBS
-LIBS="-laprutil-0  $LIBS"
+LIBS="-laprutil-1  $LIBS"
 cat >conftest.$ac_ext <<_ACEOF
 /* confdefs.h.  */
 _ACEOF
@@ -4055,29 +4055,29 @@ if { (eval echo "$as_me:$LINENO: \"$ac_link\"") >&5
   ac_status=$?
   echo "$as_me:$LINENO: \$? = $ac_status" >&5
   (exit $ac_status); }; }; then
-  ac_cv_lib_aprutil_0_apu_version=yes
+  ac_cv_lib_aprutil_1_apu_version=yes
 else
   echo "$as_me: failed program was:" >&5
 sed 's/^/| /' conftest.$ac_ext >&5
 
-ac_cv_lib_aprutil_0_apu_version=no
+ac_cv_lib_aprutil_1_apu_version=no
 fi
 rm -f conftest.err conftest.$ac_objext \
       conftest$ac_exeext conftest.$ac_ext
 LIBS=$ac_check_lib_save_LIBS
 fi
-echo "$as_me:$LINENO: result: $ac_cv_lib_aprutil_0_apu_version" >&5
-echo "${ECHO_T}$ac_cv_lib_aprutil_0_apu_version" >&6
-if test $ac_cv_lib_aprutil_0_apu_version = yes; then
+echo "$as_me:$LINENO: result: $ac_cv_lib_aprutil_1_apu_version" >&5
+echo "${ECHO_T}$ac_cv_lib_aprutil_1_apu_version" >&6
+if test $ac_cv_lib_aprutil_1_apu_version = yes; then
   cat >>confdefs.h <<_ACEOF
-#define HAVE_LIBAPRUTIL_0 1
+#define HAVE_LIBAPRUTIL_1 1
 _ACEOF
 
-  LIBS="-laprutil-0 $LIBS"
+  LIBS="-laprutil-1 $LIBS"
 
 else
-  { { echo "$as_me:$LINENO: error: libaprutil-0 not installed" >&5
-echo "$as_me: error: libaprutil-0 not installed" >&2;}
+  { { echo "$as_me:$LINENO: error: libaprutil-1 not installed" >&5
+echo "$as_me: error: libaprutil-1 not installed" >&2;}
    { (exit 1); exit 1; }; }
 fi
 

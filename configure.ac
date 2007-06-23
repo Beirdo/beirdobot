@@ -1,13 +1,13 @@
 # Process this file with autoconf to produce a configure script.
 AC_PREREQ(2.59)
 
-AC_INIT(beirdobot, [0.2+SVN], [gjhurlbu@gmail.com])
+AC_INIT(beirdobot, [SVN], [gjhurlbu@gmail.com])
 AC_CONFIG_AUX_DIR(scripts)
 AC_CONFIG_SRCDIR(bot/src/main.c)
 AM_CONFIG_HEADER(bot/include/config.h)
 AC_CANONICAL_SYSTEM
 
-AM_INIT_AUTOMAKE(beirdobot, "0.2+SVN")
+AM_INIT_AUTOMAKE(beirdobot, "SVN")
 
 
 
@@ -136,10 +136,10 @@ ENABLE_SWITCH([plugin-trac],[plugin_trac],[PLUGIN_TRAC],[--disable-plugin-trac],
               [yes],[no],
 	      [AC_CHECK_LIB([curl], [curl_escape],,
                             [AC_MSG_ERROR(libcurl not installed)])
-	       AC_CHECK_LIB([apr-0], [apr_palloc],,
-			    [AC_MSG_ERROR(libapr-0 not installed)])
-	       AC_CHECK_LIB([aprutil-0], [apu_version],,
-			    [AC_MSG_ERROR(libaprutil-0 not installed)])
+	       AC_CHECK_LIB([apr-1], [apr_palloc],,
+			    [AC_MSG_ERROR(libapr-1 not installed)])
+	       AC_CHECK_LIB([aprutil-1], [apu_version],,
+			    [AC_MSG_ERROR(libaprutil-1 not installed)])
 	       AC_CHECK_LIB([svn_client-1], [svn_client_log],,
 			    [AC_MSG_ERROR(libsvn_client-1 not installed)])
               ])

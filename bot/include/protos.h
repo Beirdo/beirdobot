@@ -100,6 +100,7 @@ BalancedBTree_t *db_get_plugins( void );
 void plugins_initialize( void );
 bool pluginLoad( char *name );
 bool pluginUnload( char *name );
+void pluginUnloadAll( void );
 
 void regexp_initialize( void );
 void regexp_add( const char *channelRegexp, const char *contentRegexp, 
