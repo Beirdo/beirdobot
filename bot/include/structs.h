@@ -65,6 +65,7 @@ typedef struct {
     pthread_t           txThreadId;
     char               *txThreadName;
     QueueObject_t      *txQueue;
+    bool                enabled;
 } IRCServer_t;
 
 typedef struct {
@@ -79,6 +80,7 @@ typedef struct {
     int                 notifywindow;
     char                cmdChar;
     bool                joined;
+    bool                enabled;
 } IRCChannel_t;
 
 typedef enum {

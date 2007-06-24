@@ -84,12 +84,13 @@ void tracTicketCsv( BalancedBTree_t *tree, char *page );
 static char ident[] _UNUSED_ = 
     "$Id$";
 
-#define CURRENT_SCHEMA_TRAC 2
+#define CURRENT_SCHEMA_TRAC 3
 
 static QueryTable_t defSchema[] = {
   { "CREATE TABLE `plugin_trac` (\n"
     "  `serverid` int(11) NOT NULL default '0',\n"
     "  `chanid` int(11) NOT NULL default '0',\n"
+    "  `enabled` INT NOT NULL DEFAULT '1',\n"
     "  `url` varchar(255) NOT NULL default '',\n"
     "  `svnUrl` varchar(255) NOT NULL default '',\n"
     "  `svnUser` varchar(64) NOT NULL default '',\n"
@@ -107,12 +108,16 @@ static SchemaUpgrade_t schemaUpgrade[CURRENT_SCHEMA_TRAC] = {
         "AFTER `url`, ADD `svnUser` VARCHAR( 64 ) NOT NULL AFTER `svnUrl`, "
         "ADD `svnPasswd` VARCHAR( 64 ) NOT NULL AFTER `svnUser`", NULL, NULL, 
         FALSE },
+      { NULL, NULL, NULL, FALSE } },
+    /* 2 -> 3 */
+    { { "ALTER TABLE `plugin_trac` ADD `enabled` INT NOT NULL DEFAULT '1' "
+        "AFTER `chanid`", NULL, NULL, FALSE },
       { NULL, NULL, NULL, FALSE } }
 };
 
 static QueryTable_t tracQueryTable[] = {
     /* 0 */
-    { "SELECT serverid, chanid, url, svnUrl, svnUser, svnPasswd "
+    { "SELECT serverid, chanid, url, svnUrl, svnUser, svnPasswd, enabled "
       "FROM `plugin_trac` ORDER BY `chanid` ASC", NULL, NULL, FALSE }
 };
 
@@ -127,6 +132,7 @@ typedef struct {
     char               *svnPasswd;
     apr_pool_t         *svnPool;
     svn_client_ctx_t   *svnContext;
+    bool                enabled;
 } TracURL_t;
 
 typedef struct {
@@ -291,6 +297,10 @@ void regexpFuncTicket( IRCServer_t *server, IRCChannel_t *channel, char *who,
 
     tracItem = (TracURL_t *)item->item;
 
+    if( !tracItem->enabled ) {
+        return;
+    }
+
     string = regexp_substring( msg, ovector, ovecsize, 1 );
     if( string ) {
         message = (char *)malloc(28 + (2 * strlen(string)) + 
@@ -320,6 +330,9 @@ void regexpFuncChangeset( IRCServer_t *server, IRCChannel_t *channel,
 
     tracItem = (TracURL_t *)item->item;
 
+    if( !tracItem->enabled ) {
+        return;
+    }
 
     string = regexp_substring( msg, ovector, ovecsize, 1 );
     if( string ) {
@@ -378,15 +391,18 @@ static void result_load_channel_regexp( MYSQL_RES *res, MYSQL_BIND *input,
         tracItem->chanId    = atoi(row[1]);
         tracItem->url       = strdup(row[2]);
         tracItem->svnUrl    = strdup(row[3]);
-        tracItem->svnUser   = strdup(row[3]);
-        tracItem->svnPasswd = strdup(row[3]);
+        tracItem->svnUser   = strdup(row[4]);
+        tracItem->svnPasswd = strdup(row[5]);
+        tracItem->enabled   = ( atoi(row[6]) == 0 ? FALSE : TRUE );
 
-        if( *tracItem->svnUrl && 
-            my_svn_initialize( tracItem ) != EXIT_SUCCESS ) {
-            LogPrintNoArg( LOG_CRIT, "Trac: SVN Initialization error!" );
-            if( tracItem->svnPool ) {
-                svn_pool_destroy( tracItem->svnPool );
-                tracItem->svnPool = NULL;
+        if( !tracItem->enabled ) {
+            if( *tracItem->svnUrl && 
+                my_svn_initialize( tracItem ) != EXIT_SUCCESS ) {
+                LogPrintNoArg( LOG_CRIT, "Trac: SVN Initialization error!" );
+                if( tracItem->svnPool ) {
+                    svn_pool_destroy( tracItem->svnPool );
+                    tracItem->svnPool = NULL;
+                }
             }
         }
 
@@ -624,6 +640,12 @@ void botCmdTrac( IRCServer_t *server, IRCChannel_t *channel, char *who,
         }
         
         tracItem = (TracURL_t *)item->item;
+
+        if( !tracItem->enabled ) {
+            LogPrintNoArg( LOG_CRIT, "Trac entry disabled" );
+            free( which );
+            return;
+        }
 
         if( *which == '#' ) {
             /* This is a ticket */

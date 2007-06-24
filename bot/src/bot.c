@@ -67,8 +67,8 @@ void ProcOnConnected(BN_PInfo I, const char HostName[])
 
     server = (IRCServer_t *)I->User;
     LogPrint( LOG_NOTICE, "Connected to %s:%d as %s...", server->server, 
-
               server->port, server->nick);
+
     if( verbose ) {
         LogPrint( LOG_DEBUG, "Event Connected : (%s)", HostName);
     }
@@ -121,7 +121,7 @@ void ProcOnRegistered(BN_PInfo I)
         for( found = false, item = server->channels->head; 
              item && !found; item = item->next ) {
             channel = (IRCChannel_t *)item;
-            if( channel->joined ) {
+            if( channel->joined || !channel->enabled ) {
                 continue;
             }
 
@@ -185,7 +185,9 @@ void ProcOnDisconnected(BN_PInfo I, const char Msg[])
             LinkedListLock( server->channels );
             for( item = server->channels->head; item ; item = item->next ) {
                 channel = (IRCChannel_t *)item;
-                db_nick_history( channel, NULL, HIST_END );
+                if( channel->enabled ) {
+                    db_nick_history( channel, NULL, HIST_END );
+                }
             }
             LinkedListUnlock( server->channels );
         }
@@ -380,7 +382,7 @@ void ProcOnInvite(BN_PInfo I, const char Chan[], const char Who[],
 
     server = (IRCServer_t *)I->User;
     channel = FindChannel(server, Chan);
-    if( !channel ) {
+    if( !channel || !channel->enabled ) {
         return;
     }
 
@@ -573,7 +575,7 @@ void ProcOnJoinChannel(BN_PInfo I, const char Chan[])
         for( found = false, item = server->channels->head; 
              item && !found; item = item->next ) {
             channel = (IRCChannel_t *)item;
-            if( channel->joined ) {
+            if( channel->joined || !channel->enabled ) {
                 continue;
             }
 
@@ -610,11 +612,13 @@ void bot_start(void)
     LinkedListLock( ServerList );
     for( item = ServerList->head; item; item = item->next ) {
         server = (IRCServer_t *)item;
-        server->txQueue = QueueCreate( 1024 );
-        thread_create( &server->txThreadId, transmit_thread, (void *)server,
-                       server->txThreadName );
-        thread_create( &server->threadId, bot_server_thread, (void *)server,
-                       server->threadName );
+        if( server->enabled ) {
+            server->txQueue = QueueCreate( 1024 );
+            thread_create( &server->txThreadId, transmit_thread, 
+                           (void *)server, server->txThreadName );
+            thread_create( &server->threadId, bot_server_thread, 
+                           (void *)server, server->threadName );
+        }
     }
     LinkedListUnlock( ServerList );
 }

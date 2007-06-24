@@ -94,11 +94,6 @@ static SchemaUpgrade_t coreSchemaUpgrade[CURRENT_SCHEMA] = {
     },
     /* 6 -> 7 */
     {
-      { "CREATE TABLE `plugin_trac` (\n"
-        " `chanid` INT NOT NULL ,\n"
-        " `url` VARCHAR( 255 ) NOT NULL ,\n"
-        " PRIMARY KEY ( `chanid` )\n"
-        ") TYPE = MYISAM\n", NULL, NULL, FALSE },
       { NULL, NULL, NULL, FALSE }
     },
     /* 7 -> 8 */
@@ -113,6 +108,14 @@ static SchemaUpgrade_t coreSchemaUpgrade[CURRENT_SCHEMA] = {
         "ADD `floodMaxTime` INT DEFAULT '8' NOT NULL ,\n"
         "ADD `floodBuffer` INT DEFAULT '2000' NOT NULL ,\n"
         "ADD `floodMaxLine` INT DEFAULT '256' NOT NULL\n", NULL, NULL, FALSE },
+      { NULL, NULL, NULL, FALSE }
+    },
+    /* 9 -> 10 */
+    {
+      { "ALTER TABLE `channels` ADD `enabled` INT DEFAULT '1' NOT NULL "
+        "AFTER `serverid`", NULL, NULL, FALSE },
+      { "ALTER TABLE `servers` ADD `enabled` INT DEFAULT '1' NOT NULL "
+        "AFTER `serverid`", NULL, NULL, FALSE },
       { NULL, NULL, NULL, FALSE }
     }
 };

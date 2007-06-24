@@ -52,11 +52,12 @@
 static char ident[] _UNUSED_ = 
     "$Id$";
 
-#define CURRENT_SCHEMA_RSSFEED 4
+#define CURRENT_SCHEMA_RSSFEED 5
 
 static QueryTable_t defSchema[] = {
   { "CREATE TABLE `plugin_rssfeed` (\n"
     "    `feedid` INT NOT NULL AUTO_INCREMENT ,\n"
+    "    `enabled` INT NOT NULL DEFAULT '1',\n"
     "    `chanid` INT NOT NULL ,\n"
     "    `url` VARCHAR( 255 ) NOT NULL ,\n"
     "    `userpasswd` VARCHAR( 255 ) NOT NULL ,\n"
@@ -86,6 +87,10 @@ static SchemaUpgrade_t schemaUpgrade[CURRENT_SCHEMA_RSSFEED] = {
     /* 3 -> 4 */
     { { "ALTER TABLE `plugin_rssfeed` ADD `timespec` VARCHAR( 255 ) NOT NULL "
         "AFTER `lastpost` ;", NULL, NULL, FALSE },
+      { NULL, NULL, NULL, FALSE } },
+    /* 4 -> 5 */
+    { { "ALTER TABLE `plugin_rssfeed` ADD `enabled` INT NOT NULL DEFAULT '1' "
+        "AFTER `feedId`", NULL, NULL, FALSE },
       { NULL, NULL, NULL, FALSE } }
 };
 
@@ -93,7 +98,7 @@ static QueryTable_t rssfeedQueryTable[] = {
     /* 0 */
     { "SELECT a.`feedid`, a.`chanid`, b.`serverid`, a.`url`, a.`userpasswd`, "
       "a.`authtype`, a.`prefix`, "
-      "a.`timeout`, a.`lastpost`, a.`timespec`, a.`feedoffset` "
+      "a.`timeout`, a.`lastpost`, a.`timespec`, a.`feedoffset`, a.`enabled` "
       "FROM `plugin_rssfeed` AS a, "
       "`channels` AS b WHERE a.`chanid` = b.`chanid` ORDER BY a.`feedid` ASC",
       NULL, NULL, FALSE },
@@ -695,12 +700,16 @@ static void result_load_rssfeeds( MYSQL_RES *res, MYSQL_BIND *input,
         data->timeSpec = strdup(row[9]);
         data->offset   = atol(row[10]);
         data->nextpoll = nextpoll++;
-        data->enabled  = TRUE;
+        data->enabled  = ( atoi(row[11]) == 0 ? FALSE : TRUE );
 
         item = (BalancedBTreeItem_t *)malloc(sizeof(BalancedBTreeItem_t));
         item->item = (void *)data;
         item->key  = (void *)&data->feedId;
         BalancedBTreeAdd( rssfeedTree, item, LOCKED, FALSE );
+
+        if( !data->enabled ) {
+            continue;
+        }
 
         item = (BalancedBTreeItem_t *)malloc(sizeof(BalancedBTreeItem_t));
         item->item = (void *)data;

@@ -45,13 +45,14 @@
 static char ident[] _UNUSED_ = 
     "$Id$";
 
-#define CURRENT_SCHEMA_URL 2
+#define CURRENT_SCHEMA_URL 3
 
 static QueryTable_t defSchema[] = {
   { "CREATE TABLE `plugin_url_keywords` (\n"
     "    `chanid` INT NOT NULL ,\n"
     "    `keyword` VARCHAR( 255 ) NOT NULL ,\n"
     "    `url` VARCHAR( 255 ) NOT NULL ,\n"
+    "    `enabled` INT NOT NULL DEFAULT '1', \n"
     "    PRIMARY KEY ( `chanid`, `keyword` )\n"
     ") TYPE = MYISAM\n", NULL, NULL, FALSE },
   { "CREATE TABLE `plugin_url_log` (\n"
@@ -81,13 +82,17 @@ static SchemaUpgrade_t schemaUpgrade[CURRENT_SCHEMA_URL] = {
         "    INDEX `chanTime` ( `chanid` , `timestamp` ) ,\n"
         "    INDEX `url` ( `url` ( 256 ) ) \n"
         ") TYPE = MYISAM\n", NULL, NULL, FALSE },
+      { NULL, NULL, NULL, FALSE } },
+    /* 2 -> 3 */
+    { { "ALTER TABLE `plugin_url_keywords` ADD `enabled` INT NOT NULL "
+        "DEFAULT '1' AFTER `url`", NULL, NULL, FALSE },
       { NULL, NULL, NULL, FALSE } }
 };
 
 static QueryTable_t urlQueryTable[] = {
     /* 0 */
     { "SELECT `url` FROM `plugin_url_keywords` WHERE `chanid` = ? AND "
-      "`keyword` = ?", NULL, NULL, FALSE },
+      "`keyword` = ? AND `enabled` = 1", NULL, NULL, FALSE },
     /* 1 */
     { "INSERT INTO `plugin_url_log` (`chanid`, `timestamp`, `url`) "
       "VALUES ( ?, ?, ? )" },
@@ -98,8 +103,8 @@ static QueryTable_t urlQueryTable[] = {
     { "SELECT `timestamp`, `url` FROM `plugin_url_log` WHERE `chanid` = ? AND "
       "`url` LIKE ? ORDER BY `timestamp` DESC LIMIT 3", NULL, NULL, FALSE },
     /* 4 */
-    { "SELECT `keyword` FROM `plugin_url_keywords` WHERE `chanid` = ? "
-      "ORDER BY `keyword` ASC", NULL, NULL, FALSE }
+    { "SELECT `keyword`, `enabled` FROM `plugin_url_keywords` "
+      "WHERE `chanid` = ? ORDER BY `keyword` ASC", NULL, NULL, FALSE }
 };
 
 typedef struct {
@@ -473,6 +478,7 @@ static void result_list_keywords( MYSQL_RES *res, MYSQL_BIND *input,
     int             count;
     int             i;
     int             len;
+    bool            enabled;
 
     pKeywords = (char **)args;
 
@@ -488,7 +494,8 @@ static void result_list_keywords( MYSQL_RES *res, MYSQL_BIND *input,
     for( i = 0; i < count; i++ ) {
         row = mysql_fetch_row(res);
 
-        len += strlen( row[0] );
+        enabled = ( atoi(row[1]) == 0 ? FALSE : TRUE );
+        len += strlen( row[0] ) + ( enabled ? 0 : 10 );
         keywords = (char *)realloc(keywords, len + 3);
         if( !key ) {
             key = keywords;
@@ -498,6 +505,9 @@ static void result_list_keywords( MYSQL_RES *res, MYSQL_BIND *input,
             strcat( keywords, " " );
         }
         strcat( keywords, row[0] );
+        if( !enabled ) {
+            strcat( keywords, "(disabled)" );
+        }
     }
 
     *pKeywords = keywords;

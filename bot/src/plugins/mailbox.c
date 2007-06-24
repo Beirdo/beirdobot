@@ -52,7 +52,7 @@
 static char ident[] _UNUSED_ = 
     "$Id$";
 
-#define CURRENT_SCHEMA_MAILBOX  2
+#define CURRENT_SCHEMA_MAILBOX  3
 
 typedef struct {
     int                 mailboxId;
@@ -86,6 +86,7 @@ typedef struct {
     IRCChannel_t       *channel;
     char               *nick;
     char               *format;
+    bool                enabled;
 } MailboxReport_t;
 
 typedef struct {
@@ -97,6 +98,7 @@ typedef struct {
 static QueryTable_t defSchema[] = {
   { "CREATE TABLE `plugin_mailbox` (\n"
     "    `mailboxId` INT NULL AUTO_INCREMENT PRIMARY KEY ,\n"
+    "    `enabled` INT NOT NULL DEFAULT '1',\n"
     "    `server` VARCHAR( 255 ) NOT NULL ,\n"
     "    `user` VARCHAR( 255 ) NOT NULL ,\n"
     "    `port` INT NOT NULL DEFAULT '0',\n"
@@ -112,6 +114,7 @@ static QueryTable_t defSchema[] = {
     "  `mailboxId` INT NOT NULL ,\n"
     "  `channelId` INT NOT NULL ,\n"
     "  `serverId` INT NOT NULL ,\n"
+    "  `enabled` INT NOT NULL DEFAULT '1',\n"
     "  `nick` VARCHAR( 64 ) NOT NULL ,\n"
     "  `format` TEXT NOT NULL\n"
     ") TYPE = MYISAM\n", NULL, NULL, FALSE }
@@ -129,20 +132,26 @@ static SchemaUpgrade_t schemaUpgrade[CURRENT_SCHEMA_MAILBOX] = {
         "  `nick` VARCHAR( 64 ) NOT NULL ,\n"
         "  `format` TEXT NOT NULL\n"
         ") TYPE = MYISAM\n", NULL, NULL, FALSE },
+      { NULL, NULL, NULL, FALSE } },
+    /* 2 -> 3 */
+    { { "ALTER TABLE `plugin_mailbox` ADD `enabled` INT NOT NULL DEFAULT '1' "
+        "AFTER `mailboxId`", NULL, NULL, FALSE },
+      { "ALTER TABLE `plugin_mailbox_report` ADD `enabled` INT NOT NULL "
+        "DEFAULT '1' AFTER `mailboxId`", NULL, NULL, FALSE },
       { NULL, NULL, NULL, FALSE } }
 };
 
 static QueryTable_t mailboxQueryTable[] = {
     /* 0 */
     { "SELECT mailboxId, server, port, user, password, protocol, options, "
-      "mailbox, pollInterval, lastCheck, lastRead FROM `plugin_mailbox` "
-      "ORDER BY `mailboxId` ASC", NULL, NULL, FALSE },
+      "mailbox, pollInterval, lastCheck, lastRead, enabled "
+      "FROM `plugin_mailbox` ORDER BY `mailboxId` ASC", NULL, NULL, FALSE },
     /* 1 */
     { "UPDATE `plugin_mailbox` SET `lastCheck` = ? WHERE `mailboxId` = ?", 
       NULL, NULL, FALSE },
     /* 2 */
-    { "SELECT channelId, serverId, nick, format FROM `plugin_mailbox_report` "
-      "WHERE mailboxId = ?", NULL, NULL, FALSE },
+    { "SELECT channelId, serverId, nick, format, enabled "
+      "FROM `plugin_mailbox_report` WHERE mailboxId = ?", NULL, NULL, FALSE },
     /* 3 */
     { "UPDATE `plugin_mailbox` SET `lastRead` = ? WHERE `mailboxId` = ?", 
       NULL, NULL, FALSE }
@@ -409,7 +418,7 @@ void *mailbox_thread(void *arg)
                         }
                     }
 
-                    if( !report->server ) {
+                    if( !report->server || !report->enabled ) {
                         continue;
                     }
 
@@ -754,7 +763,7 @@ static void result_load_mailboxes( MYSQL_RES *res, MYSQL_BIND *input,
         } else {
             mailbox->nextPoll = mailbox->lastCheck + mailbox->interval;
         }
-        mailbox->enabled   = TRUE;
+        mailbox->enabled   = ( atoi(row[11]) == 0 ? FALSE : TRUE );
         len = strlen(mailbox->server) + strlen(mailbox->options) + 
               strlen(mailbox->mailbox) + 4;
 
@@ -777,6 +786,10 @@ static void result_load_mailboxes( MYSQL_RES *res, MYSQL_BIND *input,
         item->item = (void *)mailbox;
         item->key  = (void *)&mailbox->mailboxId;
         BalancedBTreeAdd( mailboxTree, item, LOCKED, FALSE );
+
+        if( !mailbox->enabled ) {
+            continue;
+        }
 
         /* Setup the next poll */
         item = (BalancedBTreeItem_t *)malloc(sizeof(BalancedBTreeItem_t));
@@ -854,6 +867,7 @@ static void result_load_reports( MYSQL_RES *res, MYSQL_BIND *input,
         report->serverId  = atoi(row[1]);
         report->nick      = strdup(row[2]);
         report->format    = strdup(row[3]);
+        report->enabled   = ( atoi(row[4]) == 0 ? FALSE : TRUE );
 
         LinkedListAdd( mailbox->reports, (LinkedListItem_t *)report, LOCKED,
                        AT_TAIL );

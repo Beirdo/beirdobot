@@ -33,13 +33,14 @@
 static char db_schema_h_ident[] _UNUSED_ = 
     "$Id$";
 
-#define CURRENT_SCHEMA  9
+#define CURRENT_SCHEMA  10
 
 
 static QueryTable_t defCoreSchema[] = {
   { "CREATE TABLE `channels` (\n"
     "  `chanid` int(11) NOT NULL auto_increment,\n"
     "  `serverid` int(11) NOT NULL default '0',\n"
+    "  `enabled` int(11) NOT NULL default '1',\n"
     "  `channel` varchar(64) NOT NULL default '',\n"
     "  `notify` int(11) NOT NULL default '0',\n"
     "  `url` text NOT NULL,\n"
@@ -81,6 +82,7 @@ static QueryTable_t defCoreSchema[] = {
 
   { "CREATE TABLE `servers` (\n"
     "  `serverid` int(11) NOT NULL auto_increment,\n"
+    "  `enabled` int(11) NOT NULL default '1',\n"
     "  `server` varchar(255) NOT NULL default '',\n"
     "  `port` int(11) NOT NULL default '0',\n"
     "  `password` varchar(255) NOT NULL default '',\n"
@@ -118,12 +120,6 @@ static QueryTable_t defCoreSchema[] = {
     " `key` VARCHAR( 16 ) NOT NULL ,\n"
     " `keyIndex` INT NOT NULL ,\n"
     " PRIMARY KEY ( `username` )\n"
-    ") TYPE = MYISAM\n", NULL, NULL, FALSE },
-
-  { "CREATE TABLE `plugin_trac` (\n"
-    " `chanid` INT NOT NULL ,\n"
-    " `url` VARCHAR( 255 ) NOT NULL ,\n"
-    " PRIMARY KEY ( `chanid` )\n"
     ") TYPE = MYISAM\n", NULL, NULL, FALSE }
 };
 static int defCoreSchemaCount = NELEMENTS(defCoreSchema);

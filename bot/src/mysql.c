@@ -88,10 +88,10 @@ QueryTable_t    QueryTable[] = {
     /* 0 */
     { "SELECT `serverid`, `server`, `port`, `password`, `nick`, `username`, "
       "`realname`, `nickserv`, `nickservmsg`, `floodInterval`, `floodMaxTime`, "
-      "`floodBuffer`, `floodMaxLine` FROM `servers` ORDER BY `serverid`",
-      NULL, NULL, FALSE },
+      "`floodBuffer`, `floodMaxLine`, `enabled` FROM `servers` "
+      "ORDER BY `serverid`", NULL, NULL, FALSE },
     /* 1 */
-    { "SELECT `chanid`, `channel`, `url`, `notifywindow`, `cmdChar` "
+    { "SELECT `chanid`, `channel`, `url`, `notifywindow`, `cmdChar`, `enabled` "
       "FROM `channels` WHERE `serverid` = ? ORDER BY `chanid`", 
       NULL, NULL, FALSE },
     /* 2 */
@@ -1286,6 +1286,7 @@ void result_load_servers( MYSQL_RES *res, MYSQL_BIND *input, void *arg )
         server->floodMaxTime    = atoi(row[10]);
         server->floodBuffer     = atoi(row[11]);
         server->floodMaxLine    = atoi(row[12]);
+        server->enabled         = ( atoi(row[13]) == 0 ? FALSE : TRUE );
 
         if( server->floodInterval <= 0 ) {
             server->floodInterval = 1;
@@ -1348,6 +1349,7 @@ void result_load_channels( MYSQL_RES *res, MYSQL_BIND *input, void *arg )
         channel->url            = strdup(row[2]);
         channel->notifywindow   = atoi(row[3]);
         channel->cmdChar        = row[4][0];
+        channel->enabled        = ( atoi(row[5]) == 0 ? FALSE : TRUE );
         channel->server         = server;
         channel->joined         = false;
 
