@@ -6,14 +6,29 @@
 /* Define to 1 if you have the <inttypes.h> header file. */
 #undef HAVE_INTTYPES_H
 
+/* Define to 1 if you have the `aprutil-1' library (-laprutil-1). */
+#undef HAVE_LIBAPRUTIL_1
+
+/* Define to 1 if you have the `apr-1' library (-lapr-1). */
+#undef HAVE_LIBAPR_1
+
 /* Define to 1 if you have the `curl' library (-lcurl). */
 #undef HAVE_LIBCURL
+
+/* Define to 1 if you have the `c-client' library (-lc-client). */
+#undef HAVE_LIBC_CLIENT
 
 /* Define to 1 if you have the `mysqlclient' library (-lmysqlclient). */
 #undef HAVE_LIBMYSQLCLIENT
 
 /* Define to 1 if you have the `pcre' library (-lpcre). */
 #undef HAVE_LIBPCRE
+
+/* Define to 1 if you have the `resolv' library (-lresolv). */
+#undef HAVE_LIBRESOLV
+
+/* Define to 1 if you have the `svn_client-1' library (-lsvn_client-1). */
+#undef HAVE_LIBSVN_CLIENT_1
 
 /* Define to 1 if your system has a GNU libc compatible `malloc' function, and
    to 0 otherwise. */
@@ -74,8 +89,29 @@
 /* Define to the version of this package. */
 #undef PACKAGE_VERSION
 
+/* To enable the compilation of the dns plugin */
+#undef PLUGIN_DNS
+
+/* To enable the compilation of the fart plugin */
+#undef PLUGIN_FART
+
 /* To enable the compilation of the luascript plugin */
 #undef PLUGIN_LUASCRIPT
+
+/* To enable the compilation of the mailbox plugin */
+#undef PLUGIN_MAILBOX
+
+/* To enable the compilation of the rssfeed plugin */
+#undef PLUGIN_RSSFEED
+
+/* To enable the compilation of the trac plugin */
+#undef PLUGIN_TRAC
+
+/* To enable the compilation of the trout plugin */
+#undef PLUGIN_TROUT
+
+/* To enable the compilation of the url plugin */
+#undef PLUGIN_URL
 
 /* Define as the return type of signal handlers (`int' or `void'). */
 #undef RETSIGTYPE

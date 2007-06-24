@@ -32,6 +32,7 @@
 
 #include "environment.h"
 #include "structs.h"
+#include "config.h"
 
 /* CVS generated ID string (optional for h files) */
 static char plugin_list_h_ident[] _UNUSED_ = 
@@ -39,15 +40,31 @@ static char plugin_list_h_ident[] _UNUSED_ =
 
 #ifdef _DEFINE_PLUGINS
 static PluginDef_t DefaultPlugins[] = {
+#ifdef PLUGIN_TROUT
     { "trout",      "plugin_trout.so",      1,  "" },
+#endif
+#ifdef PLUGIN_FART
     { "fart",       "plugin_fart.so",       0,  "" },
+#endif
     { "core",       "plugin_core.so",       1,  "" },
+#ifdef PLUGIN_DNS
     { "dns",        "plugin_dns.so",        1,  "" },
+#endif
+#ifdef PLUGIN_RSSFEED
     { "rssfeed",    "plugin_rssfeed.so",    0,  "" },
+#endif
+#ifdef PLUGIN_LUASCRIPT
     { "luascript",  "plugin_luascript.so",  0,  "" },
+#endif
+#ifdef PLUGIN_MAILBOX
     { "mailbox",    "plugin_mailbox.so",    0,  "" },
+#endif
+#ifdef PLUGIN_TRAC
     { "trac",       "plugin_trac.so",       0,  "" },
+#endif
+#ifdef PLUGIN_URL
     { "url",        "plugin_url.so",        0,  "" },
+#endif
 };
 static int DefaultPluginCount = NELEMENTS(DefaultPlugins);
 #endif
