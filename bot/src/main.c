@@ -61,6 +61,7 @@ bool        GlobalAbort;
 bool        BotDone;
 pthread_t   mainThreadId;
 
+void mainSighup( int signum, void *arg );
 void LogBanner( void );
 void MainParseArgs( int argc, char **argv );
 void MainDisplayUsage( char *program, char *errorMsg );
@@ -128,7 +129,7 @@ int main ( int argc, char **argv )
     /* Start up the Logging thread */
     logging_initialize();
 
-    thread_register( &mainThreadId, "thread_main", NULL, NULL );
+    thread_register( &mainThreadId, "thread_main", mainSighup, NULL );
 
     /* Setup signal handler for SIGUSR1 (toggles Debug) */
     sa.sa_sigaction = (sigAction_t)logging_toggle_debug;
@@ -400,11 +401,14 @@ void signal_everyone( int signum, siginfo_t *info, void *secret )
 
     sigFunc = ThreadGetHandler( myThreadId, signum, &arg );
     if( sigFunc ) {
+        if( signum == SIGUSR2 ) {
 #ifdef OLD_IP
-        sigFunc( signum, (void *)uc->uc_mcontext.gregs[OLD_IP], arg );
+            arg = (void *)uc->uc_mcontext.gregs[OLD_IP];
 #else
-        sigFunc( signum, NULL, arg );
+            arg = NULL;
 #endif
+        }
+        sigFunc( signum, arg );
     }
 }
 
@@ -434,9 +438,9 @@ void signal_death( int signum, siginfo_t *info, void *secret )
 #endif
 
 #ifdef OLD_IP
-    do_backtrace( signum, (void *)uc->uc_mcontext.gregs[OLD_IP], NULL );
+    do_backtrace( signum, (void *)uc->uc_mcontext.gregs[OLD_IP] );
 #else
-    do_backtrace( signum, NULL, NULL );
+    do_backtrace( signum, NULL );
 #endif
 
     /* Spew all remaining messages */
@@ -446,7 +450,7 @@ void signal_death( int signum, siginfo_t *info, void *secret )
     abort();
 }
 
-void do_backtrace( int signum, void *ip, void *arg )
+void do_backtrace( int signum, void *ip )
 {
     void               *array[100];
     size_t              size;
@@ -523,6 +527,15 @@ void MainDelayExit( void )
     /* And finally... die */
     _exit( 0 );
 }
+
+void mainSighup( int signum, void *arg )
+{
+    LogPrint( LOG_DEBUG, "Main received signal %d", signum );
+    /*
+     * Need to rescan the plugins
+     */
+}
+
 
 
 /*

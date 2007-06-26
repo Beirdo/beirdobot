@@ -58,7 +58,7 @@ LinkedList_t   *ServerList;
 bool            ChannelsLoaded = FALSE;
 
 void *bot_server_thread(void *arg);
-void botSighup( int signum, void *ip, void *arg );
+void botSighup( int signum, void *arg );
 
 
 void ProcOnConnected(BN_PInfo I, const char HostName[])
@@ -151,7 +151,7 @@ void ProcOnError(BN_PInfo I, int err)
         LogPrint( LOG_DEBUG, "Event Error : %s (%d) : Server %s", 
                              strerror(err), err, server->server );
 
-        do_backtrace( 0, NULL, NULL );
+        do_backtrace( 0, NULL );
     }
 }
 
@@ -804,7 +804,7 @@ void LoggedActionMessage( IRCServer_t *server, IRCChannel_t *channel,
     db_update_nick( channel, server->nick, true, false );
 }
 
-void botSighup( int signum, void *ip, void *arg )
+void botSighup( int signum, void *arg )
 {
     IRCServer_t    *server;
 
@@ -815,6 +815,15 @@ void botSighup( int signum, void *ip, void *arg )
 
     LogPrint( LOG_DEBUG, "Bot %s@%s:%d received signal %d", server->nick,
                          server->server, server->port, signum );
+
+    /* Reload info for this server */
+    
+    /* If it is now disabled, quit, kill threads */
+    
+    /*
+     * Check each channel on the server, leave those no longer needed, join
+     * new ones
+     */
 }
 
 

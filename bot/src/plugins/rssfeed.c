@@ -140,7 +140,7 @@ typedef struct {
 
 
 /* INTERNAL FUNCTION PROTOTYPES */
-void rssfeedSighup( int signum, void *ip, void *arg );
+void rssfeedSighup( int signum, void *arg );
 void botCmdRssfeed( IRCServer_t *server, IRCChannel_t *channel, char *who, 
                     char *msg, void *tag );
 char *botHelpRssfeed( void *tag );
@@ -493,9 +493,15 @@ void *rssfeed_thread(void *arg)
     return( NULL );
 }
 
-void rssfeedSighup( int signum, void *ip, void *arg )
+void rssfeedSighup( int signum, void *arg )
 {
     LogPrint( LOG_DEBUG, "RSSfeed received signal %d", signum );
+
+    /* Reload the RSS Feeds */
+
+    /* Disable any not any longer in use */
+
+    /* Enable new ones */
 }
 
 

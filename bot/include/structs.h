@@ -295,7 +295,7 @@ typedef struct _QueryItem_t {
     unsigned int        querySequence;
 } QueryItem_t;
 
-typedef void (*SigFunc_t)( int, void *, void * );
+typedef void (*SigFunc_t)( int, void * );
 
 #endif
 

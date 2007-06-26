@@ -167,7 +167,7 @@ unsigned long mysql_get_server_version(MYSQL *mysql);
 my_bool mysql_thread_init(void);
 #endif
 
-void do_backtrace( int signum, void *ip, void *arg );
+void do_backtrace( int signum, void *ip );
 
 
 #endif

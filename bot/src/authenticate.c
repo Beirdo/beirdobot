@@ -49,7 +49,6 @@ static int changed(AuthData_t *auth, char *nick);
 extern int __opieparsechallenge(char *buffer, int *algorithm, int *sequence, 
                                 char **seed, int *exts);
 
-void authenticateSighup( int signum, void *ip, void *arg );
 void *authenticate_thread(void *arg);
 char *auth_user_challenge( AuthData_t **pAuth, char *nick );
 bool auth_user_verify( AuthData_t **pAuth, char *nick, char *response );
@@ -293,7 +292,7 @@ static int changed(AuthData_t *auth, char *nick)
 void authenticate_start(void)
 {
     thread_create( &authentThreadId, authenticate_thread, NULL, 
-                   "thread_authenticate", authenticateSighup, NULL );
+                   "thread_authenticate", NULL, NULL );
 }
 
 void *authenticate_thread(void *arg)
@@ -454,11 +453,6 @@ void authenticate_state_machine( IRCServer_t *server, IRCChannel_t *channel,
     default:
         break;
     }
-}
-
-void authenticateSighup( int signum, void *ip, void *arg )
-{
-    LogPrint( LOG_DEBUG, "Authenticate received signal %d", signum );
 }
 
 

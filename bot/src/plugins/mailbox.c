@@ -159,7 +159,7 @@ static QueryTable_t mailboxQueryTable[] = {
 
 
 /* INTERNAL FUNCTION PROTOTYPES */
-void mailboxSighup( int signum, void *ip, void *arg );
+void mailboxSighup( int signum, void *arg );
 void botCmdMailbox( IRCServer_t *server, IRCChannel_t *channel, char *who, 
                     char *msg, void *tag );
 char *botHelpMailbox( void *tag );
@@ -502,9 +502,15 @@ void *mailbox_thread(void *arg)
     return( NULL );
 }
 
-void mailboxSighup( int signum, void *ip, void *arg )
+void mailboxSighup( int signum, void *arg )
 {
     LogPrint( LOG_DEBUG, "Mailbox received signal %d", signum );
+    
+    /* Reload the mailbox info */
+
+    /* Disable any that are no longer in use */
+
+    /* Enable any new ones */
 }
 
 void botCmdMailbox( IRCServer_t *server, IRCChannel_t *channel, char *who, 

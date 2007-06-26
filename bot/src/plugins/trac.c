@@ -48,7 +48,7 @@
 #include <curl/curl.h>
 
 /* INTERNAL FUNCTION PROTOTYPES */
-void tracSighup( int signum, void *ip, void *arg);
+void tracSighup( int signum, void *arg);
 void regexpFuncTicket( IRCServer_t *server, IRCChannel_t *channel, char *who, 
                        char *msg, IRCMsgType_t type, int *ovector, int ovecsize,
                        void *tag );
@@ -158,11 +158,15 @@ typedef struct {
 static char    *ticketRegexp = "(?i)(?:\\s|^)\\#(\\d+)(?:\\s|$)";
 static char    *changesetRegexp = "(?i)(?:\\s|^)\\[(\\d+)\\](?:\\s|$)";
 static char    *channelRegexp = NULL;
+static bool     commandInit = FALSE;
 
 pthread_t           tracThreadId;
 static bool         threadAbort = FALSE;
 BalancedBTree_t    *urlTree;
 static bool         apr_initialized = FALSE;
+static pthread_mutex_t  shutdownMutex;
+static pthread_mutex_t  signalMutex;
+static pthread_cond_t   kickCond;
 
 int my_svn_initialize( TracURL_t *tracItem );
 char *tracDetailsTicket( TracURL_t *tracItem, int number );
@@ -181,6 +185,10 @@ void plugin_initialize( char *args )
     atexit( uninit_apr );
     apr_initialized = TRUE;
 
+    pthread_mutex_init( &shutdownMutex, NULL );
+    pthread_mutex_init( &signalMutex, NULL );
+    pthread_cond_init( &kickCond, NULL );
+
     thread_create( &tracThreadId, trac_thread, NULL, "thread_trac", 
                    tracSighup, NULL );
 }
@@ -191,14 +199,26 @@ void plugin_shutdown( void )
     TracURL_t              *tracItem;
 
     LogPrintNoArg( LOG_NOTICE, "Removing trac..." );
-    if( channelRegexp ) {
+    if( commandInit ) {
         botCmd_remove( "trac" );
+    }
+
+    if( channelRegexp ) {
         regexp_remove( channelRegexp, ticketRegexp );
         regexp_remove( channelRegexp, changesetRegexp );
         free( channelRegexp );
     }
 
     threadAbort = TRUE;
+
+    /* Kick the thread to tell it it can quit now */
+    pthread_mutex_lock( &signalMutex );
+    pthread_cond_broadcast( &kickCond );
+    pthread_mutex_unlock( &signalMutex );
+
+    /* Clean up stuff once the thread stops */
+    pthread_mutex_lock( &shutdownMutex );
+    pthread_mutex_destroy( &shutdownMutex );
 
     if( urlTree ) {
         BalancedBTreeLock( urlTree );
@@ -240,14 +260,12 @@ void *trac_thread(void *arg)
     int                     len;
     static char            *command = "trac";
 
-    while( !threadAbort ) {
+    while( !GlobalAbort && !threadAbort ) {
         if( !ChannelsLoaded ) {
             sleep( 5 );
             continue;
         }
         
-        threadAbort = TRUE;
-
         BalancedBTreeLock( urlTree );
         if( !urlTree->root ) {
             LogPrintNoArg( LOG_INFO, "No Channels defined for Trac, "
@@ -277,15 +295,41 @@ void *trac_thread(void *arg)
                     regexpFuncTicket, NULL );
         regexp_add( (const char *)channelRegexp, (const char *)changesetRegexp,
                     regexpFuncChangeset, NULL );
-        botCmd_add( (const char **)&command, botCmdTrac, botHelpTrac, NULL );
+        if( !commandInit ) {
+            botCmd_add( (const char **)&command, botCmdTrac, botHelpTrac, 
+                        NULL );
+            commandInit = TRUE;
+        }
+
+        pthread_mutex_lock( &signalMutex );
+        pthread_cond_wait( &kickCond, &signalMutex );
+        pthread_mutex_unlock( &signalMutex );
+
+        if( !GlobalAbort && !threadAbort ) {
+            /* reload stuff */
+            
+            /* regenerate the channel regexp */
+            if( channelRegexp ) {
+                regexp_remove( channelRegexp, ticketRegexp );
+                regexp_remove( channelRegexp, changesetRegexp );
+                free( channelRegexp );
+                channelRegexp = NULL;
+            }
+        }
     }
 
+    pthread_mutex_unlock( &shutdownMutex );
     return( NULL );
 }
 
-void tracSighup( int signum, void *ip, void *arg)
+void tracSighup( int signum, void *arg)
 {
     LogPrint( LOG_DEBUG, "Trac received signal %d", signum );
+
+    /* kick the thread */
+    pthread_mutex_lock( &signalMutex );
+    pthread_cond_broadcast( &kickCond );
+    pthread_mutex_unlock( &signalMutex );
 }
 
 
