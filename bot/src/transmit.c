@@ -195,6 +195,13 @@ void *transmit_thread(void *arg)
     LogPrint( LOG_NOTICE, "Ending transmit thread - %s", 
                           server->txThreadName );
 
+    snprintf(string, MAX_STRING_LENGTH, ":%s", 
+                     "Received SIGINT, shutting down");
+    msg = BN_MakeMessage(NULL, "QUIT", string);
+    BN_SendMessage( &server->ircInfo, msg, BN_LOW_PRIORITY );
+
+    sleep( 1 );
+
     /* Close the server socket to expedite killing the server thread */
     sock = server->ircInfo.Socket;
     server->ircInfo.Socket = 0;

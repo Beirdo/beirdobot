@@ -470,7 +470,9 @@ void do_backtrace( int signum, void *args )
 
 void MainDelayExit( void )
 {
+#if 0
     int         i;
+#endif
     pthread_t   shutdownThreadId;
 
     LogPrintNoArg( LOG_CRIT, "Shutting down" );
@@ -493,9 +495,15 @@ void MainDelayExit( void )
                    NULL );
 
     /* Delay to allow all the other tasks to finish (esp. logging!) */
+#if 0
     for( i = 15; i && !BotDone; i-- ) {
         sleep(1);
     }
+#endif
+
+    LogPrint(LOG_DEBUG, "Sleeping %d""s", 3 );
+    sleep(3);
+    LogFlushOutput();
 
     /* And finally... die */
     _exit( 0 );

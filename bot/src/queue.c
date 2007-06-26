@@ -47,6 +47,8 @@ static char ident[] _UNUSED_ =
 
 static void QueueConditionUpdate( QueueObject_t *queue );
 
+extern QueueObject_t *LoggingQ;
+
 LinkedList_t   *QueueList = NULL;
 
 QueueObject_t * QueueCreate( uint32 numElements )
@@ -270,7 +272,7 @@ QueueItem_t QueueDequeueItem( QueueObject_t *queue, int32 ms_timeout )
             status = pthread_cond_wait( queue->cNotEmpty, queue->mutex );
         }
 
-        if( GlobalAbort )
+        if( GlobalAbort && queue != LoggingQ )
         {
             /* The program is trying to shut down, don't dequeue anything */
             status = pthread_mutex_unlock( queue->mutex );
@@ -467,6 +469,11 @@ void QueueKillAll( void )
     LinkedListLock(QueueList);
     for (listItem = QueueList->head; listItem; listItem = listItem->next) {
         queue = (QueueObject_t *) listItem;
+
+        /* We don't want to flush the log messages */
+        if( queue == LoggingQ ) {
+            continue;
+        }
 
         /*
          * To allow all listeners to wake up and hear the GlobalAbort,

@@ -689,17 +689,7 @@ void *bot_server_thread(void *arg)
                   server->port, server->nick);
 
         if( GlobalAbort ) {
-            if( server->channels ) {
-                LinkedListLock( server->channels );
-                for( item = server->channels->head; item ; item = item->next ) {
-                    channel = (IRCChannel_t *)item;
-                    db_nick_history( channel, NULL, HIST_END );
-                }
-                LinkedListUnlock( server->channels );
-            }
-            LogPrint( LOG_NOTICE, "Killing thread for %s@%s:%d", server->nick,
-                      server->server, server->port );
-            return( NULL );
+            break;
         }
 
         sleep(10);
@@ -718,6 +708,17 @@ void *bot_server_thread(void *arg)
                   server->port, server->nick);
     }
 
+    if( server->channels ) {
+        LinkedListLock( server->channels );
+        for( item = server->channels->head; item ; item = item->next ) {
+            channel = (IRCChannel_t *)item;
+            db_nick_history( channel, NULL, HIST_END );
+        }
+        LinkedListUnlock( server->channels );
+    }
+
+    LogPrint( LOG_NOTICE, "Exiting thread for %s@%s:%d", server->nick,
+                          server->server, server->port );
     return(NULL);
 }
 

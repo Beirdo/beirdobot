@@ -83,9 +83,10 @@ static char ident[] _UNUSED_ =
 LogLevel_t LogLevel = LOG_UNKNOWN;  /**< The log level mask to apply, messages
                                          must be at at least this priority to
                                          be output */
-QueueObject_t  *LoggingQ;
-LinkedList_t   *LogList;
-pthread_t       loggingThreadId;
+QueueObject_t      *LoggingQ;
+LinkedList_t       *LogList;
+pthread_t           loggingThreadId;
+extern pthread_t    mainThreadId;
 
 /**
  * @brief Formats and enqueues a log message for the Logging thread
@@ -152,6 +153,10 @@ void logging_initialize( void )
 
 void logging_toggle_debug( int signum, void *info, void *secret )
 {
+    if( !pthread_equal( pthread_self(), mainThreadId ) ) {
+        return;
+    }
+
     if( Debug ) {
         /* We are turning OFF debug logging */
         LogPrintNoArg( LOG_CRIT, "Received SIGUSR1, disabling debug logging" );

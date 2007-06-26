@@ -302,7 +302,6 @@ void pluginUnloadTree( BalancedBTreeItem_t *node )
     plugin = (Plugin_t *)node->item;
 
     if( plugin->loaded ) {
-        LogPrint( LOG_DEBUG, "Unloaded module %s", plugin->name );
         pluginUnloadItem( plugin );
     }
 

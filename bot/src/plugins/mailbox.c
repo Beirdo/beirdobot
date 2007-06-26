@@ -357,7 +357,7 @@ void *mailbox_thread(void *arg)
 
         /* Trigger all mailboxes expired or to expire in <= 15s */
         BalancedBTreeLock( mailboxActiveTree );
-        for( done = FALSE; item && !done && !threadAbort ; 
+        for( done = FALSE; item && !done && !threadAbort && !GlobalAbort; 
              item = BalancedBTreeFindLeast( mailboxActiveTree->root ) ) {
             gettimeofday( &now, NULL );
             mailbox = (Mailbox_t *)item->item;
@@ -367,6 +367,10 @@ void *mailbox_thread(void *arg)
             if( mailbox->nextPoll > now.tv_sec + 15 ) {
                 delta = mailbox->nextPoll - now.tv_sec;
                 done = TRUE;
+                continue;
+            }
+
+            if( GlobalAbort || threadAbort ) {
                 continue;
             }
 
@@ -387,9 +391,18 @@ void *mailbox_thread(void *arg)
             mailbox->lastCheck = now.tv_sec;
             db_update_lastpoll( mailbox->mailboxId, now.tv_sec );
 
+            if( GlobalAbort || threadAbort ) {
+                continue;
+            }
+
             if( !mail_ping( mailbox->stream ) ) {
                 mail_open( mailbox->stream, mailbox->serverSpec, 0 );
             }
+
+            if( GlobalAbort || threadAbort ) {
+                continue;
+            }
+
             mail_status( mailbox->stream, mailbox->serverSpec, 
                          SA_MESSAGES | SA_UNSEEN );
 
@@ -397,11 +410,17 @@ void *mailbox_thread(void *arg)
                 if( !mailbox->messageList ) {
                     mailbox->messageList = LinkedListCreate();
                 }
+
+                if( GlobalAbort || threadAbort ) {
+                    continue;
+                }
+
                 mail_search_full( mailbox->stream, NULL, &searchProgram, 
                                   SE_UID );
 
                 LinkedListLock( mailbox->reports );
-                for( rptItem = mailbox->reports->head; rptItem; 
+                for( rptItem = mailbox->reports->head; 
+                     rptItem && !GlobalAbort && !threadAbort; 
                      rptItem = rptItem->next ) {
                     report = (MailboxReport_t *)rptItem;
 
@@ -424,6 +443,10 @@ void *mailbox_thread(void *arg)
                     }
 
                     /* Do the report! */
+                    if( GlobalAbort || threadAbort ) {
+                        continue;
+                    }
+
                     mailboxReport( mailbox, report );
 
                     gettimeofday( &now, NULL );
@@ -435,7 +458,8 @@ void *mailbox_thread(void *arg)
 
             if( mailbox->messageList ) {
                 LinkedListLock( mailbox->messageList );
-                while( mailbox->messageList->head ) {
+                while( mailbox->messageList->head && !GlobalAbort && 
+                       !threadAbort ) {
                     listItem = mailbox->messageList->head;
                     msg = (MailboxUID_t *)listItem;
 
@@ -461,12 +485,14 @@ void *mailbox_thread(void *arg)
         ts.tv_sec  = now.tv_sec + delta;
         ts.tv_nsec = now.tv_usec * 1000;
 
-        pthread_mutex_lock( &signalMutex );
-        retval = pthread_cond_timedwait( &kickCond, &signalMutex, &ts );
-        pthread_mutex_unlock( &signalMutex );
+        if( !GlobalAbort && !threadAbort ) {
+            pthread_mutex_lock( &signalMutex );
+            retval = pthread_cond_timedwait( &kickCond, &signalMutex, &ts );
+            pthread_mutex_unlock( &signalMutex );
 
-        if( retval != ETIMEDOUT ) {
-            LogPrintNoArg( LOG_NOTICE, "Mailbox: thread woken up early" );
+            if( retval != ETIMEDOUT ) {
+                LogPrintNoArg( LOG_NOTICE, "Mailbox: thread woken up early" );
+            }
         }
     }
 

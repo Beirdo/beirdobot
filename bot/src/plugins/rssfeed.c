@@ -305,7 +305,7 @@ void *rssfeed_thread(void *arg)
         /* Trigger all feeds expired or to expire in <= 15s */
         BalancedBTreeLock( rssfeedActiveTree );
         BalancedBTreeLock( rssItemTree );
-        for( done = FALSE; item && !done && !threadAbort ; 
+        for( done = FALSE; item && !done && !threadAbort && !GlobalAbort; 
              item = BalancedBTreeFindLeast( rssfeedActiveTree->root ) ) {
             gettimeofday( &now, NULL );
             feed = (RssFeed_t *)item->item;
@@ -345,6 +345,10 @@ void *rssfeed_thread(void *arg)
             BalancedBTreeAdd( rssfeedActiveTree, item, LOCKED, FALSE );
 
             lastPost = feed->lastPost;
+
+            if( GlobalAbort || threadAbort ) {
+                continue;
+            }
 
             ret = mrss_parse_url_auth( feed->url, &data, feed->userpass, 
                                        feed->authtype );
@@ -422,7 +426,7 @@ void *rssfeed_thread(void *arg)
         BalancedBTreeUnlock( rssfeedActiveTree );
 
         for( item = BalancedBTreeFindLeast( rssItemTree->root ) ;
-             item && !threadAbort ; 
+             item && !threadAbort && !GlobalAbort; 
              item = BalancedBTreeFindLeast( rssItemTree->root ) ) {
 
             itemData = (RssItem_t *)item->item;
@@ -472,12 +476,14 @@ void *rssfeed_thread(void *arg)
         ts.tv_sec  = now.tv_sec + delta;
         ts.tv_nsec = now.tv_usec * 1000;
 
-        pthread_mutex_lock( &signalMutex );
-        retval = pthread_cond_timedwait( &kickCond, &signalMutex, &ts );
-        pthread_mutex_unlock( &signalMutex );
+        if( !GlobalAbort && !threadAbort ) {
+            pthread_mutex_lock( &signalMutex );
+            retval = pthread_cond_timedwait( &kickCond, &signalMutex, &ts );
+            pthread_mutex_unlock( &signalMutex );
 
-        if( retval != ETIMEDOUT ) {
-            LogPrintNoArg( LOG_NOTICE, "RSS: thread woken up early" );
+            if( retval != ETIMEDOUT ) {
+                LogPrintNoArg( LOG_NOTICE, "RSS: thread woken up early" );
+            }
         }
     }
 
