@@ -180,7 +180,7 @@ void plugin_initialize( char *args )
     atexit( uninit_apr );
     apr_initialized = TRUE;
 
-    thread_create( &tracThreadId, trac_thread, NULL, "thread_trac" );
+    thread_create( &tracThreadId, trac_thread, NULL, "thread_trac", NULL );
 }
 
 void plugin_shutdown( void )

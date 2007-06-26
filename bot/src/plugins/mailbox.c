@@ -211,7 +211,8 @@ void plugin_initialize( char *args )
     pthread_mutex_init( &signalMutex, NULL );
     pthread_cond_init( &kickCond, NULL );
 
-    thread_create( &mailboxThreadId, mailbox_thread, NULL, "thread_mailbox" );
+    thread_create( &mailboxThreadId, mailbox_thread, NULL, "thread_mailbox",
+                   NULL );
     botCmd_add( (const char **)&command, botCmdMailbox, botHelpMailbox, NULL );
 }
 

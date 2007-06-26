@@ -301,7 +301,7 @@ void db_setup(void)
     QueryQ = QueueCreate( 1024 );
 
     /* Start the thread */
-    thread_create( &sqlThreadId, mysql_thread, NULL, "thread_mysql" );
+    thread_create( &sqlThreadId, mysql_thread, NULL, "thread_mysql", NULL );
 }
 
 bool db_server_connect( MYSQL *mysql )

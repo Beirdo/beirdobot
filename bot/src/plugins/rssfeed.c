@@ -183,7 +183,8 @@ void plugin_initialize( char *args )
     pthread_mutex_init( &signalMutex, NULL );
     pthread_cond_init( &kickCond, NULL );
 
-    thread_create( &rssfeedThreadId, rssfeed_thread, NULL, "thread_rssfeed" );
+    thread_create( &rssfeedThreadId, rssfeed_thread, NULL, "thread_rssfeed",
+                   NULL );
     botCmd_add( (const char **)&command, botCmdRssfeed, botHelpRssfeed, NULL );
 }
 

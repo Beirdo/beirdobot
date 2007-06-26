@@ -100,7 +100,7 @@ void plugin_initialize( char *args )
     LogPrintNoArg( LOG_NOTICE, "Initializing dns..." );
 
     pthread_mutex_init( &shutdownMutex, NULL );
-    thread_create( &dnsThreadId, dns_thread, NULL, "thread_dns" );
+    thread_create( &dnsThreadId, dns_thread, NULL, "thread_dns", NULL );
 
     dnsTypeTree = BalancedBTreeCreate( BTREE_KEY_STRING );
     dnsTypeNumTree = BalancedBTreeCreate( BTREE_KEY_INT );

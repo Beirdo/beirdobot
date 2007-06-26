@@ -36,7 +36,6 @@
 #endif
 #include <string.h>
 #include <strings.h>
-#include <execinfo.h>
 #include <stdio.h>
 #include <stdlib.h>
 #ifdef __unix__
@@ -144,10 +143,6 @@ void ProcOnUnknown(BN_PInfo I, const char Who[], const char Command[],
 void ProcOnError(BN_PInfo I, int err)
 {
     IRCServer_t        *server;
-    void               *array[100];
-    size_t              size;
-    char              **strings;
-    size_t              i;
 
     if( verbose || 1 ) {
         server = (IRCServer_t *)I->User;
@@ -155,16 +150,7 @@ void ProcOnError(BN_PInfo I, int err)
         LogPrint( LOG_DEBUG, "Event Error : %s (%d) : Server %s", 
                              strerror(err), err, server->server );
 
-        size = backtrace( array, 100 );
-        strings = backtrace_symbols( array, size );
-
-        LogPrint( LOG_DEBUG, "Obtained %zd stack frames.", size );
-
-        for( i = 0; i < size; i++ ) {
-            LogPrint( LOG_DEBUG, "%s", strings[i] );
-        }
-
-        free( strings );
+        do_backtrace( 0, NULL );
     }
 }
 
@@ -615,9 +601,9 @@ void bot_start(void)
         if( server->enabled ) {
             server->txQueue = QueueCreate( 1024 );
             thread_create( &server->txThreadId, transmit_thread, 
-                           (void *)server, server->txThreadName );
+                           (void *)server, server->txThreadName, NULL );
             thread_create( &server->threadId, bot_server_thread, 
-                           (void *)server, server->threadName );
+                           (void *)server, server->threadName, NULL );
         }
     }
     LinkedListUnlock( ServerList );

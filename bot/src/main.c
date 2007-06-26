@@ -36,6 +36,8 @@
 #include <errno.h>
 #include <getopt.h>
 #include <sys/types.h>
+#include <execinfo.h>
+#include <ucontext.h>
 #include "botnet.h"
 #include "protos.h"
 #include "release.h"
@@ -61,13 +63,18 @@ pthread_t   mainThreadId;
 void LogBanner( void );
 void MainParseArgs( int argc, char **argv );
 void MainDisplayUsage( char *program, char *errorMsg );
-void signal_interrupt( int signum );
+void signal_interrupt( int signum, siginfo_t *info, void *secret );
+void signal_everyone( int signum, siginfo_t *info, void *secret );
 void MainDelayExit( void );
+
+typedef void (*sigAction_t)(int, siginfo_t *, void *);
 
 int main ( int argc, char **argv )
 {
     pthread_mutex_t     spinLockMutex;
     pid_t               childPid;
+    struct sigaction    sa;
+    sigset_t            sigmsk;
 
     GlobalAbort = false;
 
@@ -99,19 +106,45 @@ int main ( int argc, char **argv )
 
     mainThreadId = pthread_self();
 
+    /* 
+     * Setup the sigmasks for this thread (which is the parent to all others) 
+     */
+    sigfillset( &sigmsk );
+    sigdelset( &sigmsk, SIGUSR1 );
+    sigdelset( &sigmsk, SIGUSR2 );
+    sigdelset( &sigmsk, SIGHUP );
+    sigdelset( &sigmsk, SIGINT );
+    sigdelset( &sigmsk, SIGSEGV );
+    sigdelset( &sigmsk, SIGILL );
+    sigdelset( &sigmsk, SIGFPE );
+    pthread_sigmask( SIG_SETMASK, &sigmsk, NULL );
+
     /* Start up the Logging thread */
     logging_initialize();
 
-    thread_register( &mainThreadId, "thread_main" );
+    thread_register( &mainThreadId, "thread_main", NULL );
 
     /* Setup signal handler for SIGUSR1 (toggles Debug) */
-    signal( SIGUSR1, logging_toggle_debug );
+    sa.sa_sigaction = (sigAction_t)logging_toggle_debug;
+    sigemptyset( &sa.sa_mask );
+    sa.sa_flags = SA_RESTART;
+    sigaction( SIGUSR1, &sa, NULL );
 
     /* Setup the exit handler */
     atexit( MainDelayExit );
 
-    /* Setup signal handler for SIGINT (shut down cleanly */
-    signal( SIGINT, signal_interrupt );
+    /* Setup signal handler for SIGINT (shut down cleanly) */
+    sa.sa_sigaction = signal_interrupt;
+    sigemptyset( &sa.sa_mask );
+    sa.sa_flags = SA_RESTART;
+    sigaction( SIGINT, &sa, NULL );
+    
+    /* Setup signal handlers that are to be propogated to all threads */
+    sa.sa_sigaction = signal_everyone;
+    sigemptyset( &sa.sa_mask );
+    sa.sa_flags = SA_RESTART | SA_SIGINFO;
+    sigaction( SIGUSR2, &sa, NULL );
+    sigaction( SIGHUP, &sa, NULL );
 
     /* Print the startup log messages */
     LogBanner();
@@ -309,7 +342,7 @@ void MainDisplayUsage( char *program, char *errorMsg )
                "\t-h or --help\tshow this help text\n\n" );
 }
 
-void signal_interrupt( int signum )
+void signal_interrupt( int signum, siginfo_t *info, void *secret )
 {
     extern const char *const sys_siglist[];
 
@@ -317,6 +350,83 @@ void signal_interrupt( int signum )
         LogPrint( LOG_CRIT, "Received signal: %s", sys_siglist[signum] );
         exit( 0 );
     }
+}
+
+#ifdef REG_EIP
+ #define OLD_IP REG_EIP
+#else
+ #ifdef REG_RIP
+  #define OLD_IP REG_RIP
+ #endif
+#endif
+
+void signal_everyone( int signum, siginfo_t *info, void *secret )
+{
+    extern const char *const    sys_siglist[];
+    SigFunc_t                   sigFunc;
+    pthread_t                   myThreadId;
+    ucontext_t                 *uc;
+
+    uc = (ucontext_t *)secret;
+    myThreadId = pthread_self();
+
+    if( pthread_equal( myThreadId, mainThreadId ) ) {
+        LogPrint( LOG_CRIT, "Received signal: %s", sys_siglist[signum] );
+
+        ThreadAllKill( signum );
+
+    }
+
+    sigFunc = ThreadGetHandler( myThreadId, signum );
+    if( sigFunc ) {
+#ifdef OLD_IP
+        sigFunc( signum, (void *)uc->uc_mcontext.gregs[OLD_IP] );
+#else
+        sigFunc( signum, NULL );
+#endif
+    }
+}
+
+void do_backtrace( int signum, void *args )
+{
+    void               *array[100];
+    size_t              size;
+    char              **strings;
+    size_t              i;
+    char               *name;
+    static char        *unknown = "unknown";
+
+    if( args ) {
+        /* This was a signal, so print the thread name */
+        name = thread_name( pthread_self() );
+        if( !name ) {
+            name = unknown;
+        }
+        LogPrint( LOG_DEBUG, "Thread: %s backtrace", name );
+    } else {
+        name = NULL;
+    }
+
+    size = backtrace( array, 100 );
+
+#if 0
+    /* replace the sigaction/pthread_kill with the caller's address */
+    if( args ) {
+        array[1] = args;
+    }
+#endif
+
+    strings = backtrace_symbols( array, size );
+
+    LogPrint( LOG_DEBUG, "%s%sObtained %zd stack frames.", 
+                         (name ? name : ""), (name ? ": " : ""), size );
+
+    for( i = 0; i < size; i++ ) {
+        LogPrint( LOG_DEBUG, "%s%s%s", (name ? name : ""), (name? ": " : ""),
+                             strings[i] );
+    }
+
+    free( strings );
 }
 
 void MainDelayExit( void )
@@ -340,7 +450,8 @@ void MainDelayExit( void )
     QueueKillAll();
 
     /* Shut down IRC connections */
-    thread_create( &shutdownThreadId, bot_shutdown, NULL, "thread_shutdown" );
+    thread_create( &shutdownThreadId, bot_shutdown, NULL, "thread_shutdown",
+                   NULL );
 
     /* Delay to allow all the other tasks to finish (esp. logging!) */
     for( i = 15; i && !BotDone; i-- ) {
