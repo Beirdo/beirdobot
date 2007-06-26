@@ -128,7 +128,7 @@ int main ( int argc, char **argv )
     /* Start up the Logging thread */
     logging_initialize();
 
-    thread_register( &mainThreadId, "thread_main", NULL );
+    thread_register( &mainThreadId, "thread_main", NULL, NULL );
 
     /* Setup signal handler for SIGUSR1 (toggles Debug) */
     sa.sa_sigaction = (sigAction_t)logging_toggle_debug;
@@ -386,6 +386,7 @@ void signal_everyone( int signum, siginfo_t *info, void *secret )
     SigFunc_t                   sigFunc;
     pthread_t                   myThreadId;
     ucontext_t                 *uc;
+    void                       *arg;
 
     uc = (ucontext_t *)secret;
     myThreadId = pthread_self();
@@ -397,12 +398,12 @@ void signal_everyone( int signum, siginfo_t *info, void *secret )
 
     }
 
-    sigFunc = ThreadGetHandler( myThreadId, signum );
+    sigFunc = ThreadGetHandler( myThreadId, signum, &arg );
     if( sigFunc ) {
 #ifdef OLD_IP
-        sigFunc( signum, (void *)uc->uc_mcontext.gregs[OLD_IP] );
+        sigFunc( signum, (void *)uc->uc_mcontext.gregs[OLD_IP], arg );
 #else
-        sigFunc( signum, NULL );
+        sigFunc( signum, NULL, arg );
 #endif
     }
 }
@@ -433,9 +434,9 @@ void signal_death( int signum, siginfo_t *info, void *secret )
 #endif
 
 #ifdef OLD_IP
-    do_backtrace( signum, (void *)uc->uc_mcontext.gregs[OLD_IP] );
+    do_backtrace( signum, (void *)uc->uc_mcontext.gregs[OLD_IP], NULL );
 #else
-    do_backtrace( signum, NULL );
+    do_backtrace( signum, NULL, NULL );
 #endif
 
     /* Spew all remaining messages */
@@ -445,7 +446,7 @@ void signal_death( int signum, siginfo_t *info, void *secret )
     abort();
 }
 
-void do_backtrace( int signum, void *args )
+void do_backtrace( int signum, void *ip, void *arg )
 {
     void               *array[100];
     size_t              size;
@@ -454,7 +455,7 @@ void do_backtrace( int signum, void *args )
     char               *name;
     static char        *unknown = "unknown";
 
-    if( args ) {
+    if( ip ) {
         /* This was a signal, so print the thread name */
         name = thread_name( pthread_self() );
         if( !name ) {
@@ -469,8 +470,8 @@ void do_backtrace( int signum, void *args )
 
 #if 0
     /* replace the sigaction/pthread_kill with the caller's address */
-    if( args ) {
-        array[1] = args;
+    if( ip ) {
+        array[1] = ip;
     }
 #endif
 
@@ -509,7 +510,7 @@ void MainDelayExit( void )
 
     /* Shut down IRC connections */
     thread_create( &shutdownThreadId, bot_shutdown, NULL, "thread_shutdown",
-                   NULL );
+                   NULL, NULL );
 
     /* Delay to allow all the other tasks to finish (esp. logging!) */
     for( i = 15; i && !BotDone; i-- ) {

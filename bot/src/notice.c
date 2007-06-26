@@ -52,7 +52,7 @@ void *notify_thread(void *arg);
 void notify_start(void)
 {
     thread_create( &notifyThreadId, notify_thread, NULL, "thread_notify", 
-                   NULL );
+                   NULL, NULL );
 }
 
 void *notify_thread(void *arg)

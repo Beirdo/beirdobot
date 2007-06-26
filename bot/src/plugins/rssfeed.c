@@ -140,6 +140,7 @@ typedef struct {
 
 
 /* INTERNAL FUNCTION PROTOTYPES */
+void rssfeedSighup( int signum, void *ip, void *arg );
 void botCmdRssfeed( IRCServer_t *server, IRCChannel_t *channel, char *who, 
                     char *msg, void *tag );
 char *botHelpRssfeed( void *tag );
@@ -184,7 +185,7 @@ void plugin_initialize( char *args )
     pthread_cond_init( &kickCond, NULL );
 
     thread_create( &rssfeedThreadId, rssfeed_thread, NULL, "thread_rssfeed",
-                   NULL );
+                   rssfeedSighup, NULL );
     botCmd_add( (const char **)&command, botCmdRssfeed, botHelpRssfeed, NULL );
 }
 
@@ -491,6 +492,12 @@ void *rssfeed_thread(void *arg)
     pthread_mutex_unlock( &shutdownMutex );
     return( NULL );
 }
+
+void rssfeedSighup( int signum, void *ip, void *arg )
+{
+    LogPrint( LOG_DEBUG, "RSSfeed received signal %d", signum );
+}
+
 
 void botCmdRssfeed( IRCServer_t *server, IRCChannel_t *channel, char *who, 
                     char *msg, void *tag )

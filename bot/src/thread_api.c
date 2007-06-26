@@ -46,18 +46,21 @@ typedef struct {
     pthread_t  *threadId;
     char       *name;
     SigFunc_t   sighupFunc;
+    void       *sighupArg;
 } Thread_t;
 
 void ThreadRecurseKill( BalancedBTreeItem_t *node, int signum );
 
 void thread_create( pthread_t *pthreadId, void * (*routine)(void *), 
-                    void *arg, char *name, SigFunc_t sighupFunc )
+                    void *arg, char *name, SigFunc_t sighupFunc, 
+                    void *sighupArg )
 {
     pthread_create( pthreadId, NULL, routine, arg );
-    thread_register( pthreadId, name, sighupFunc );
+    thread_register( pthreadId, name, sighupFunc, sighupArg );
 }
 
-void thread_register( pthread_t *pthreadId, char *name, SigFunc_t sighupFunc )
+void thread_register( pthread_t *pthreadId, char *name, SigFunc_t sighupFunc,
+                      void *sighupArg )
 {
     BalancedBTreeItem_t    *item;
     Thread_t               *thread;
@@ -74,6 +77,7 @@ void thread_register( pthread_t *pthreadId, char *name, SigFunc_t sighupFunc )
     thread->threadId   = pthreadId;
     thread->name       = name;
     thread->sighupFunc = sighupFunc;
+    thread->sighupArg  = sighupArg;
 
     item = (BalancedBTreeItem_t *)malloc(sizeof(BalancedBTreeItem_t));
     item->item = (void *)thread;
@@ -162,7 +166,7 @@ void ThreadRecurseKill( BalancedBTreeItem_t *node, int signum )
     ThreadRecurseKill( node->right, signum );
 }
 
-SigFunc_t ThreadGetHandler( pthread_t threadId, int signum )
+SigFunc_t ThreadGetHandler( pthread_t threadId, int signum, void **parg )
 {
     BalancedBTreeItem_t    *item;
     Thread_t               *thread;
@@ -173,6 +177,10 @@ SigFunc_t ThreadGetHandler( pthread_t threadId, int signum )
     }
 
     thread = (Thread_t *)item->item;
+
+    if( parg ) {
+        *parg = thread->sighupArg;
+    }
 
     switch( signum ) {
     case SIGUSR2:

@@ -136,12 +136,14 @@ void LogItemOutput( void *vitem );
 void LogFlushOutput( void );
 
 void thread_create( pthread_t *pthreadId, void * (*routine)(void *), 
-                    void *arg, char *name, SigFunc_t sighupFunc );
-void thread_register( pthread_t *pthreadId, char *name, SigFunc_t sighupFunc );
+                    void *arg, char *name, SigFunc_t sighupFunc, 
+                    void *sighupArg );
+void thread_register( pthread_t *pthreadId, char *name, SigFunc_t sighupFunc,
+                      void *sighupArg );
 char *thread_name( pthread_t pthreadId );
 void thread_deregister( pthread_t pthreadId );
 void ThreadAllKill( int signum );
-SigFunc_t ThreadGetHandler( pthread_t threadId, int signum );
+SigFunc_t ThreadGetHandler( pthread_t threadId, int signum, void **parg );
 
 void *transmit_thread(void *arg);
 void transmitMsg( IRCServer_t *server, TxType_t type, char *channel, 
@@ -165,7 +167,7 @@ unsigned long mysql_get_server_version(MYSQL *mysql);
 my_bool mysql_thread_init(void);
 #endif
 
-void do_backtrace( int signum, void *args );
+void do_backtrace( int signum, void *ip, void *arg );
 
 
 #endif

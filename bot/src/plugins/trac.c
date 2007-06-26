@@ -48,6 +48,7 @@
 #include <curl/curl.h>
 
 /* INTERNAL FUNCTION PROTOTYPES */
+void tracSighup( int signum, void *ip, void *arg);
 void regexpFuncTicket( IRCServer_t *server, IRCChannel_t *channel, char *who, 
                        char *msg, IRCMsgType_t type, int *ovector, int ovecsize,
                        void *tag );
@@ -180,7 +181,8 @@ void plugin_initialize( char *args )
     atexit( uninit_apr );
     apr_initialized = TRUE;
 
-    thread_create( &tracThreadId, trac_thread, NULL, "thread_trac", NULL );
+    thread_create( &tracThreadId, trac_thread, NULL, "thread_trac", 
+                   tracSighup, NULL );
 }
 
 void plugin_shutdown( void )
@@ -279,6 +281,11 @@ void *trac_thread(void *arg)
     }
 
     return( NULL );
+}
+
+void tracSighup( int signum, void *ip, void *arg)
+{
+    LogPrint( LOG_DEBUG, "Trac received signal %d", signum );
 }
 
 

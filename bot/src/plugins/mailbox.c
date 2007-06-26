@@ -159,6 +159,7 @@ static QueryTable_t mailboxQueryTable[] = {
 
 
 /* INTERNAL FUNCTION PROTOTYPES */
+void mailboxSighup( int signum, void *ip, void *arg );
 void botCmdMailbox( IRCServer_t *server, IRCChannel_t *channel, char *who, 
                     char *msg, void *tag );
 char *botHelpMailbox( void *tag );
@@ -212,7 +213,7 @@ void plugin_initialize( char *args )
     pthread_cond_init( &kickCond, NULL );
 
     thread_create( &mailboxThreadId, mailbox_thread, NULL, "thread_mailbox",
-                   NULL );
+                   mailboxSighup, NULL );
     botCmd_add( (const char **)&command, botCmdMailbox, botHelpMailbox, NULL );
 }
 
@@ -499,6 +500,11 @@ void *mailbox_thread(void *arg)
     LogPrintNoArg( LOG_NOTICE, "Shutting down Mailbox thread" );
     pthread_mutex_unlock( &shutdownMutex );
     return( NULL );
+}
+
+void mailboxSighup( int signum, void *ip, void *arg )
+{
+    LogPrint( LOG_DEBUG, "Mailbox received signal %d", signum );
 }
 
 void botCmdMailbox( IRCServer_t *server, IRCChannel_t *channel, char *who, 

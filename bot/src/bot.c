@@ -58,6 +58,7 @@ LinkedList_t   *ServerList;
 bool            ChannelsLoaded = FALSE;
 
 void *bot_server_thread(void *arg);
+void botSighup( int signum, void *ip, void *arg );
 
 
 void ProcOnConnected(BN_PInfo I, const char HostName[])
@@ -150,7 +151,7 @@ void ProcOnError(BN_PInfo I, int err)
         LogPrint( LOG_DEBUG, "Event Error : %s (%d) : Server %s", 
                              strerror(err), err, server->server );
 
-        do_backtrace( 0, NULL );
+        do_backtrace( 0, NULL, NULL );
     }
 }
 
@@ -601,9 +602,10 @@ void bot_start(void)
         if( server->enabled ) {
             server->txQueue = QueueCreate( 1024 );
             thread_create( &server->txThreadId, transmit_thread, 
-                           (void *)server, server->txThreadName, NULL );
+                           (void *)server, server->txThreadName, NULL, NULL );
             thread_create( &server->threadId, bot_server_thread, 
-                           (void *)server, server->threadName, NULL );
+                           (void *)server, server->threadName, botSighup,
+                           (void *)server );
         }
     }
     LinkedListUnlock( ServerList );
@@ -801,6 +803,20 @@ void LoggedActionMessage( IRCServer_t *server, IRCChannel_t *channel,
     db_add_logentry( channel, server->nick, TYPE_ACTION, message, false );
     db_update_nick( channel, server->nick, true, false );
 }
+
+void botSighup( int signum, void *ip, void *arg )
+{
+    IRCServer_t    *server;
+
+    server = (IRCServer_t *)arg;
+    if( !server ) {
+        return;
+    }
+
+    LogPrint( LOG_DEBUG, "Bot %s@%s:%d received signal %d", server->nick,
+                         server->server, server->port, signum );
+}
+
 
 /*
  * vim:ts=4:sw=4:ai:et:si:sts=4
