@@ -179,16 +179,7 @@ void logging_toggle_debug( int signum, void *info, void *secret )
 void *LoggingThread( void *arg )
 {
     LoggingItem_t      *item;
-    struct tm           ts;
-    char                line[MAX_STRING_LENGTH];
-    char                usPart[9];
-    char                timestamp[TIMESTAMP_MAX];
-    int                 length;
-    LinkedListItem_t   *listItem, *next;
-    LogFileChain_t     *logFile;
     struct timespec     delay;
-    static char        *unknown = "thread_unknown";
-    char               *threadName;
 
     /* 100ms delay */
     delay.tv_sec = 0;
@@ -203,50 +194,7 @@ void *LoggingThread( void *arg )
             continue;
         }
 
-        localtime_r( (const time_t *)&(item->tv.tv_sec), &ts );
-        strftime( timestamp, TIMESTAMP_MAX-8, "%Y-%b-%d %H:%M:%S",
-                  (const struct tm *)&ts );
-        snprintf( usPart, 9, ".%06d ", (int)(item->tv.tv_usec) );
-        strcat( timestamp, usPart );
-        length = strlen( timestamp );
-        
-        LinkedListLock( LogList );
-        
-        for( listItem = LogList->head; listItem; listItem = next ) {
-            logFile = (LogFileChain_t *)listItem;
-            next = listItem->next;
-
-            switch( logFile->type ) {
-            case LT_SYSLOG:
-                syslog( item->level, "%s", item->message );
-                break;
-            case LT_CONSOLE:
-                sprintf( line, "%s %s\n", timestamp, item->message );
-                LogWrite( logFile, line, strlen(line) );
-                break;
-            case LT_FILE:
-                threadName = thread_name( item->threadId );
-                if( !threadName ) {
-                    threadName = unknown;
-                }
-                sprintf( line, "%s %s %s:%d (%s) - %s\n", timestamp, threadName,
-                         item->file, item->line, item->function, 
-                         item->message );
-                LogWrite( logFile, line, strlen(line) );
-                break;
-            default:
-                break;
-            }
-
-            if( logFile->aborted ) {
-                LogOutputRemove( logFile );
-            }
-        }
-
-        LinkedListUnlock( LogList );
-
-        free( item->message );
-        free( item );
+        LogItemOutput( (void *)item );
     }
 
     return( NULL );
@@ -421,6 +369,85 @@ bool LogFileRemove( char *filename )
 
     LinkedListUnlock( LogList );
     return( found );
+}
+
+void LogItemOutput( void *vitem )
+{
+    LoggingItem_t      *item;
+    struct tm           ts;
+    char                line[MAX_STRING_LENGTH];
+    char                usPart[9];
+    char                timestamp[TIMESTAMP_MAX];
+    int                 length;
+    LinkedListItem_t   *listItem, *next;
+    LogFileChain_t     *logFile;
+    static char        *unknown = "thread_unknown";
+    char               *threadName;
+
+    if( !vitem ) {
+        return;
+    }
+
+    item = (LoggingItem_t *)vitem;
+
+    localtime_r( (const time_t *)&(item->tv.tv_sec), &ts );
+    strftime( timestamp, TIMESTAMP_MAX-8, "%Y-%b-%d %H:%M:%S",
+              (const struct tm *)&ts );
+    snprintf( usPart, 9, ".%06d ", (int)(item->tv.tv_usec) );
+    strcat( timestamp, usPart );
+    length = strlen( timestamp );
+    
+    LinkedListLock( LogList );
+    
+    for( listItem = LogList->head; listItem; listItem = next ) {
+        logFile = (LogFileChain_t *)listItem;
+        next = listItem->next;
+
+        switch( logFile->type ) {
+        case LT_SYSLOG:
+            syslog( item->level, "%s", item->message );
+            break;
+        case LT_CONSOLE:
+            sprintf( line, "%s %s\n", timestamp, item->message );
+            LogWrite( logFile, line, strlen(line) );
+            break;
+        case LT_FILE:
+            threadName = thread_name( item->threadId );
+            if( !threadName ) {
+                threadName = unknown;
+            }
+            sprintf( line, "%s %s %s:%d (%s) - %s\n", timestamp, threadName,
+                     item->file, item->line, item->function, 
+                     item->message );
+            LogWrite( logFile, line, strlen(line) );
+            break;
+        default:
+            break;
+        }
+
+        if( logFile->aborted ) {
+            LogOutputRemove( logFile );
+        }
+    }
+
+    LinkedListUnlock( LogList );
+
+    free( item->message );
+    free( item );
+}
+
+void LogFlushOutput( void )
+{
+    LoggingItem_t      *item;
+
+    while( 1 ) {
+        item = (LoggingItem_t *)QueueDequeueItem( LoggingQ, 0 );
+        if( !item ) {
+            return;
+        }
+
+        LogItemOutput( (void *)item );
+    }
 }
 
 /*

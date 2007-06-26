@@ -65,6 +65,7 @@ void MainParseArgs( int argc, char **argv );
 void MainDisplayUsage( char *program, char *errorMsg );
 void signal_interrupt( int signum, siginfo_t *info, void *secret );
 void signal_everyone( int signum, siginfo_t *info, void *secret );
+void signal_death( int signum, siginfo_t *info, void *secret );
 void MainDelayExit( void );
 
 typedef void (*sigAction_t)(int, siginfo_t *, void *);
@@ -107,7 +108,8 @@ int main ( int argc, char **argv )
     mainThreadId = pthread_self();
 
     /* 
-     * Setup the sigmasks for this thread (which is the parent to all others) 
+     * Setup the sigmasks for this thread (which is the parent to all others).
+     * This will propogate to all children.
      */
     sigfillset( &sigmsk );
     sigdelset( &sigmsk, SIGUSR1 );
@@ -145,6 +147,14 @@ int main ( int argc, char **argv )
     sa.sa_flags = SA_RESTART | SA_SIGINFO;
     sigaction( SIGUSR2, &sa, NULL );
     sigaction( SIGHUP, &sa, NULL );
+
+    /* Setup signal handlers for SEGV, ILL, FPE */
+    sa.sa_sigaction = signal_death;
+    sigemptyset( &sa.sa_mask );
+    sa.sa_flags = SA_RESTART | SA_SIGINFO;
+    sigaction( SIGSEGV, &sa, NULL );
+    sigaction( SIGILL, &sa, NULL );
+    sigaction( SIGFPE, &sa, NULL );
 
     /* Print the startup log messages */
     LogBanner();
@@ -385,6 +395,35 @@ void signal_everyone( int signum, siginfo_t *info, void *secret )
         sigFunc( signum, NULL );
 #endif
     }
+}
+
+void signal_death( int signum, siginfo_t *info, void *secret )
+{
+    extern const char *const    sys_siglist[];
+    ucontext_t                 *uc;
+
+    uc = (ucontext_t *)secret;
+
+    LogPrint( LOG_CRIT, "Received signal: %s", sys_siglist[signum] );
+#ifdef OLD_IP
+    LogPrint( LOG_CRIT, "Faulty Address: %p, from %p", info->si_addr,
+                        uc->uc_mcontext.gregs[OLD_IP] );
+#else
+    LogPrint( LOG_CRIT, "Faulty Address %p, no discernable context",
+                        info->si_addr );
+#endif
+
+#ifdef OLD_IP
+    do_backtrace( signum, (void *)uc->uc_mcontext.gregs[OLD_IP] );
+#else
+    do_backtrace( signum, NULL );
+#endif
+
+    /* Spew all remaining messages */
+    LogFlushOutput();
+
+    /* Kill this thing HARD! */
+    abort();
 }
 
 void do_backtrace( int signum, void *args )

@@ -132,6 +132,8 @@ bool LogSyslogAdd( int facility );
 bool LogStdoutAdd( void );
 bool LogFileAdd( char * filename );
 bool LogFileRemove( char *filename );
+void LogItemOutput( void *vitem );
+void LogFlushOutput( void );
 
 void thread_create( pthread_t *pthreadId, void * (*routine)(void *), 
                     void *arg, char *name, SigFunc_t sighupFunc );
