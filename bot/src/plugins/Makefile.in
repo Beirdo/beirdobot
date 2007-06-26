@@ -5,6 +5,7 @@ BOTNETCFG	= ../../bin/botnet-config
 MYSQLCFG	= mysql_config
 PKGCONFIGPATH	= ../../lib/pkgconfig
 LUACFG		= lua-config
+CURLCFG		= curl-config
 
 CC	= @CC@
 
@@ -55,9 +56,10 @@ ifeq (${PLUGIN_RSSFEED},yes)
  SRCS  += rssfeed.c
  CFLAGS_rssfeed  = $(shell PKG_CONFIG_PATH=${PKGCONFIGPATH} pkg-config --cflags nxml)
  CFLAGS_rssfeed += $(shell PKG_CONFIG_PATH=${PKGCONFIGPATH} pkg-config --cflags mrss)
+ CFLAGS_rssfeed += $(shell ${CURLCFG} --cflags)
  DLLIBS_rssfeed  = $(shell PKG_CONFIG_PATH=${PKGCONFIGPATH} pkg-config --libs nxml)
  DLLIBS_rssfeed += $(shell PKG_CONFIG_PATH=${PKGCONFIGPATH} pkg-config --libs mrss)
- DLLIBS_rssfeed += -lcurl
+ DLLIBS_rssfeed += $(shell ${CURLCFG} --libs)
 endif
 
 PLUGIN_TRAC      = @PLUGIN_TRAC@
@@ -66,10 +68,11 @@ ifeq (${PLUGIN_TRAC},yes)
  CFLAGS_trac  = -I/usr/include/subversion-1 -I/usr/include/apr-0
  CFLAGS_trac += $(shell PKG_CONFIG_PATH=${PKGCONFIGPATH} pkg-config --cflags nxml)
  CFLAGS_trac += $(shell PKG_CONFIG_PATH=${PKGCONFIGPATH} pkg-config --cflags mrss)
+ CFLAGS_trac += $(shell ${CURLCFG} --cflags)
  DLLIBS_trac  = -lsvn_client-1 -lapr-1 -laprutil-1
  DLLIBS_trac += $(shell PKG_CONFIG_PATH=${PKGCONFIGPATH} pkg-config --libs nxml)
  DLLIBS_trac += $(shell PKG_CONFIG_PATH=${PKGCONFIGPATH} pkg-config --libs mrss)
- DLLIBS_trac += -lcurl
+ DLLIBS_trac += $(shell ${CURLCFG} --libs)
 endif
 
 PLUGIN_TROUT     = @PLUGIN_TROUT@
@@ -80,7 +83,8 @@ endif
 PLUGIN_URL       = @PLUGIN_URL@
 ifeq (${PLUGIN_URL},yes)
  SRCS  += url.c
- DLLIBS_url      = -lcurl
+ CFLAGS_url 	= $(shell ${CURLCFG} --cflags)
+ DLLIBS_url     = $(shell ${CURLCFG} --libs)
 endif
 
 OBJS	= ${SRCS:%.c=plugin_%.so}

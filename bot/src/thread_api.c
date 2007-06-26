@@ -116,6 +116,10 @@ void thread_deregister( pthread_t pthreadId )
 
     free( thread );
     free( item );
+
+    if( !pthread_equal( pthread_self(), pthreadId ) ) {
+        pthread_join( pthreadId, NULL );
+    }
 }
 
 

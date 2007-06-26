@@ -38,6 +38,7 @@
 #include <sys/types.h>
 #include <execinfo.h>
 #include <ucontext.h>
+#include <curl/curl.h>
 #include "botnet.h"
 #include "protos.h"
 #include "release.h"
@@ -120,6 +121,9 @@ int main ( int argc, char **argv )
     sigdelset( &sigmsk, SIGILL );
     sigdelset( &sigmsk, SIGFPE );
     pthread_sigmask( SIG_SETMASK, &sigmsk, NULL );
+
+    /* Initialize the non-threadsafe CURL library functionality */
+    curl_global_init( CURL_GLOBAL_ALL );
 
     /* Start up the Logging thread */
     logging_initialize();
@@ -354,9 +358,15 @@ void MainDisplayUsage( char *program, char *errorMsg )
 
 void signal_interrupt( int signum, siginfo_t *info, void *secret )
 {
-    extern const char *const sys_siglist[];
+    extern const char *const    sys_siglist[];
+    struct sigaction            sa;
 
     if( pthread_equal( pthread_self(), mainThreadId ) ) {
+        sa.sa_handler = SIG_DFL;
+        sigemptyset( &sa.sa_mask );
+        sa.sa_flags = SA_RESTART;
+        sigaction( SIGINT, &sa, NULL );
+
         LogPrint( LOG_CRIT, "Received signal: %s", sys_siglist[signum] );
         exit( 0 );
     }
@@ -401,8 +411,17 @@ void signal_death( int signum, siginfo_t *info, void *secret )
 {
     extern const char *const    sys_siglist[];
     ucontext_t                 *uc;
+    struct sigaction            sa;
 
     uc = (ucontext_t *)secret;
+
+    /* Make it so another bad signal will just KILL it */
+    sa.sa_handler = SIG_DFL;
+    sigemptyset( &sa.sa_mask );
+    sa.sa_flags = SA_RESTART;
+    sigaction( SIGSEGV, &sa, NULL );
+    sigaction( SIGILL, &sa, NULL );
+    sigaction( SIGFPE, &sa, NULL );
 
     LogPrint( LOG_CRIT, "Received signal: %s", sys_siglist[signum] );
 #ifdef OLD_IP
@@ -470,9 +489,7 @@ void do_backtrace( int signum, void *args )
 
 void MainDelayExit( void )
 {
-#if 0
     int         i;
-#endif
     pthread_t   shutdownThreadId;
 
     LogPrintNoArg( LOG_CRIT, "Shutting down" );
@@ -480,10 +497,10 @@ void MainDelayExit( void )
     /* Signal to all that we are aborting */
     BotDone = false;
 
+    GlobalAbort = true;
+
     /* Unload all plugins (which should kill all associated threads) */
     pluginUnloadAll();
-
-    GlobalAbort = true;
 
     /* Send out signals from all queues waking up anything waiting on them so
      * the listeners can unblock and die
@@ -495,14 +512,11 @@ void MainDelayExit( void )
                    NULL );
 
     /* Delay to allow all the other tasks to finish (esp. logging!) */
-#if 0
     for( i = 15; i && !BotDone; i-- ) {
         sleep(1);
     }
-#endif
 
-    LogPrint(LOG_DEBUG, "Sleeping %d""s", 3 );
-    sleep(3);
+    LogPrintNoArg(LOG_DEBUG, "Shutdown complete!" );
     LogFlushOutput();
 
     /* And finally... die */

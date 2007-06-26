@@ -218,6 +218,8 @@ void plugin_shutdown( void )
         apr_terminate();
         apr_initialized = FALSE;
     }
+
+    thread_deregister( tracThreadId );
 }
 
 void uninit_apr( void )
@@ -276,7 +278,6 @@ void *trac_thread(void *arg)
         botCmd_add( (const char **)&command, botCmdTrac, botHelpTrac, NULL );
     }
 
-    thread_deregister( tracThreadId );
     return( NULL );
 }
 

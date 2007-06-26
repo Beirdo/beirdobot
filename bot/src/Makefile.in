@@ -4,6 +4,7 @@ EMPTY_AUTOMAKE_TARGETS += ps info html tags ctags distdir
 BOTNETCFG	= ../bin/botnet-config
 MYSQLCFG	= mysql_config
 PCRECFG		= pcre-config
+CURLCFG		= curl-config
 PKGCONFIGPATH	= ../lib/pkgconfig
 
 CC	= @CC@
@@ -15,12 +16,14 @@ CFLAGS  += $(shell ${MYSQLCFG} --cflags)
 
 CFLAGS_regexp = $(shell ${PCRECFG} --cflags)
 CFLAGS_plugin_api = -DPLUGIN_PATH=\"${pkglibdir}\"
+CFLAGS_main = $(shell ${CURLCFG} --cflags)
 
 LDFLAGS = -g -rdynamic
 
 LIBS	= $(shell ${MYSQLCFG} @MYSQL_LIBS@)
 LIBS   += $(shell ${BOTNETCFG} --libs-static)
 LIBS   += $(shell ${PCRECFG} --libs)
+LIBS   += $(shell ${CURLCFG} --libs)
 LIBS   += -ldl -L../lib -lopie
 
 SRCS	= main.c plugin_api.c bot.c bot_cmds.c mysql.c linked_list.c regexp.c

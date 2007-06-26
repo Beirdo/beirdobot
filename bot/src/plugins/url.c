@@ -165,6 +165,7 @@ void botCmdUrl( IRCServer_t *server, IRCChannel_t *channel, char *who,
     char           *url;
     char           *expand;
     int             len;
+    CURL           *curl;
 
     if( !server || !msg ) {
         return;
@@ -225,11 +226,20 @@ void botCmdUrl( IRCServer_t *server, IRCChannel_t *channel, char *who,
             if( !msg ) {
                 url = urlFmt;
             } else {
+#if ( LIBCURL_VERSION_NUM < 0x070f04 )
+                (void)curl;
                 expand = curl_escape( msg, 0 );
+#else
+                curl = curl_easy_init();
+                expand = curl_easy_escape( curl, msg, 0 );
+#endif
                 len = strlen(urlFmt) + strlen(expand) + 10;
                 url = (char *)malloc(len + 1);
                 snprintf( url, len, urlFmt, expand );
                 curl_free( expand );
+#if ( LIBCURL_VERSION_NUM >= 0x070f04 )
+                curl_easy_cleanup( curl );
+#endif
                 free( urlFmt );
             }
 
