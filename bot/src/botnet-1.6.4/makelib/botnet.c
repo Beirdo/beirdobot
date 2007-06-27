@@ -100,6 +100,11 @@ void BN_destroyts(void *ptr)
   BN_FreeList(ts->BN_NJoinList,ts->BN_NJoinCount);
 #endif
   free(ptr);
+
+  ts=pthread_getspecific(BN_tskey);
+  if( ts ) {
+     free( ts );
+  }
 }
 
 void BN_tsinitkey(void)

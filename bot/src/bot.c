@@ -716,6 +716,8 @@ bool serverKillTree( BalancedBTreeItem_t *node, bool ifVisited )
             }
 
             LinkedListDestroy( server->channels );
+            BalancedBTreeDestroy( server->channelName );
+            BalancedBTreeDestroy( server->channelNum );
         }
 
         free( server->server );
@@ -725,6 +727,7 @@ bool serverKillTree( BalancedBTreeItem_t *node, bool ifVisited )
         free( server->realname );
         free( server->nickserv );
         free( server->nickservmsg );
+        free( server->ircInfo.Server );
 
         LinkedListLock( server->floodList );
         for( listItem = server->floodList->head; listItem; listItem = next ) {
@@ -738,6 +741,7 @@ bool serverKillTree( BalancedBTreeItem_t *node, bool ifVisited )
         free( server->threadName );
         free( server->txThreadName );
         free( server );
+        free( node );
 
         return( TRUE );
     }

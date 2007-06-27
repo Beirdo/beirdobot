@@ -35,6 +35,7 @@
 #include <sys/time.h>
 #include <time.h>
 #include <mysql.h>
+#include <execinfo.h>
 #include "botnet.h"
 #include "structs.h"
 #include "protos.h"
@@ -47,9 +48,12 @@ void botCmdSeen( IRCServer_t *server, IRCChannel_t *channel, char *who,
                  char *msg, void *tag );
 void botCmdNotice( IRCServer_t *server, IRCChannel_t *channel, char *who, 
                    char *msg, void *tag );
+void botCmdSymbol( IRCServer_t *server, IRCChannel_t *channel, char *who, 
+                   char *msg, void *tag );
 char *botHelpSearch( void *tag );
 char *botHelpSeen( void *tag );
 char *botHelpNotice( void *tag );
+char *botHelpSymbol( void *tag );
 void db_search_text( IRCServer_t *server, IRCChannel_t *channel, char *who, 
                      char *text );
 void result_search_text( MYSQL_RES *res, MYSQL_BIND *input, void *args );
@@ -70,7 +74,7 @@ static QueryTable_t coreQueryTable[] = {
 
 void plugin_initialize( char *args )
 {
-    static char    *commands[] = { "search", "seen", "notice" };
+    static char    *commands[] = { "search", "seen", "notice", "symbol" };
 
     LogPrintNoArg( LOG_NOTICE, "Initializing core plugin..." );
     botCmd_add( (const char **)&commands[0], botCmdSearch, botHelpSearch, 
@@ -78,6 +82,8 @@ void plugin_initialize( char *args )
     botCmd_add( (const char **)&commands[1], botCmdSeen,   botHelpSeen, 
                 NULL );
     botCmd_add( (const char **)&commands[2], botCmdNotice, botHelpNotice,
+                NULL );
+    botCmd_add( (const char **)&commands[3], botCmdSymbol, botHelpSymbol,
                 NULL );
 }
 
@@ -87,6 +93,7 @@ void plugin_shutdown( void )
     botCmd_remove( "search" );
     botCmd_remove( "seen" );
     botCmd_remove( "notice" );
+    botCmd_remove( "symbol" );
 }
 
 
@@ -285,6 +292,38 @@ char *botHelpNotice( void *tag )
                         " the logs online.  "
                         "Syntax: (in channel) notice  "
                         "(in privmsg) notice #channel";
+
+    return( help );
+}
+
+void botCmdSymbol( IRCServer_t *server, IRCChannel_t *channel, char *who, 
+                   char *msg, void *tag )
+{
+    long long int   addr;
+    void           *array[1];
+    char          **strings;
+
+    if( !server || channel ) {
+        return;
+    }
+
+    if( !msg ) {
+        transmitMsg( server, TX_PRIVMSG, who, "Try \"help symbol\"" );
+        return;
+    }
+
+    addr = strtol(msg, NULL, 16);
+
+    array[0] = (void *)addr;
+    strings = backtrace_symbols( array, 1 );
+
+    transmitMsg( server, TX_PRIVMSG, who, strings[0] );
+    free( strings );
+}
+
+char *botHelpSymbol( void *tag )
+{
+    static char *help = "Looks up a symbol by address.  Privmsg only.";
 
     return( help );
 }

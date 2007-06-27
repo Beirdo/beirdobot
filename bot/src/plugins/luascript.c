@@ -204,6 +204,10 @@ void plugin_shutdown( void )
         }
         BalancedBTreeRemove( luascriptTree, item, LOCKED, FALSE );
 
+        free( luascript->name );
+        free( luascript->fileName );
+        free( luascript->args );
+
         LinkedListLock( luascript->regexps );
         LinkedListDestroy( luascript->regexps );
         LinkedListLock( luascript->commands );

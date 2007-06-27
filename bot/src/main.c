@@ -69,6 +69,7 @@ void signal_interrupt( int signum, siginfo_t *info, void *secret );
 void signal_everyone( int signum, siginfo_t *info, void *secret );
 void signal_death( int signum, siginfo_t *info, void *secret );
 void MainDelayExit( void );
+void do_symbol( void *ptr );
 
 typedef void (*sigAction_t)(int, siginfo_t *, void *);
 
@@ -448,6 +449,19 @@ void signal_death( int signum, siginfo_t *info, void *secret )
 
     /* Kill this thing HARD! */
     abort();
+}
+
+void do_symbol( void *ptr )
+{
+    void               *array[1];
+    char              **strings;
+
+    array[0] = ptr;
+    strings = backtrace_symbols( array, 1 );
+
+    LogPrint( LOG_DEBUG, "%s", strings[0] );
+
+    free( strings );
 }
 
 void do_backtrace( int signum, void *ip )

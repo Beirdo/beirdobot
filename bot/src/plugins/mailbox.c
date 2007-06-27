@@ -295,6 +295,7 @@ void plugin_shutdown( void )
 
         BalancedBTreeRemove( mailboxTree, item, LOCKED, FALSE );
         free( item );
+        free( mailbox );
     }
     BalancedBTreeDestroy( mailboxTree );
 
@@ -319,7 +320,6 @@ void *mailbox_thread(void *arg)
     MailboxUID_t           *msg;
 
     pthread_mutex_lock( &shutdownMutex );
-    db_thread_init();
 
     LogPrintNoArg( LOG_NOTICE, "Starting Mailbox thread" );
 

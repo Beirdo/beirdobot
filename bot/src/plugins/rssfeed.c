@@ -228,6 +228,7 @@ void plugin_shutdown( void )
             free( feed->userpass );
         }
         free( feed->prefix );
+        free( feed->timeSpec );
         free( feed );
         free( item );
     }

@@ -123,6 +123,7 @@ void botCmd_remove( char *command )
     if( item ) {
         BalancedBTreeRemove( botCmdTree, item, LOCKED, TRUE );
         free( item->item );
+        free( item );
     }
     BalancedBTreeUnlock( botCmdTree );
 }
