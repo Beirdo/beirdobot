@@ -73,7 +73,7 @@ static svn_error_t *user_prompt_callback( svn_auth_cred_username_t **cred,
                                           void *baton, const char *realm,
                                           svn_boolean_t may_save,
                                           apr_pool_t *pool );
-static svn_error_t *my_svn_receiver( void *baton, apr_hash_t *changed_paths, 
+static svn_error_t *tracSvnReceiver( void *baton, apr_hash_t *changed_paths, 
                                      svn_revnum_t revision, const char *author, 
                                      const char *date, const char *message, 
                                      apr_pool_t *pool );
@@ -160,15 +160,15 @@ static char    *changesetRegexp = "(?i)(?:\\s|^)\\[(\\d+)\\](?:\\s|$)";
 static char    *channelRegexp = NULL;
 static bool     commandInit = FALSE;
 
-pthread_t           tracThreadId;
-static bool         threadAbort = FALSE;
-BalancedBTree_t    *urlTree;
-static bool         apr_initialized = FALSE;
+pthread_t               tracThreadId;
+static bool             threadAbort = FALSE;
+BalancedBTree_t        *urlTree;
+static bool             apr_initialized = FALSE;
 static pthread_mutex_t  shutdownMutex;
 static pthread_mutex_t  signalMutex;
 static pthread_cond_t   kickCond;
 
-int my_svn_initialize( TracURL_t *tracItem );
+int tracSvnInitialize( TracURL_t *tracItem );
 char *tracDetailsTicket( TracURL_t *tracItem, int number );
 char *tracDetailsChangeset( TracURL_t *tracItem, int number );
 void uninit_apr( void );
@@ -307,6 +307,7 @@ void *trac_thread(void *arg)
 
         if( !GlobalAbort && !threadAbort ) {
             /* reload stuff */
+            db_load_channel_regexp();
             
             /* regenerate the channel regexp */
             if( channelRegexp ) {
@@ -423,6 +424,9 @@ static void result_load_channel_regexp( MYSQL_RES *res, MYSQL_BIND *input,
     MYSQL_ROW               row;
     TracURL_t              *tracItem;
     BalancedBTreeItem_t    *item;
+    bool                    oldEnabled;
+    int                     chanid;
+    bool                    found;
 
     if( !res || !(count = mysql_num_rows(res)) ) {
         channelRegexp = NULL;
@@ -434,22 +438,59 @@ static void result_load_channel_regexp( MYSQL_RES *res, MYSQL_BIND *input,
     for( i = 0; i < count; i++ ) {
         row = mysql_fetch_row(res);
 
-        tracItem = (TracURL_t *)malloc(sizeof(TracURL_t));
-        item     = (BalancedBTreeItem_t *)malloc(sizeof(BalancedBTreeItem_t));
-
-        memset( tracItem, 0x00, sizeof(TracURL_t) );
+        chanid = atoi(row[1]);
+        item = BalancedBTreeFind( urlTree, &chanid, LOCKED );
+        if( item ) {
+            tracItem = (TracURL_t *)item->item;
+            oldEnabled = tracItem->enabled;
+            found = TRUE;
+        } else {
+            tracItem = (TracURL_t *)malloc(sizeof(TracURL_t));
+            item = (BalancedBTreeItem_t *)malloc(sizeof(BalancedBTreeItem_t));
+            memset( tracItem, 0x00, sizeof(TracURL_t) );
+            oldEnabled = FALSE;
+            found = FALSE;
+        }
 
         tracItem->serverId  = atoi(row[0]);
         tracItem->chanId    = atoi(row[1]);
+
+        if( found && strcasecmp( tracItem->url, row[2] ) ) {
+            free( tracItem->url );
+        }
         tracItem->url       = strdup(row[2]);
+
+        if( found && strcasecmp( tracItem->svnUrl, row[3] ) ) {
+            free( tracItem->svnUrl );
+        }
         tracItem->svnUrl    = strdup(row[3]);
+
+        if( found && strcasecmp( tracItem->svnUser, row[4] ) ) {
+            free( tracItem->svnUser );
+        }
         tracItem->svnUser   = strdup(row[4]);
+
+        if( found && strcmp( tracItem->svnPasswd, row[5] ) ) {
+            free( tracItem->svnPasswd );
+        }
         tracItem->svnPasswd = strdup(row[5]);
         tracItem->enabled   = ( atoi(row[6]) == 0 ? FALSE : TRUE );
 
-        if( !tracItem->enabled ) {
+        if( found && oldEnabled && !tracItem->enabled ) {
+            /* It was enabled, but isn't now */
+            if( tracItem->svnPool ) {
+                svn_pool_destroy( tracItem->svnPool );
+                tracItem->svnPool = NULL;
+            }
+        }
+
+        if( (!found || !oldEnabled) && tracItem->enabled ) {
+            /* 
+             * Either this is a new entry, or one that was disabled and is now 
+             * enabled 
+             */
             if( *tracItem->svnUrl && 
-                my_svn_initialize( tracItem ) != EXIT_SUCCESS ) {
+                tracSvnInitialize( tracItem ) != EXIT_SUCCESS ) {
                 LogPrintNoArg( LOG_CRIT, "Trac: SVN Initialization error!" );
                 if( tracItem->svnPool ) {
                     svn_pool_destroy( tracItem->svnPool );
@@ -458,9 +499,11 @@ static void result_load_channel_regexp( MYSQL_RES *res, MYSQL_BIND *input,
             }
         }
 
-        item->item = (void *)tracItem;
-        item->key  = (void *)&tracItem->chanId;
-        BalancedBTreeAdd( urlTree, item, LOCKED, FALSE );
+        if( !found ) {
+            item->item = (void *)tracItem;
+            item->key  = (void *)&tracItem->chanId;
+            BalancedBTreeAdd( urlTree, item, LOCKED, FALSE );
+        }
     }
 
     BalancedBTreeAdd( urlTree, NULL, LOCKED, TRUE );
@@ -571,7 +614,7 @@ static svn_error_t *user_prompt_callback( svn_auth_cred_username_t **cred,
     return( SVN_NO_ERROR );
 }
 
-int my_svn_initialize( TracURL_t *tracItem ) 
+int tracSvnInitialize( TracURL_t *tracItem ) 
 {
     int                             retval;
     apr_pool_t                     *pool;
@@ -757,7 +800,7 @@ char *botHelpTrac( void *tag )
     return( help );
 }
 
-static svn_error_t *my_svn_receiver( void *baton, apr_hash_t *changed_paths, 
+static svn_error_t *tracSvnReceiver( void *baton, apr_hash_t *changed_paths, 
                                      svn_revnum_t revision, const char *author, 
                                      const char *date, const char *message, 
                                      apr_pool_t *pool )
@@ -926,7 +969,7 @@ char *tracDetailsChangeset( TracURL_t *tracItem, int number )
     args.message = NULL;
 
     if( (error = svn_client_log( target, &revision, &revision, 
-                                 FALSE, FALSE, my_svn_receiver, 
+                                 FALSE, FALSE, tracSvnReceiver, 
                                  (void *)&args, 
                                  tracItem->svnContext, pool ) ) ) {
         log_svn_error( error );
