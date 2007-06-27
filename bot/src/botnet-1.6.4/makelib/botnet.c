@@ -101,10 +101,12 @@ void BN_destroyts(void *ptr)
 #endif
   free(ptr);
 
+#if 0
   ts=pthread_getspecific(BN_tskey);
   if( ts ) {
      free( ts );
   }
+#endif
 }
 
 void BN_tsinitkey(void)

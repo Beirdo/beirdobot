@@ -1,7 +1,8 @@
 function initialize ( )
    beirdobot.LogPrint("Starting LUA-burp");
-   beirdobot.regexp_add( nil, "(?i)(\\s|^)burps?(\\s|\\.|$)", "burpback" );
-   beirdobot.regexp_add( nil, "(?i)(\\s|^)belch(es)?(\\s|\\.|$)", "belchback" );
+   beirdobot.regexp_add( nil, "(?i)(\\B|\\s|^)burps?(\\s|\\.|$)", "burpback" );
+   beirdobot.regexp_add( nil, "(?i)(\\B|\\s|^)belch(es)?(\\s|\\.|$)", 
+                         "belchback" );
    beirdobot.botCmd_add( "burp", "burpcmd", "burphelp" );
 end
 

@@ -158,8 +158,8 @@ typedef struct {
     char               *data;
 } TracCSV_t;
 
-static char    *ticketRegexp = "(?i)(?:\\s|^)\\#(\\d+)(?:\\s|$)";
-static char    *changesetRegexp = "(?i)(?:\\s|^)\\[(\\d+)\\](?:\\s|$)";
+static char    *ticketRegexp = "(?i)(?:\\B|\\s|^)\\#(\\d+)(?:\\s|$)";
+static char    *changesetRegexp = "(?i)(?:\\B|\\s|^)\\[(\\d+)\\](?:\\s|$)";
 static char    *channelRegexp = NULL;
 static bool     commandInit = FALSE;
 

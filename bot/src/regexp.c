@@ -148,6 +148,7 @@ void regexp_parse( IRCServer_t *server, IRCChannel_t *channel, char *who,
     int                 lenMsg;
     int                 lenChan;
     int                 ovector[30];
+    int                 start;
 
     if( !channel ) {
         return;
@@ -168,12 +169,14 @@ void regexp_parse( IRCServer_t *server, IRCChannel_t *channel, char *who,
             continue;
         }
 
-        rc = pcre_exec( regexp->reContent, regexp->peContent, msg, lenMsg,
-                        0, 0, ovector, 30 );
-        if( rc >= 0 ) {
-            /* We got a channel and content match, call the function */
-            regexp->func( server, channel, who, msg, type, ovector, rc,
-                          regexp->tag );
+        for( rc = 1, start = 0; rc > 0; start = ovector[1] ) {
+            rc = pcre_exec( regexp->reContent, regexp->peContent, msg, lenMsg,
+                            start, 0, ovector, 30 );
+            if( rc >= 0 ) {
+                /* We got a channel and content match, call the function */
+                regexp->func( server, channel, who, msg, type, ovector, rc,
+                              regexp->tag );
+            }
         }
     }
 

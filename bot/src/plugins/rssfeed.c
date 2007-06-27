@@ -124,6 +124,7 @@ typedef struct {
     bool            enabled;
     char           *timeSpec;
     long            offset;
+    bool            visited;
 } RssFeed_t;
 
 typedef struct {
@@ -154,6 +155,8 @@ char *botRssfeedDepthFirst( BalancedBTreeItem_t *item, IRCServer_t *server,
                             IRCChannel_t *channel, bool filter );
 char *botRssfeedDump( BalancedBTreeItem_t *item );
 char *rssfeedShowDetails( RssFeed_t *feed );
+void rssfeedUnvisitTree( BalancedBTreeItem_t *node );
+bool rssfeedFlushUnvisited( BalancedBTreeItem_t *node );
 
 
 /* INTERNAL VARIABLES  */
@@ -165,6 +168,7 @@ static bool             threadAbort = FALSE;
 static pthread_mutex_t  shutdownMutex;
 static pthread_mutex_t  signalMutex;
 static pthread_cond_t   kickCond;
+static bool             threadReload = FALSE;
 
 
 void plugin_initialize( char *args )
@@ -178,7 +182,14 @@ void plugin_initialize( char *args )
     db_check_schema( "dbSchemaRssfeed", "RSSfeed", CURRENT_SCHEMA_RSSFEED,
                      defSchema, defSchemaCount, schemaUpgrade );
 
+    rssfeedTree = BalancedBTreeCreate( BTREE_KEY_INT );
+    rssfeedActiveTree = BalancedBTreeCreate( BTREE_KEY_INT );
+
+    BalancedBTreeLock( rssfeedTree );
+    BalancedBTreeLock( rssfeedActiveTree );
     db_load_rssfeeds();
+    BalancedBTreeUnlock( rssfeedActiveTree );
+    BalancedBTreeUnlock( rssfeedTree );
 
     pthread_mutex_init( &shutdownMutex, NULL );
     pthread_mutex_init( &signalMutex, NULL );
@@ -491,6 +502,31 @@ void *rssfeed_thread(void *arg)
                 LogPrintNoArg( LOG_NOTICE, "RSS: thread woken up early" );
             }
         }
+
+        if( threadReload ) {
+            threadReload = FALSE;
+
+            LogPrintNoArg( LOG_NOTICE, "RSSfeed thread needs data reload" );
+
+            BalancedBTreeLock( rssfeedActiveTree );
+            BalancedBTreeLock( rssfeedTree );
+
+            rssfeedUnvisitTree( rssfeedTree->root );
+            db_load_rssfeeds();
+            while( rssfeedFlushUnvisited( rssfeedTree->root ) ) {
+                /*
+                 * Keep calling until nothing was flushed as any flushing 
+                 * deletes from the tree which messes up the recursion
+                 */
+            }
+
+            /* Rebalance trees */
+            BalancedBTreeAdd( rssfeedTree, NULL, LOCKED, TRUE );
+            BalancedBTreeAdd( rssfeedActiveTree, NULL, LOCKED, TRUE );
+
+            BalancedBTreeUnlock( rssfeedTree );
+            BalancedBTreeUnlock( rssfeedActiveTree );
+        }
     }
 
     LogPrintNoArg( LOG_NOTICE, "Shutting down RSSfeed thread" );
@@ -498,15 +534,70 @@ void *rssfeed_thread(void *arg)
     return( NULL );
 }
 
+void rssfeedUnvisitTree( BalancedBTreeItem_t *node )
+{
+    RssFeed_t              *feed;
+
+    if( !node ) {
+        return;
+    }
+
+    rssfeedUnvisitTree( node->left );
+
+    feed = (RssFeed_t *)node->item;
+    feed->visited = FALSE;
+
+    rssfeedUnvisitTree( node->right );
+}
+
+bool rssfeedFlushUnvisited( BalancedBTreeItem_t *node )
+{
+    RssFeed_t              *feed;
+    BalancedBTreeItem_t    *item;
+
+    if( !node ) {
+        return( FALSE );
+    }
+
+    if( rssfeedFlushUnvisited( node->left ) ) {
+        return( TRUE );
+    }
+
+    feed = (RssFeed_t *)node->item;
+    if( !feed->visited ) {
+        BalancedBTreeRemove( node->btree, node, LOCKED, FALSE );
+        item = BalancedBTreeFind( rssfeedActiveTree, &feed->nextpoll, LOCKED );
+        if( item ) {
+            BalancedBTreeRemove( item->btree, item, LOCKED, FALSE );
+            free( item );
+        }
+
+        free( feed->url );
+        if( feed->userpass ) {
+            free( feed->userpass );
+        }
+        free( feed->prefix );
+        free( feed->timeSpec );
+        free( feed );
+        free( node );
+        return( TRUE );
+    }
+
+    if( rssfeedFlushUnvisited( node->right ) ) {
+        return( TRUE );
+    }
+
+    return( FALSE );
+}
+
 void rssfeedSighup( int signum, void *arg )
 {
-    LogPrint( LOG_DEBUG, "RSSfeed received signal %d", signum );
+    threadReload = TRUE;
 
-    /* Reload the RSS Feeds */
-
-    /* Disable any not any longer in use */
-
-    /* Enable new ones */
+    /* kick the thread */
+    pthread_mutex_lock( &signalMutex );
+    pthread_cond_broadcast( &kickCond );
+    pthread_mutex_unlock( &signalMutex );
 }
 
 
@@ -672,9 +763,6 @@ static void db_load_rssfeeds( void )
 {
     pthread_mutex_t        *mutex;
 
-    rssfeedTree = BalancedBTreeCreate( BTREE_KEY_INT );
-    rssfeedActiveTree = BalancedBTreeCreate( BTREE_KEY_INT );
-
     mutex = (pthread_mutex_t *)malloc(sizeof(pthread_mutex_t));
     pthread_mutex_init( mutex, NULL );
 
@@ -685,6 +773,7 @@ static void db_load_rssfeeds( void )
     free( mutex );
 }
 
+/* Assumes both the rssfeedTree and rssfeedActiveTree are locked */
 static void result_load_rssfeeds( MYSQL_RES *res, MYSQL_BIND *input, 
                                   void *args )
 {
@@ -696,6 +785,9 @@ static void result_load_rssfeeds( MYSQL_RES *res, MYSQL_BIND *input,
     struct timeval          tv;
     time_t                  nextpoll;
     char                   *message;
+    int                     feedId;
+    bool                    found;
+    bool                    oldEnabled;
 
     if( !res || !(count = mysql_num_rows(res)) ) {
         return;
@@ -704,35 +796,78 @@ static void result_load_rssfeeds( MYSQL_RES *res, MYSQL_BIND *input,
     gettimeofday( &tv, NULL );
     nextpoll = tv.tv_sec;
 
-    BalancedBTreeLock( rssfeedTree );
-    BalancedBTreeLock( rssfeedActiveTree );
-
     for( i = 0; i < count; i++ ) {
         row = mysql_fetch_row(res);
 
-        data = (RssFeed_t *)malloc(sizeof(RssFeed_t));
-        memset( data, 0x00, sizeof(RssFeed_t) );
+        feedId = atoi(row[0]);
+        item = BalancedBTreeFind( rssfeedTree, &feedId, LOCKED );
+        if( item ) {
+            data = (RssFeed_t *)item->item;
+            found = TRUE;
+            oldEnabled = data->enabled;
+        } else {
+            data = (RssFeed_t *)malloc(sizeof(RssFeed_t));
+            item = (BalancedBTreeItem_t *)malloc(sizeof(BalancedBTreeItem_t));
+            memset( data, 0x00, sizeof(RssFeed_t) );
+            found = FALSE;
+            oldEnabled = FALSE;
+        }
 
         data->feedId   = atoi(row[0]);
         data->chanId   = atoi(row[1]);
         data->serverId = atoi(row[2]);
+
+        if( found && strcasecmp( data->url, row[3] ) ) {
+            free( data->url );
+        }
         data->url      = strdup(row[3]);
+
+        if( found && data->userpass && strcmp( data->userpass, row[4] ) ) {
+            free( data->userpass );
+        }
         data->userpass = (*row[4] ? strdup(row[4]) : NULL);
+
         data->authtype = atol(row[5]);
+
+        if( found && strcmp( data->prefix, row[6] ) ) {
+            free( data->prefix );
+        }
         data->prefix   = strdup(row[6]);
         data->timeout  = atoi(row[7]);
         data->lastPost = atoi(row[8]);
+
+        if( found && strcmp( data->timeSpec, row[9] ) ) {
+            free( data->timeSpec );
+        }
         data->timeSpec = strdup(row[9]);
         data->offset   = atol(row[10]);
-        data->nextpoll = nextpoll++;
         data->enabled  = ( atoi(row[11]) == 0 ? FALSE : TRUE );
+        
+        if( ChannelsLoaded ) {
+            data->server  = FindServerNum( data->serverId );
+            data->channel = FindChannelNum( data->server, data->chanId );
+        }
 
-        item = (BalancedBTreeItem_t *)malloc(sizeof(BalancedBTreeItem_t));
-        item->item = (void *)data;
-        item->key  = (void *)&data->feedId;
-        BalancedBTreeAdd( rssfeedTree, item, LOCKED, FALSE );
+        if( !found || (!oldEnabled && data->enabled) ) {
+            data->nextpoll = nextpoll++;
+        }
+        data->visited  = TRUE;
 
-        if( !data->enabled ) {
+        if( !found ) {
+            item->item = (void *)data;
+            item->key  = (void *)&data->feedId;
+            BalancedBTreeAdd( rssfeedTree, item, LOCKED, FALSE );
+        }
+
+        if( found && oldEnabled && !data->enabled ) {
+            item = BalancedBTreeFind( rssfeedActiveTree, &data->nextpoll,
+                                      LOCKED );
+            if( item ) {
+                BalancedBTreeRemove( rssfeedActiveTree, item, LOCKED, FALSE );
+            }
+        }
+
+        if( !data->enabled || oldEnabled ) {
             continue;
         }
 
@@ -754,9 +889,6 @@ static void result_load_rssfeeds( MYSQL_RES *res, MYSQL_BIND *input,
     message = botRssfeedDump( rssfeedActiveTree->root );
     LogPrint( LOG_NOTICE, "RSS: %s", message );
     free( message );
-
-    BalancedBTreeUnlock( rssfeedTree );
-    BalancedBTreeUnlock( rssfeedActiveTree );
 }
 
 void db_update_lastpost( int feedId, int lastPost ) {
@@ -813,10 +945,12 @@ char *botRssfeedDepthFirst( BalancedBTreeItem_t *item, IRCServer_t *server,
     if( (server == feed->server) && (!filter || feed->enabled) && 
         (!channel || channel == feed->channel) ) {
         if( !channel ) {
-            sprintf( buf, "%d-(%s)-%s", feed->feedId, feed->channel->channel, 
-                                        feed->prefix );
+            snprintf( buf, 256, "%d-(%s)-%s%s", feed->feedId, 
+                           feed->channel->channel, feed->prefix, 
+                           ( feed->enabled ? "" : "(disabled)" ) );
         } else {
-            sprintf( buf, "%d-%s", feed->feedId, feed->prefix );
+            snprintf( buf, 256, "%d-%s%s", feed->feedId, feed->prefix,
+                           ( feed->enabled ? "" : "(disabled)" ) );
         }
 
         submsg = buf;
@@ -831,12 +965,16 @@ char *botRssfeedDepthFirst( BalancedBTreeItem_t *item, IRCServer_t *server,
 
     submsg = botRssfeedDepthFirst( item->right, server, channel, filter );
     if( submsg ) {
-        len = strlen( message );
+        if( message ) {
+            len = strlen( message );
 
-        message = (char *)realloc(message, len + 2 + strlen(submsg) + 2);
-        strcat( message, ", " );
-        strcat( message, submsg );
-        free( submsg );
+            message = (char *)realloc(message, len + 2 + strlen(submsg) + 2);
+            strcat( message, ", " );
+            strcat( message, submsg );
+            free( submsg );
+        } else {
+            message = submsg;
+        }
     }
 
     return( message );
@@ -923,3 +1061,4 @@ char *rssfeedShowDetails( RssFeed_t *feed )
 /*
  * vim:ts=4:sw=4:ai:et:si:sts=4
  */
+
