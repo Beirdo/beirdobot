@@ -42,7 +42,7 @@ extern uint16  mysql_portnum;
 extern char   *mysql_user;
 extern char   *mysql_password;
 extern char   *mysql_db;
-extern LinkedList_t   *ServerList;
+extern BalancedBTree_t *ServerTree;
 extern bool verbose;
 extern bool Debug;
 extern bool Daemon;

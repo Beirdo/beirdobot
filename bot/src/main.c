@@ -57,8 +57,8 @@ char       *mysql_db;
 bool        verbose;
 bool        Daemon;
 bool        Debug;
-bool        GlobalAbort;
-bool        BotDone;
+bool        GlobalAbort = FALSE;
+bool        BotDone = FALSE;
 pthread_t   mainThreadId;
 
 void mainSighup( int signum, void *arg );
@@ -500,7 +500,7 @@ void MainDelayExit( void )
     LogPrintNoArg( LOG_CRIT, "Shutting down" );
 
     /* Signal to all that we are aborting */
-    BotDone = false;
+    BotDone = FALSE;
 
     GlobalAbort = true;
 
@@ -530,8 +530,6 @@ void MainDelayExit( void )
 
 void mainSighup( int signum, void *arg )
 {
-    LogPrint( LOG_DEBUG, "Main received signal %d", signum );
-
     /*
      * Need to rescan the plugins
      */

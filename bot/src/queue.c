@@ -48,6 +48,7 @@ static char ident[] _UNUSED_ =
 static void QueueConditionUpdate( QueueObject_t *queue );
 
 extern QueueObject_t *LoggingQ;
+extern QueueObject_t *QueryQ;
 
 LinkedList_t   *QueueList = NULL;
 
@@ -272,7 +273,7 @@ QueueItem_t QueueDequeueItem( QueueObject_t *queue, int32 ms_timeout )
             status = pthread_cond_wait( queue->cNotEmpty, queue->mutex );
         }
 
-        if( GlobalAbort && queue != LoggingQ )
+        if( GlobalAbort && queue != LoggingQ && queue != QueryQ )
         {
             /* The program is trying to shut down, don't dequeue anything */
             status = pthread_mutex_unlock( queue->mutex );
@@ -372,15 +373,18 @@ void QueueDestroy( QueueObject_t *queue )
      */
     pthread_cond_broadcast( queue->cNotFull );
     pthread_cond_destroy( queue->cNotFull );
+    free( queue->cNotFull );
 
     pthread_cond_broadcast( queue->cNotEmpty );
     pthread_cond_destroy( queue->cNotEmpty );
+    free( queue->cNotEmpty );
 
     /*
      * get rid of the mutex
      */
     pthread_mutex_unlock( queue->mutex );
     pthread_mutex_destroy( queue->mutex );
+    free( queue->mutex );
 
     /*
      * get rid of the item table

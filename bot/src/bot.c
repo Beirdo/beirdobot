@@ -54,11 +54,13 @@
 static char ident[] _UNUSED_ = 
     "$Id$";
 
-LinkedList_t   *ServerList;
-bool            ChannelsLoaded = FALSE;
+BalancedBTree_t    *ServerTree = NULL;
+bool                ChannelsLoaded = FALSE;
 
 void *bot_server_thread(void *arg);
 void botSighup( int signum, void *arg );
+void serverStartTree( BalancedBTreeItem_t *node );
+bool serverKillTree( BalancedBTreeItem_t *node, bool ifVisited );
 
 
 void ProcOnConnected(BN_PInfo I, const char HostName[])
@@ -151,7 +153,9 @@ void ProcOnError(BN_PInfo I, int err)
         LogPrint( LOG_DEBUG, "Event Error : %s (%d) : Server %s", 
                              strerror(err), err, server->server );
 
+#if 0
         do_backtrace( 0, NULL );
+#endif
     }
 }
 
@@ -173,7 +177,7 @@ void ProcOnDisconnected(BN_PInfo I, const char Msg[])
             for( item = server->channels->head; item ; item = item->next ) {
                 channel = (IRCChannel_t *)item;
                 if( channel->enabled ) {
-                    db_nick_history( channel, NULL, HIST_END );
+                    db_nick_history( channel, "", HIST_END );
                 }
             }
             LinkedListUnlock( server->channels );
@@ -582,11 +586,10 @@ void ProcOnJoinChannel(BN_PInfo I, const char Chan[])
 
 void bot_start(void)
 {
-    LinkedListItem_t *item;
-    IRCServer_t      *server;
+    /* Create the server tree */
+    ServerTree = BalancedBTreeCreate( BTREE_KEY_INT );
 
-    /* Create the server list */
-    ServerList = LinkedListCreate();
+    BalancedBTreeLock( ServerTree );
 
     /* Read the list of servers */
     db_load_servers();
@@ -596,40 +599,154 @@ void bot_start(void)
 
     ChannelsLoaded = TRUE;
 
-    LinkedListLock( ServerList );
-    for( item = ServerList->head; item; item = item->next ) {
-        server = (IRCServer_t *)item;
-        if( server->enabled ) {
-            server->txQueue = QueueCreate( 1024 );
-            thread_create( &server->txThreadId, transmit_thread, 
-                           (void *)server, server->txThreadName, NULL, NULL );
-            thread_create( &server->threadId, bot_server_thread, 
-                           (void *)server, server->threadName, botSighup,
-                           (void *)server );
-        }
+    serverStartTree( ServerTree->root );
+
+    BalancedBTreeUnlock( ServerTree );
+}
+
+void serverStartTree( BalancedBTreeItem_t *node )
+{
+    IRCServer_t      *server;
+
+    if( !node ) {
+        return;
     }
-    LinkedListUnlock( ServerList );
+
+    serverStartTree( node->left );
+
+    server = (IRCServer_t *)node->item;
+
+    if( server->enabled ) {
+        server->txQueue = QueueCreate( 1024 );
+        thread_create( &server->txThreadId, transmit_thread, 
+                       (void *)server, server->txThreadName, NULL, NULL );
+        thread_create( &server->threadId, bot_server_thread, 
+                       (void *)server, server->threadName, botSighup,
+                       (void *)server );
+    }
+
+    serverStartTree( node->right );
 }
 
 void *bot_shutdown(void *arg)
 {
-    LinkedListItem_t *item;
-    IRCServer_t      *server;
-    static char      *quitMsg = "Received SIGINT, shutting down";
+    if( ServerTree ) {
+        BalancedBTreeLock( ServerTree );
 
-    if( ServerList ) {
-        LinkedListLock( ServerList );
-        for( item = ServerList->head; item; item = item->next ) {
-            server = (IRCServer_t *)item;
-            transmitMsg( server, TX_QUIT, NULL, quitMsg );
-            pthread_join( server->threadId, NULL );
+        while( serverKillTree( ServerTree->root, FALSE ) ) {
+            /*
+             * This recurses and kills off every entry in the tree, which
+             * messes up recursion, so needs restarting
+             */
         }
-        LinkedListUnlock( ServerList );
+
+        BalancedBTreeDestroy( ServerTree );
+        ServerTree = NULL;
     }
+
     LogPrintNoArg( LOG_NOTICE, "Shutdown all bot threads" );
     BotDone = true;
 
     return( NULL );
+}
+
+
+bool serverKillTree( BalancedBTreeItem_t *node, bool ifVisited )
+{
+    IRCServer_t            *server;
+    LinkedListItem_t       *listItem, *next;
+    IRCChannel_t           *channel;
+    BalancedBTreeItem_t    *item;
+
+    if( !node ) {
+        return( FALSE );
+    }
+
+    if( serverKillTree( node->left, ifVisited ) ) {
+        return( TRUE );
+    }
+
+    server = (IRCServer_t *)node->item;
+
+    if( !ifVisited || server->visited ) {
+        if( server->enabled ) {
+            server->threadAbort = TRUE;
+            thread_deregister( server->txThreadId );
+            thread_deregister( server->threadId );
+        }
+
+        BalancedBTreeRemove( node->btree, node, LOCKED, FALSE );
+
+        if( server->txQueue ) {
+            /* This *might* leak the contents of any queue entries? */
+            QueueClear( server->txQueue, TRUE );
+            QueueLock( server->txQueue );
+            QueueDestroy( server->txQueue );
+        }
+
+        if( server->channels ) {
+            LinkedListLock( server->channels );
+            BalancedBTreeLock( server->channelName );
+            BalancedBTreeLock( server->channelNum );
+
+            for( listItem = server->channels->head; listItem; 
+                 listItem = next ) {
+                next = listItem->next;
+                channel = (IRCChannel_t *)listItem;
+
+                LinkedListRemove( server->channels, listItem, LOCKED );
+
+                item = BalancedBTreeFind( server->channelName, 
+                                          &channel->channel, LOCKED );
+                if( item ) {
+                    BalancedBTreeRemove( server->channelName, item, LOCKED, 
+                                         FALSE );
+                }
+
+                item = BalancedBTreeFind( server->channelNum, 
+                                          &channel->channelId, LOCKED );
+                if( item ) {
+                    BalancedBTreeRemove( server->channelNum, item, LOCKED, 
+                                         FALSE );
+                }
+                free( channel->channel );
+                free( channel->fullspec );
+                free( channel->url );
+                free( channel );
+            }
+
+            LinkedListDestroy( server->channels );
+        }
+
+        free( server->server );
+        free( server->password );
+        free( server->nick );
+        free( server->username );
+        free( server->realname );
+        free( server->nickserv );
+        free( server->nickservmsg );
+
+        LinkedListLock( server->floodList );
+        for( listItem = server->floodList->head; listItem; listItem = next ) {
+            next = listItem->next;
+
+            LinkedListRemove( server->floodList, listItem, LOCKED );
+            free( listItem );
+        }
+        LinkedListDestroy( server->floodList );
+
+        free( server->threadName );
+        free( server->txThreadName );
+        free( server );
+
+        return( TRUE );
+    }
+
+    if( serverKillTree( node->right, ifVisited ) ) {
+        return( TRUE );
+    }
+
+    return( FALSE );
 }
 
 
@@ -645,8 +762,6 @@ void *bot_server_thread(void *arg)
     if( !server ) {
         return(NULL);
     }
-
-    db_thread_init();
 
     Info = &server->ircInfo;
 
@@ -714,7 +829,7 @@ void *bot_server_thread(void *arg)
         LinkedListLock( server->channels );
         for( item = server->channels->head; item ; item = item->next ) {
             channel = (IRCChannel_t *)item;
-            db_nick_history( channel, NULL, HIST_END );
+            db_nick_history( channel, "", HIST_END );
         }
         LinkedListUnlock( server->channels );
     }
@@ -764,28 +879,20 @@ IRCChannel_t *FindChannelNum( IRCServer_t *server, int channum )
 IRCServer_t *FindServerNum( int serverId )
 {
     IRCServer_t            *server;
-    IRCServer_t            *retServer;
-    bool                    found;
-    LinkedListItem_t       *listItem;
+    BalancedBTreeItem_t    *item;
 
     if( !ChannelsLoaded ) {
         return( NULL );
     }
 
-    retServer = NULL;
-
-    LinkedListLock( ServerList );
-    for( listItem = ServerList->head, found = FALSE;
-         listItem && !found; listItem = listItem->next ) {
-        server = (IRCServer_t *)listItem;
-        if( server->serverId == serverId ) {
-            found = TRUE;
-            retServer = server;
-        }
+    item = BalancedBTreeFind( ServerTree, &serverId, UNLOCKED );
+    if( !item ) {
+        return( NULL );
     }
-    LinkedListUnlock( ServerList );
 
-    return( retServer );
+    server = (IRCServer_t *)item->item;
+
+    return( server );
 }
 
 void LoggedChannelMessage( IRCServer_t *server, IRCChannel_t *channel,

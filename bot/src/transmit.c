@@ -76,7 +76,7 @@ void *transmit_thread(void *arg)
     LogPrint( LOG_NOTICE, "Starting transmit thread - %s", 
                           server->txThreadName );
 
-    while( !GlobalAbort ) {
+    while( !GlobalAbort && !server->threadAbort ) {
         item = (TransmitItem_t *)QueueDequeueItem( server->txQueue, -1 );
         if( !item ) {
             continue;
@@ -163,23 +163,24 @@ void *transmit_thread(void *arg)
                 }
             }
             
-            BN_SendMessage( &server->ircInfo, msg, BN_LOW_PRIORITY );
-            sendTime += server->floodInterval + (len / 120);
+            if( !GlobalAbort && !server->threadAbort ) {
+                BN_SendMessage( &server->ircInfo, msg, BN_LOW_PRIORITY );
+                sendTime += server->floodInterval + (len / 120);
 
-            gettimeofday( &now, NULL );
-            LogPrint( LOG_NOTICE, "Server %d: Sendtime: %ld/%ld", 
-                                  server->serverId, sendTime, 
-                                  sendTime - now.tv_sec );
+                gettimeofday( &now, NULL );
+                LogPrint( LOG_NOTICE, "Server %d: Sendtime: %ld/%ld", 
+                                      server->serverId, sendTime, 
+                                      sendTime - now.tv_sec );
 
-            floodItem = (FloodListItem_t *)malloc(sizeof(FloodListItem_t));
+                floodItem = (FloodListItem_t *)malloc(sizeof(FloodListItem_t));
 
-            floodItem->timeWake = now.tv_sec + server->floodInterval +
-                                  (len / 120);
-            floodItem->bytes    = len;
+                floodItem->timeWake = now.tv_sec + server->floodInterval +
+                                      (len / 120);
+                floodItem->bytes    = len;
 
-            LinkedListAdd( server->floodList, (LinkedListItem_t *)floodItem,
-                           UNLOCKED, AT_TAIL );
-
+                LinkedListAdd( server->floodList, (LinkedListItem_t *)floodItem,
+                               UNLOCKED, AT_TAIL );
+            }
         }
 
         if( item->channel ) {

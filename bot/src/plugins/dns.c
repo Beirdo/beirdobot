@@ -144,11 +144,22 @@ void plugin_shutdown( void )
     pthread_mutex_lock( &shutdownMutex );
     pthread_mutex_destroy( &shutdownMutex );
 
-    BalancedBTreeLock( dnsTypeTree );
-    BalancedBTreeDestroy( dnsTypeTree );
+    if( QueueUsed( DnsQ ) != 0 ) {
+        QueueClear( DnsQ, true );
+    }
 
-    BalancedBTreeLock( dnsTypeNumTree );
-    BalancedBTreeDestroy( dnsTypeNumTree );
+    QueueLock( DnsQ );
+    QueueDestroy( DnsQ );
+
+    if( dnsTypeTree ) {
+        BalancedBTreeLock( dnsTypeTree );
+        BalancedBTreeDestroy( dnsTypeTree );
+    }
+
+    if( dnsTypeNumTree ) {
+        BalancedBTreeLock( dnsTypeNumTree );
+        BalancedBTreeDestroy( dnsTypeNumTree );
+    }
 
     thread_deregister( dnsThreadId );
 }
@@ -276,12 +287,6 @@ void *dns_thread(void *arg)
         free( qItem );
     }
 
-    if( QueueUsed( DnsQ ) != 0 ) {
-        QueueClear( DnsQ, true );
-    }
-
-    QueueLock( DnsQ );
-    QueueDestroy( DnsQ );
     LogPrintNoArg( LOG_NOTICE, "Shutting down DNS thread" );
     pthread_mutex_unlock( &shutdownMutex );
     return( NULL );

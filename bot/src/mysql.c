@@ -68,6 +68,8 @@ MYSQL_RES *db_query( const char *query, MYSQL_BIND *args, int arg_count,
                      bool *connected );
 bool db_server_connect( MYSQL *sql );
 
+void serverTreeLoadChannels( BalancedBTreeItem_t *node, 
+                             pthread_mutex_t *mutex );
 
 void chain_update_nick( MYSQL_RES *res, QueryItem_t *item );
 void chain_flush_nick( MYSQL_RES *res, QueryItem_t *item );
@@ -165,8 +167,8 @@ QueueObject_t   *QueryQ;
 void *mysql_thread( void *arg ) {
     QueryItem_t        *item;
     MysqlData_t        *protItem;
-    QueryTable_t       *query;
-    MYSQL_RES          *res;
+    QueryTable_t       *query = NULL;
+    MYSQL_RES          *res = NULL;
     int                 i;
     time_t              lastAccess;
     struct timeval      now;
@@ -179,8 +181,8 @@ void *mysql_thread( void *arg ) {
     gettimeofday( &now, NULL );
     lastAccess = now.tv_sec;
 
-    while( !GlobalAbort ) {
-        item = (QueryItem_t *)QueueDequeueItem( QueryQ, -1 );
+    while( !BotDone ) {
+        item = (QueryItem_t *)QueueDequeueItem( QueryQ, 1000 );
         if( !item ) {
             continue;
         }
@@ -192,9 +194,6 @@ void *mysql_thread( void *arg ) {
             timeout = now.tv_sec - lastAccess;
             lastAccess = now.tv_sec;
 
-#if 0
-            LogPrint( LOG_NOTICE, "MySQL session idle for %ds", timeout );
-#endif
             if( timeout >= MYSQL_PING_THRESHOLD ) {
                 LogPrint( LOG_NOTICE, "MySQL session idle for %ds, pinging",
                                       timeout );
@@ -205,7 +204,7 @@ void *mysql_thread( void *arg ) {
                 /* Ping the server, if it's gone, reconnect */
                 ProtectedDataLock( sql );
                 protItem = (MysqlData_t *)sql->data;
-                while( !connected ) {
+                while( !BotDone && !connected ) {
                     connected = (mysql_ping( protItem->sql ) != 0 ? FALSE : 
                                  TRUE);
                     if( !connected ) {
@@ -223,48 +222,53 @@ void *mysql_thread( void *arg ) {
                 ProtectedDataUnlock( sql );
             }
 
-            connected = TRUE;
-            query = &item->queryTable[item->queryId];
-            res = db_query( query->queryPattern, item->queryData, 
-                            item->queryDataCount, &connected );
+            if( !BotDone ) {
+                connected = TRUE;
+                query = &item->queryTable[item->queryId];
+                res = db_query( query->queryPattern, item->queryData, 
+                                item->queryDataCount, &connected );
 
-            if( !connected ) {
-                LogPrintNoArg( LOG_NOTICE, "MySQL connection is gone, "
-                                           "reconnecting" );
+                if( !connected ) {
+                    LogPrintNoArg( LOG_NOTICE, "MySQL connection is gone, "
+                                               "reconnecting" );
+                }
             }
-        } while( !connected );
+        } while( !BotDone && !connected );
 
-        if( res ) {
-            if( item->queryCallback ) {
-                item->queryCallback( res, item->queryData, 
-                                     item->queryCallbackArg );
-            } else if( query->queryChainFunc ) {
-                query->queryChainFunc( res, item );
+        if( !BotDone ) {
+            if( res ) {
+                if( item->queryCallback ) {
+                    item->queryCallback( res, item->queryData, 
+                                         item->queryCallbackArg );
+                } else if( query->queryChainFunc ) {
+                    query->queryChainFunc( res, item );
+                }
+                mysql_free_result(res);
             }
-            mysql_free_result(res);
-        }
 
-        if( item->queryMutex ) {
-            pthread_mutex_unlock( item->queryMutex );
-        }
+            if( item->queryMutex ) {
+                pthread_mutex_unlock( item->queryMutex );
+            }
 
-        if( !query->queryChainFunc ) {
-            for( i = 0; i < item->queryDataCount; i++ ) {
-                if( !item->queryData[i].is_null || 
-                    !(*item->queryData[i].is_null) ) {
-                    free( item->queryData[i].buffer );
+            if( !query->queryChainFunc ) {
+                for( i = 0; i < item->queryDataCount; i++ ) {
+                    if( !item->queryData[i].is_null || 
+                        !(*item->queryData[i].is_null) ) {
+                        free( item->queryData[i].buffer );
+                    }
+                }
+
+                if( item->queryData ) {
+                    free( item->queryData );
                 }
             }
 
-            if( item->queryData ) {
-                free( item->queryData );
-            }
+            free( item );
         }
-
-        free( item );
     }
 
     LogPrintNoArg( LOG_NOTICE, "Ending MySQL thread" );
+    mysql_thread_end();
     return(NULL);
 }
 
@@ -670,35 +674,43 @@ void db_load_servers(void)
     free( mutex );
 }
 
+/* Assumes that ServerTree is already locked */
 void db_load_channels(void)
 {
-    LinkedListItem_t   *item;
-    IRCServer_t        *server;
     pthread_mutex_t    *mutex;
-    MYSQL_BIND         *data;
 
     mutex = (pthread_mutex_t *)malloc(sizeof(pthread_mutex_t));
     pthread_mutex_init( mutex, NULL );
 
-    LinkedListLock( ServerList );
-    
-    for( item = ServerList->head; item; item = item->next ) {
-        data = (MYSQL_BIND *)malloc(sizeof(MYSQL_BIND));
-        memset( data, 0, sizeof(MYSQL_BIND) );
+    serverTreeLoadChannels( ServerTree->root, mutex );
 
-        server = (IRCServer_t *)item;
-
-        bind_numeric( &data[0], server->serverId, MYSQL_TYPE_LONG );
-
-        db_queue_query( 1, QueryTable, data, 1, result_load_channels, server, 
-                        mutex );
-        pthread_mutex_unlock( mutex );
-    }
-    LinkedListUnlock( ServerList );
-
-    pthread_mutex_unlock( mutex );
     pthread_mutex_destroy( mutex );
     free( mutex );
+}
+
+void serverTreeLoadChannels( BalancedBTreeItem_t *node, 
+                             pthread_mutex_t *mutex )
+{
+    IRCServer_t    *server;
+    MYSQL_BIND     *data;
+
+    if( !node ) {
+        return;
+    }
+
+    serverTreeLoadChannels( node->left, mutex );
+
+    server = (IRCServer_t *)node->item;
+    data = (MYSQL_BIND *)malloc(sizeof(MYSQL_BIND));
+    memset( data, 0 , sizeof(MYSQL_BIND) );
+
+    bind_numeric( &data[0], server->serverId, MYSQL_TYPE_LONG );
+
+    db_queue_query( 1, QueryTable, data, 1, result_load_channels, server, 
+                    mutex );
+    pthread_mutex_unlock( mutex );
+
+    serverTreeLoadChannels( node->right, mutex );
 }
 
 
@@ -1248,13 +1260,15 @@ void chain_set_auth( MYSQL_RES *res, QueryItem_t *item )
  * Query result callbacks
  */
 
+/* Assumes that ServerTree is already locked */
 void result_load_servers( MYSQL_RES *res, MYSQL_BIND *input, void *arg )
 {
-    IRCServer_t    *server;
-    int             count;
-    int             i;
-    int             len;
-    MYSQL_ROW       row;
+    IRCServer_t            *server;
+    BalancedBTreeItem_t    *item;
+    int                     count;
+    int                     i;
+    int                     len;
+    MYSQL_ROW               row;
 
     if( !res || !(count = mysql_num_rows(res)) ) {
         return;
@@ -1265,6 +1279,12 @@ void result_load_servers( MYSQL_RES *res, MYSQL_BIND *input, void *arg )
 
         server = (IRCServer_t *)malloc(sizeof(IRCServer_t));
         if( !server ) {
+            continue;
+        }
+
+        item = (BalancedBTreeItem_t *)malloc(sizeof(BalancedBTreeItem_t));
+        if( !item ) {
+            free( server );
             continue;
         }
 
@@ -1284,6 +1304,7 @@ void result_load_servers( MYSQL_RES *res, MYSQL_BIND *input, void *arg )
         server->floodBuffer     = atoi(row[11]);
         server->floodMaxLine    = atoi(row[12]);
         server->enabled         = ( atoi(row[13]) == 0 ? FALSE : TRUE );
+        server->visited         = TRUE;
 
         if( server->floodInterval <= 0 ) {
             server->floodInterval = 1;
@@ -1305,9 +1326,11 @@ void result_load_servers( MYSQL_RES *res, MYSQL_BIND *input, void *arg )
         sprintf( server->txThreadName, "tx_thread_%s@%s:%d", server->nick,
                  server->server, server->port );
 
-        LinkedListAdd( ServerList, (LinkedListItem_t *)server, UNLOCKED,
-                       AT_TAIL );
+        item->item = (void *)server;
+        item->key  = (void *)&server->serverId;
+        BalancedBTreeAdd( ServerTree, item, LOCKED, FALSE );
     }
+    BalancedBTreeAdd( ServerTree, NULL, LOCKED, TRUE );
 }
 
 void result_load_channels( MYSQL_RES *res, MYSQL_BIND *input, void *arg )
@@ -1348,7 +1371,8 @@ void result_load_channels( MYSQL_RES *res, MYSQL_BIND *input, void *arg )
         channel->cmdChar        = row[4][0];
         channel->enabled        = ( atoi(row[5]) == 0 ? FALSE : TRUE );
         channel->server         = server;
-        channel->joined         = false;
+        channel->joined         = FALSE;
+        channel->visited        = TRUE;
 
         channel->fullspec       = (char *)malloc(strlen(server->nick) + 10 +
                                                  strlen(server->server) +

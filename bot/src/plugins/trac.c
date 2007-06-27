@@ -393,8 +393,6 @@ bool tracFlushUnvisited( BalancedBTreeItem_t *node )
 
 void tracSighup( int signum, void *arg)
 {
-    LogPrint( LOG_DEBUG, "Trac received signal %d", signum );
-
     /* kick the thread */
     pthread_mutex_lock( &signalMutex );
     pthread_cond_broadcast( &kickCond );

@@ -274,7 +274,6 @@ void *rssfeed_thread(void *arg)
     char                   *cr;
 
     pthread_mutex_lock( &shutdownMutex );
-    db_thread_init();
 
     LogPrintNoArg( LOG_NOTICE, "Starting RSSfeed thread" );
 
@@ -295,10 +294,15 @@ void *rssfeed_thread(void *arg)
             delta = 900;
             goto DelayPoll;
         } 
+
+        if( !ChannelsLoaded ) {
+            delta = 60;
+            goto DelayPoll;
+        }
         
         feed = (RssFeed_t *)item->item;
         nextpoll = feed->nextpoll;
-        if( nextpoll > now.tv_sec + 15 || !ChannelsLoaded ) {
+        if( nextpoll > now.tv_sec + 15 ) {
             delta = nextpoll - now.tv_sec;
             goto DelayPoll;
         }
@@ -477,7 +481,7 @@ void *rssfeed_thread(void *arg)
         ts.tv_sec  = now.tv_sec + delta;
         ts.tv_nsec = now.tv_usec * 1000;
 
-        if( !GlobalAbort && !threadAbort ) {
+        if( delta >= 0 && !GlobalAbort && !threadAbort ) {
             pthread_mutex_lock( &signalMutex );
             retval = pthread_cond_timedwait( &kickCond, &signalMutex, &ts );
             pthread_mutex_unlock( &signalMutex );

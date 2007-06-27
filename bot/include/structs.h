@@ -41,7 +41,6 @@ static char interthread_h_ident[] _UNUSED_ =
 
 
 typedef struct {
-    LinkedListItem_t    item;
     LinkedList_t       *channels;
     BalancedBTree_t    *channelName;
     BalancedBTree_t    *channelNum;
@@ -65,7 +64,9 @@ typedef struct {
     pthread_t           txThreadId;
     char               *txThreadName;
     QueueObject_t      *txQueue;
+    bool                threadAbort;
     bool                enabled;
+    bool                visited;
 } IRCServer_t;
 
 typedef struct {
@@ -81,6 +82,7 @@ typedef struct {
     char                cmdChar;
     bool                joined;
     bool                enabled;
+    bool                visited;
 } IRCChannel_t;
 
 typedef enum {
