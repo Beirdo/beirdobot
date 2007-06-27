@@ -531,14 +531,14 @@ void MainDelayExit( void )
 void mainSighup( int signum, void *arg )
 {
     LogPrint( LOG_DEBUG, "Main received signal %d", signum );
+
     /*
      * Need to rescan the plugins
      */
+    plugins_sighup();
 }
-
 
 
 /*
  * vim:ts=4:sw=4:ai:et:si:sts=4
  */
-

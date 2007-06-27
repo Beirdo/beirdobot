@@ -99,8 +99,9 @@ char *CommandLineParse( char *msg, char **pLine );
 void send_notice( IRCChannel_t *channel, char *nick );
 void notify_start(void);
 
-BalancedBTree_t *db_get_plugins( void );
+void db_get_plugins( BalancedBTree_t *tree );
 void plugins_initialize( void );
+void plugins_sighup( void );
 bool pluginLoad( char *name );
 bool pluginUnload( char *name );
 void pluginUnloadAll( void );

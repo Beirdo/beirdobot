@@ -80,6 +80,8 @@ static svn_error_t *tracSvnReceiver( void *baton, apr_hash_t *changed_paths,
 static size_t tracMemorizeFile(void *ptr, size_t size, size_t nmemb, 
                                void *data);
 void tracTicketCsv( BalancedBTree_t *tree, char *page );
+bool tracFlushUnvisited( BalancedBTreeItem_t *node );
+void tracUnvisitTree( BalancedBTreeItem_t *node );
 
 /* CVS generated ID string */
 static char ident[] _UNUSED_ = 
@@ -134,6 +136,7 @@ typedef struct {
     apr_pool_t         *svnPool;
     svn_client_ctx_t   *svnContext;
     bool                enabled;
+    bool                visited;
 } TracURL_t;
 
 typedef struct {
@@ -180,7 +183,11 @@ void plugin_initialize( char *args )
     db_check_schema( "dbSchemaTrac", "Trac", CURRENT_SCHEMA_TRAC,
                      defSchema, defSchemaCount, schemaUpgrade );
 
+    urlTree = BalancedBTreeCreate( BTREE_KEY_INT );
+
+    BalancedBTreeLock( urlTree );
     db_load_channel_regexp();
+    BalancedBTreeUnlock( urlTree );
 
     atexit( uninit_apr );
     apr_initialized = TRUE;
@@ -306,8 +313,19 @@ void *trac_thread(void *arg)
         pthread_mutex_unlock( &signalMutex );
 
         if( !GlobalAbort && !threadAbort ) {
-            /* reload stuff */
+            BalancedBTreeLock( urlTree );
+            tracUnvisitTree( urlTree->root );
             db_load_channel_regexp();
+            while( tracFlushUnvisited( urlTree->root ) ) {
+                /*
+                 * Keep calling until nothing was flushed as any flushing 
+                 * deletes from the tree which messes up the recursion
+                 */
+            }
+
+            /* Rebalance the Tree */
+            BalancedBTreeAdd( urlTree, NULL, LOCKED, TRUE );
+            BalancedBTreeUnlock( urlTree );
             
             /* regenerate the channel regexp */
             if( channelRegexp ) {
@@ -321,6 +339,56 @@ void *trac_thread(void *arg)
 
     pthread_mutex_unlock( &shutdownMutex );
     return( NULL );
+}
+
+void tracUnvisitTree( BalancedBTreeItem_t *node )
+{
+    TracURL_t      *tracItem;
+
+    if( !node ) {
+        return;
+    }
+
+    tracUnvisitTree( node->left );
+
+    tracItem = (TracURL_t *)node->item;
+    tracItem->visited = FALSE;
+
+    tracUnvisitTree( node->right );
+}
+
+bool tracFlushUnvisited( BalancedBTreeItem_t *node )
+{
+    TracURL_t      *tracItem;
+
+    if( !node ) {
+        return( FALSE );
+    }
+
+    if( tracFlushUnvisited( node->left ) ) {
+        return( TRUE );
+    }
+
+    tracItem = (TracURL_t *)node->item;
+    if( !tracItem->visited ) {
+        BalancedBTreeRemove( node->btree, node, LOCKED, FALSE );
+        free( tracItem->url );
+        free( tracItem->svnUrl );
+        free( tracItem->svnUser );
+        free( tracItem->svnPasswd );
+        if( tracItem->svnPool ) {
+            svn_pool_destroy( tracItem->svnPool );
+        }
+        free( tracItem );
+        free( node );
+        return( TRUE );
+    }
+
+    if( tracFlushUnvisited( node->right ) ) {
+        return( TRUE );
+    }
+
+    return( FALSE );
 }
 
 void tracSighup( int signum, void *arg)
@@ -404,8 +472,6 @@ static void db_load_channel_regexp( void )
 {
     pthread_mutex_t        *mutex;
 
-    urlTree = BalancedBTreeCreate( BTREE_KEY_INT );
-
     mutex = (pthread_mutex_t *)malloc(sizeof(pthread_mutex_t));
     pthread_mutex_init( mutex, NULL );
 
@@ -416,6 +482,7 @@ static void db_load_channel_regexp( void )
     free( mutex );
 }
 
+/* Assumes the tree is already locked */
 static void result_load_channel_regexp( MYSQL_RES *res, MYSQL_BIND *input, 
                                         void *args )
 {
@@ -432,8 +499,6 @@ static void result_load_channel_regexp( MYSQL_RES *res, MYSQL_BIND *input,
         channelRegexp = NULL;
         return;
     }
-
-    BalancedBTreeLock( urlTree );
 
     for( i = 0; i < count; i++ ) {
         row = mysql_fetch_row(res);
@@ -475,6 +540,7 @@ static void result_load_channel_regexp( MYSQL_RES *res, MYSQL_BIND *input,
         }
         tracItem->svnPasswd = strdup(row[5]);
         tracItem->enabled   = ( atoi(row[6]) == 0 ? FALSE : TRUE );
+        tracItem->visited   = TRUE;
 
         if( found && oldEnabled && !tracItem->enabled ) {
             /* It was enabled, but isn't now */
@@ -507,7 +573,6 @@ static void result_load_channel_regexp( MYSQL_RES *res, MYSQL_BIND *input,
     }
 
     BalancedBTreeAdd( urlTree, NULL, LOCKED, TRUE );
-    BalancedBTreeUnlock( urlTree );
 }
 
 char *tracRecurseBuildChannelRegexp( BalancedBTreeItem_t *node )

@@ -52,6 +52,8 @@ void pluginUnloadItem( Plugin_t *plugin );
 void botCmdPlugin( IRCServer_t *server, IRCChannel_t *channel, char *who, 
                    char *msg, void *tag );
 void pluginUnloadTree( BalancedBTreeItem_t *node );
+void pluginUnvisitTree( BalancedBTreeItem_t *node );
+bool pluginFlushUnvisited( BalancedBTreeItem_t *node );
 
 BalancedBTree_t *pluginTree;
 
@@ -63,20 +65,98 @@ void plugins_initialize( void )
 {
     static char        *command = "plugin";
 
-    db_check_plugins( DefaultPlugins, DefaultPluginCount );
-
-    LogPrint( LOG_NOTICE, "Plugin path: %s", PLUGIN_PATH );
-
-    pluginTree = db_get_plugins();
+    pluginTree = BalancedBTreeCreate( BTREE_KEY_STRING );
     if( !pluginTree ) {
         return;
     }
 
+    db_check_plugins( DefaultPlugins, DefaultPluginCount );
+
+    LogPrint( LOG_NOTICE, "Plugin path: %s", PLUGIN_PATH );
+
     BalancedBTreeLock( pluginTree );
+
+    db_get_plugins( pluginTree );
     pluginInitializeTree( pluginTree->root );
+
     BalancedBTreeUnlock( pluginTree );
 
     botCmd_add( (const char **)&command, botCmdPlugin, NULL, NULL );
+}
+
+void plugins_sighup( void )
+{
+    BalancedBTreeLock( pluginTree );
+
+    pluginUnvisitTree( pluginTree->root );
+    db_get_plugins( pluginTree );
+    pluginInitializeTree( pluginTree->root );
+    while( pluginFlushUnvisited( pluginTree->root ) ) {
+        /* 
+         * Keep calling until nothing's been flushed.  This allows for the 
+         * fact that the tree will shift around as we delete things, and the
+         * recursion will be messed up by this.
+         */
+    }
+
+    /* Rebalance the tree */
+    BalancedBTreeAdd( pluginTree, NULL, LOCKED, TRUE );
+
+    BalancedBTreeUnlock( pluginTree );
+}
+
+void pluginUnvisitTree( BalancedBTreeItem_t *node )
+{
+    Plugin_t       *plugin;
+
+    if( !node ) {
+        return;
+    }
+
+    pluginUnvisitTree( node->left );
+
+    plugin = (Plugin_t *)node->item;
+    plugin->visited = FALSE;
+    
+    pluginUnvisitTree( node->right );
+}
+
+bool pluginFlushUnvisited( BalancedBTreeItem_t *node )
+{
+    Plugin_t       *plugin;
+
+    if( !node ) {
+        return( FALSE );
+    }
+
+    if( pluginFlushUnvisited( node->left ) ) {
+        /* Something was deleted on left side, restart at the root */
+        return( TRUE );
+    }
+
+    plugin = (Plugin_t *)node->item;
+    if( !plugin->visited ) {
+        /* Remove it from the tree */
+        BalancedBTreeRemove( node->btree, node, LOCKED, FALSE );
+
+        if( plugin->loaded ) {
+            pluginUnloadItem( plugin );
+        }
+
+        free( plugin->name );
+        free( plugin->libName );
+        free( plugin->args );
+        free( plugin );
+        free( node );
+        return( TRUE );
+    }
+
+    if( pluginFlushUnvisited( node->right ) ) {
+        /* Something was deleted on right side, restart at the root */
+        return( TRUE );
+    }
+
+    return( FALSE );
 }
 
 void pluginInitializeTree( BalancedBTreeItem_t *item )
@@ -90,8 +170,11 @@ void pluginInitializeTree( BalancedBTreeItem_t *item )
     pluginInitializeTree( item->left );
 
     plugin = (Plugin_t *)item->item;
-    if( plugin->preload ) {
-        pluginLoadItem( plugin );
+    if( plugin->newPlugin ) {
+        if( plugin->preload ) {
+            pluginLoadItem( plugin );
+        }
+        plugin->newPlugin = FALSE;
     }
 
     pluginInitializeTree( item->right );

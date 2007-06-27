@@ -903,14 +903,12 @@ void db_notify_nick( IRCChannel_t *channel, char *nick )
 }
 
 
-BalancedBTree_t *db_get_plugins( void )
+void db_get_plugins( BalancedBTree_t *tree )
 {
-    BalancedBTree_t    *tree;
     pthread_mutex_t    *mutex;
 
-    tree = BalancedBTreeCreate( BTREE_KEY_STRING );
     if( !tree ) {
-        return( tree );
+        return;
     }
     
     mutex = (pthread_mutex_t *)malloc(sizeof(pthread_mutex_t));
@@ -920,8 +918,6 @@ BalancedBTree_t *db_get_plugins( void )
     pthread_mutex_unlock( mutex );
     pthread_mutex_destroy( mutex );
     free( mutex );
-
-    return( tree );
 }
 
 
@@ -1400,6 +1396,9 @@ void result_check_nick_notify( MYSQL_RES *res, MYSQL_BIND *input, void *arg )
     }
 }
 
+/*
+ * Assumes that the tree is already locked!
+ */
 void result_get_plugins( MYSQL_RES *res, MYSQL_BIND *input, void *arg )
 {
     Plugin_t               *plugin;
@@ -1408,6 +1407,7 @@ void result_get_plugins( MYSQL_RES *res, MYSQL_BIND *input, void *arg )
     MYSQL_ROW               row;
     BalancedBTree_t        *tree;
     BalancedBTreeItem_t    *item;
+    bool                    found;
 
     tree = (BalancedBTree_t *)arg;
 
@@ -1415,39 +1415,57 @@ void result_get_plugins( MYSQL_RES *res, MYSQL_BIND *input, void *arg )
         return;
     }
 
-    BalancedBTreeLock( tree );
-
     for( i = 0; i < count; i++ ) {
         row = mysql_fetch_row(res);
 
-        plugin = (Plugin_t *)malloc(sizeof(Plugin_t));
-        item   = (BalancedBTreeItem_t *)malloc(sizeof(BalancedBTreeItem_t));
-        if( !plugin ) {
-            continue;
-        }
-
+        item = BalancedBTreeFind( tree, &row[0], LOCKED );
         if( !item ) {
-            free( plugin );
-            continue;
+            found = FALSE;
+            plugin = (Plugin_t *)malloc(sizeof(Plugin_t));
+            item = (BalancedBTreeItem_t *)malloc(sizeof(BalancedBTreeItem_t));
+            if( !plugin ) {
+                continue;
+            }
+
+            if( !item ) {
+                free( plugin );
+                continue;
+            }
+
+            memset( plugin, 0, sizeof(Plugin_t) );
+            plugin->newPlugin = TRUE;
+        } else {
+            found = TRUE;
+            plugin = (Plugin_t *)item->item;
         }
 
-        memset( plugin, 0, sizeof(Plugin_t) );
-
+        if( found && strcasecmp(plugin->name, row[0]) ) {
+            free( plugin->name );
+        }
         plugin->name    = strdup(row[0]);
+
+        if( found && strcmp(plugin->libName, row[1]) ) {
+            free( plugin->libName );
+        }
         plugin->libName = strdup(row[1]);
         plugin->preload = atoi(row[2]);
+
+        if( found && strcmp(plugin->args, row[3]) ) {
+            free( plugin->args );
+        }
         plugin->args    = strdup(row[3]);
+        plugin->visited = TRUE;
+ 
+        if( !found ) {
+            item->item = plugin;
+            item->key  = (void *)&plugin->name;
 
-        item->item = plugin;
-        item->key  = (void *)&plugin->name;
-
-        BalancedBTreeAdd( tree, item, LOCKED, FALSE );
+            BalancedBTreeAdd( tree, item, LOCKED, FALSE );
+        }
     }
 
     /* Rebalance the tree */
     BalancedBTreeAdd( tree, NULL, LOCKED, TRUE );
-
-    BalancedBTreeUnlock( tree );
 }
 
 

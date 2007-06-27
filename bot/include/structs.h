@@ -111,6 +111,8 @@ typedef struct {
     char           *libName;
     int             preload;
     int             loaded;
+    bool            newPlugin;
+    bool            visited;
     char           *args;
     void           *handle;
     void          (*init)(char *args);
