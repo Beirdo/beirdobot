@@ -76,6 +76,7 @@ typedef struct {
     NETMBX              netmbx;
     MAILSTREAM         *stream;
     LinkedList_t       *reports;
+    bool                visited;
 } Mailbox_t;
 
 typedef struct {
@@ -87,6 +88,7 @@ typedef struct {
     char               *nick;
     char               *format;
     bool                enabled;
+    bool                visited;
 } MailboxReport_t;
 
 typedef struct {
@@ -186,6 +188,8 @@ char *mailboxReportExpand( char *format, ENVELOPE *envelope, char *body,
 char *botMailboxDepthFirst( BalancedBTreeItem_t *item, IRCServer_t *server,
                             IRCChannel_t *channel, bool filter );
 char *mailboxShowDetails( Mailbox_t *mailbox );
+void mailboxUnvisitTree( BalancedBTreeItem_t *node );
+bool mailboxFlushUnvisited( BalancedBTreeItem_t *node );
 
 
 /* INTERNAL VARIABLES  */
@@ -197,6 +201,7 @@ static pthread_cond_t   kickCond;
 BalancedBTree_t        *mailboxTree;
 BalancedBTree_t        *mailboxActiveTree;
 BalancedBTree_t        *mailboxStreamTree;
+static bool             threadReload = FALSE;
 
 
 void plugin_initialize( char *args )
@@ -328,9 +333,15 @@ void *mailbox_thread(void *arg)
 
     /* Include the c-client library initialization */
     #include <c-client/linkage.c>
+    
+    mailboxTree       = BalancedBTreeCreate( BTREE_KEY_INT );
+    mailboxActiveTree = BalancedBTreeCreate( BTREE_KEY_INT );
+    mailboxStreamTree = BalancedBTreeCreate( BTREE_KEY_STRING );
 
+    BalancedBTreeLock( mailboxTree );
     db_load_mailboxes();
     db_load_reports();
+    BalancedBTreeUnlock( mailboxTree );
 
     sleep(5);
 
@@ -348,10 +359,15 @@ void *mailbox_thread(void *arg)
             delta = 900;
             goto DelayPoll;
         } 
+
+        if( !ChannelsLoaded ) {
+            delta = 60;
+            goto DelayPoll;
+        }
         
         mailbox = (Mailbox_t *)item->item;
         nextpoll = mailbox->nextPoll;
-        if( nextpoll > now.tv_sec + 15 || !ChannelsLoaded ) {
+        if( nextpoll > now.tv_sec + 15 ) {
             delta = nextpoll - now.tv_sec;
             goto DelayPoll;
         }
@@ -417,7 +433,7 @@ void *mailbox_thread(void *arg)
                 }
 
                 mail_search_full( mailbox->stream, NULL, &searchProgram, 
-                                  SE_UID );
+                                  SE_UID ); /* | SE_NOPREFETCH */
 
                 LinkedListLock( mailbox->reports );
                 for( rptItem = mailbox->reports->head; 
@@ -486,7 +502,7 @@ void *mailbox_thread(void *arg)
         ts.tv_sec  = now.tv_sec + delta;
         ts.tv_nsec = now.tv_usec * 1000;
 
-        if( !GlobalAbort && !threadAbort ) {
+        if( delta > 0 && !GlobalAbort && !threadAbort ) {
             pthread_mutex_lock( &signalMutex );
             retval = pthread_cond_timedwait( &kickCond, &signalMutex, &ts );
             pthread_mutex_unlock( &signalMutex );
@@ -495,6 +511,33 @@ void *mailbox_thread(void *arg)
                 LogPrintNoArg( LOG_NOTICE, "Mailbox: thread woken up early" );
             }
         }
+
+        if( threadReload ) {
+            threadReload = FALSE;
+
+            LogPrintNoArg( LOG_NOTICE, "Mailbox thread needs data reload" );
+
+            BalancedBTreeLock( mailboxTree );
+
+            mailboxUnvisitTree( mailboxTree->root );
+            db_load_mailboxes();
+            db_load_reports();
+            while( mailboxFlushUnvisited( mailboxTree->root ) ) {
+                /*
+                 * Keep calling until nothing was flushed as any flushing 
+                 * deletes from the tree which messes up the recursion
+                 */
+            }
+
+            /* Rebalance trees */
+            BalancedBTreeAdd( mailboxTree, NULL, LOCKED, TRUE );
+            BalancedBTreeAdd( mailboxActiveTree, NULL, UNLOCKED, TRUE );
+            BalancedBTreeAdd( mailboxStreamTree, NULL, UNLOCKED, TRUE );
+
+            BalancedBTreeUnlock( mailboxTree );
+
+            LogPrintNoArg( LOG_NOTICE, "Mailbox thread done data reload" );
+        }
     }
 
     LogPrintNoArg( LOG_NOTICE, "Shutting down Mailbox thread" );
@@ -502,15 +545,150 @@ void *mailbox_thread(void *arg)
     return( NULL );
 }
 
+void mailboxUnvisitTree( BalancedBTreeItem_t *node )
+{
+    Mailbox_t          *mailbox;
+    MailboxReport_t    *report;
+    LinkedListItem_t   *rptItem;
+
+    if( !node ) {
+        return;
+    }
+
+    mailboxUnvisitTree( node->left );
+
+    mailbox = (Mailbox_t *)node->item;
+    mailbox->visited = FALSE;
+
+    if( mailbox->reports ) {
+        LinkedListLock( mailbox->reports );
+        for( rptItem = mailbox->reports->head; rptItem; 
+             rptItem = rptItem->next ) {
+            report = (MailboxReport_t *)rptItem;
+            report->visited = FALSE;
+        }
+        LinkedListUnlock( mailbox->reports );
+    }
+
+    mailboxUnvisitTree( node->right );
+}
+
+bool mailboxFlushUnvisited( BalancedBTreeItem_t *node )
+{
+    Mailbox_t              *mailbox;
+    MailboxReport_t        *report;
+    LinkedListItem_t       *rptItem, *next;
+    BalancedBTreeItem_t    *item;
+    MailboxUID_t           *msg;
+    bool                    found;
+
+    if( !node ) {
+        return( FALSE );
+    }
+
+    if( mailboxFlushUnvisited( node->left ) ) {
+        return( TRUE );
+    }
+
+    mailbox = (Mailbox_t *)node->item;
+    if( !mailbox->visited ) {
+        if( mailbox->enabled ) {
+            mail_close( mailbox->stream );
+        }
+
+        BalancedBTreeRemove( node->btree, node, LOCKED, FALSE );
+        item = BalancedBTreeFind( mailboxActiveTree, &mailbox->nextPoll, 
+                                  UNLOCKED );
+        if( item ) {
+            BalancedBTreeRemove( item->btree, item, UNLOCKED, FALSE );
+            free( item );
+        }
+
+        item = BalancedBTreeFind( mailboxStreamTree, &mailbox->stream->mailbox,
+                                  UNLOCKED );
+        if( item ) {
+            BalancedBTreeRemove( item->btree, item, UNLOCKED, FALSE );
+            free( item );
+        }
+
+        free( mailbox->server );
+        free( mailbox->user );
+        free( mailbox->password );
+        free( mailbox->protocol );
+        free( mailbox->options );
+        free( mailbox->mailbox );
+        free( mailbox->serverSpec );
+
+        if( mailbox->reports ) {
+            LinkedListLock( mailbox->reports );
+            while( mailbox->reports->head ) {
+                report = (MailboxReport_t *)mailbox->reports->head;
+                free( report->nick );
+                free( report->format );
+                LinkedListRemove( mailbox->reports, (LinkedListItem_t *)report,
+                                  LOCKED );
+                free( report );
+            }
+            LinkedListDestroy( mailbox->reports );
+        }
+
+        if( mailbox->messageList ) {
+            LinkedListLock( mailbox->messageList );
+            while( mailbox->messageList->head ) {
+                msg = (MailboxUID_t *)mailbox->messageList->head;
+                LinkedListRemove( mailbox->messageList,
+                                  (LinkedListItem_t *)msg, LOCKED );
+                free( msg );
+            }
+            LinkedListDestroy( mailbox->messageList );
+        }
+
+        free( node );
+        free( mailbox );
+
+        return( TRUE );
+    }
+
+    if( mailbox->reports ) {
+        found = FALSE;
+
+        LinkedListLock( mailbox->reports );
+        for( rptItem = mailbox->reports->head; rptItem; rptItem = next ) {
+            report = (MailboxReport_t *)rptItem;
+            next = rptItem->next;
+
+            if( !report->visited ) {
+                free( report->nick );
+                free( report->format );
+                LinkedListRemove( mailbox->reports, (LinkedListItem_t *)report,
+                                  LOCKED );
+                free( report );
+                found = TRUE;
+            }
+        }
+        LinkedListUnlock( mailbox->reports );
+        if( found ) {
+            return( TRUE );
+        }
+    }
+
+    if( mailboxFlushUnvisited( node->right ) ) {
+        return( TRUE );
+    }
+
+    return( FALSE );
+}
+
 void mailboxSighup( int signum, void *arg )
 {
-    LogPrint( LOG_DEBUG, "Mailbox received signal %d", signum );
-    
-    /* Reload the mailbox info */
+    LogPrint( LOG_CRIT, "Mailbox received signal %d", signum );
 
-    /* Disable any that are no longer in use */
+    threadReload = TRUE;
 
-    /* Enable any new ones */
+    /* kick the thread */
+    pthread_mutex_lock( &signalMutex );
+    pthread_cond_broadcast( &kickCond );
+    pthread_mutex_unlock( &signalMutex );
 }
 
 void botCmdMailbox( IRCServer_t *server, IRCChannel_t *channel, char *who, 
@@ -669,10 +847,6 @@ static void db_load_mailboxes( void )
 {
     pthread_mutex_t        *mutex;
 
-    mailboxTree       = BalancedBTreeCreate( BTREE_KEY_INT );
-    mailboxActiveTree = BalancedBTreeCreate( BTREE_KEY_INT );
-    mailboxStreamTree = BalancedBTreeCreate( BTREE_KEY_STRING );
-
     mutex = (pthread_mutex_t *)malloc(sizeof(pthread_mutex_t));
     pthread_mutex_init( mutex, NULL );
 
@@ -726,7 +900,9 @@ static void dbRecurseReports( BalancedBTreeItem_t *node,
 
     mailbox = (Mailbox_t *)node->item;
 
-    mailbox->reports = LinkedListCreate();
+    if( !mailbox->reports ) {
+        mailbox->reports = LinkedListCreate();
+    }
 
     data = (MYSQL_BIND *)malloc(1 * sizeof(MYSQL_BIND));
     memset( data, 0, 1 * sizeof(MYSQL_BIND) );
@@ -757,6 +933,7 @@ void db_update_lastread( int mailboxId, int lastRead )
 }
 
 
+/* Assumes the mailboxTree is already locked */
 static void result_load_mailboxes( MYSQL_RES *res, MYSQL_BIND *input, 
                                    void *args )
 {
@@ -770,6 +947,9 @@ static void result_load_mailboxes( MYSQL_RES *res, MYSQL_BIND *input,
     Mailbox_t              *mailbox;
     int                     len;
     char                    port[32], user[300], service[64];
+    int                     mailboxId;
+    bool                    found;
+    bool                    oldEnabled;
 
     if( !res || !(count = mysql_num_rows(res)) ) {
         return;
@@ -778,31 +958,68 @@ static void result_load_mailboxes( MYSQL_RES *res, MYSQL_BIND *input,
     gettimeofday( &tv, NULL );
     nextpoll = tv.tv_sec;
 
-    BalancedBTreeLock( mailboxTree );
-
     for( i = 0; i < count; i++ ) {
         row = mysql_fetch_row(res);
 
-        mailbox = (Mailbox_t *)malloc(sizeof(Mailbox_t));
-        memset( mailbox, 0x00, sizeof(Mailbox_t) );
+        mailboxId = atoi(row[0]);
+        item = BalancedBTreeFind( mailboxTree, &mailboxId, LOCKED );
+        if( item ) {
+            mailbox = (Mailbox_t *)item->item;
+            oldEnabled = mailbox->enabled;
+            found = TRUE;
+        } else {
+            item = (BalancedBTreeItem_t *)malloc(sizeof(BalancedBTreeItem_t));
+            mailbox = (Mailbox_t *)malloc(sizeof(Mailbox_t));
+            memset( mailbox, 0x00, sizeof(Mailbox_t) );
+            oldEnabled = FALSE;
+            found = FALSE;
+        }
 
         mailbox->mailboxId = atoi(row[0]);
+        
+        if( found ) {
+            free( mailbox->server );
+        }
         mailbox->server    = strdup(row[1]);
         mailbox->port      = atoi(row[2]);
+
+        if( found ) {
+            free( mailbox->user );
+        }
         mailbox->user      = strdup(row[3]);
+
+        if( found ) {
+            free( mailbox->password );
+        }
         mailbox->password  = strdup(row[4]);
+
+        if( found ) {
+            free( mailbox->protocol );
+        }
         mailbox->protocol  = strdup(row[5]);
+
+        if( found ) {
+            free( mailbox->options );
+        }
         mailbox->options   = strdup(row[6]);
+
+        if( found ) {
+            free( mailbox->mailbox );
+        }
         mailbox->mailbox   = ( *row[7] ? strdup(row[7]) : strdup("INBOX") );
         mailbox->interval  = atoi(row[8]);
         mailbox->lastCheck = atol(row[9]);
         mailbox->lastRead  = atol(row[10]);
-        if( mailbox->lastCheck + mailbox->interval <= nextpoll + 1 ) {
-            mailbox->nextPoll  = nextpoll++;
-        } else {
-            mailbox->nextPoll = mailbox->lastCheck + mailbox->interval;
+        if( !found || (!oldEnabled && mailbox->enabled) ) {
+            if( mailbox->lastCheck + mailbox->interval <= nextpoll + 1 ) {
+                mailbox->nextPoll  = nextpoll++;
+            } else {
+                mailbox->nextPoll = mailbox->lastCheck + mailbox->interval;
+            }
         }
         mailbox->enabled   = ( atoi(row[11]) == 0 ? FALSE : TRUE );
+        mailbox->visited   = TRUE;
+
         len = strlen(mailbox->server) + strlen(mailbox->options) + 
               strlen(mailbox->mailbox) + 4;
 
@@ -816,17 +1033,39 @@ static void result_load_mailboxes( MYSQL_RES *res, MYSQL_BIND *input,
         sprintf( user, "/user=%s", mailbox->user );
         
         len += strlen( port ) + strlen( service ) + strlen( user );
+        if( found ) {
+            free( mailbox->serverSpec );
+        }
         mailbox->serverSpec = (char *)malloc(len);
         snprintf( mailbox->serverSpec, len, "{%s%s%s%s%s}%s", mailbox->server,
                   port, user, service, mailbox->options, mailbox->mailbox );
 
         /* Store by ID */
-        item = (BalancedBTreeItem_t *)malloc(sizeof(BalancedBTreeItem_t));
-        item->item = (void *)mailbox;
-        item->key  = (void *)&mailbox->mailboxId;
-        BalancedBTreeAdd( mailboxTree, item, LOCKED, FALSE );
+        if( !found ) {
+            item->item = (void *)mailbox;
+            item->key  = (void *)&mailbox->mailboxId;
+            BalancedBTreeAdd( mailboxTree, item, LOCKED, FALSE );
+        }
 
-        if( !mailbox->enabled ) {
+        if( found && oldEnabled && !mailbox->enabled ) {
+            item = BalancedBTreeFind( mailboxActiveTree, &mailbox->nextPoll,
+                                      UNLOCKED );
+            if( item ) {
+                BalancedBTreeRemove( mailboxActiveTree, item, UNLOCKED, FALSE );
+                free( item );
+            }
+
+            item = BalancedBTreeFind( mailboxStreamTree, 
+                                      &mailbox->stream->mailbox, UNLOCKED );
+
+            mail_close( mailbox->stream );
+            if( item ) {
+                BalancedBTreeRemove( mailboxStreamTree, item, UNLOCKED, FALSE );
+                free( item );
+            }
+        }
+
+        if( !mailbox->enabled || oldEnabled ) {
             continue;
         }
 
@@ -872,18 +1111,18 @@ static void result_load_mailboxes( MYSQL_RES *res, MYSQL_BIND *input,
     LogPrint( LOG_NOTICE, "Mailbox: %s", message );
     free( message );
     BalancedBTreeUnlock( mailboxActiveTree );
-
-    BalancedBTreeUnlock( mailboxTree );
 }
 
 static void result_load_reports( MYSQL_RES *res, MYSQL_BIND *input, 
-                                   void *args )
+                                 void *args )
 {
     int                     count;
     int                     i;
     MYSQL_ROW               row;
     Mailbox_t              *mailbox;
     MailboxReport_t        *report;
+    LinkedListItem_t       *rptItem;
+    bool                    found;
 
     mailbox = (Mailbox_t *)args;
     if( !mailbox ) {
@@ -899,17 +1138,52 @@ static void result_load_reports( MYSQL_RES *res, MYSQL_BIND *input,
     for( i = 0; i < count; i++ ) {
         row = mysql_fetch_row(res);
 
-        report = (MailboxReport_t *)malloc(sizeof(MailboxReport_t));
-        memset( report, 0x00, sizeof(MailboxReport_t) );
+        for( rptItem = mailbox->reports->head, found = FALSE; 
+             rptItem && !found; rptItem = rptItem->next ) {
+            report = (MailboxReport_t *)rptItem;
+            if( report->channelId == atoi(row[0]) &&
+                report->serverId  == atoi(row[1]) ) {
+                found = TRUE;
+                break;
+            }
+        }
+        
+        if( !found ) {
+            report = (MailboxReport_t *)malloc(sizeof(MailboxReport_t));
+            memset( report, 0x00, sizeof(MailboxReport_t) );
+        }
 
         report->channelId = atoi(row[0]);
         report->serverId  = atoi(row[1]);
+
+        if( found ) {
+            free( report->nick );
+        }
         report->nick      = strdup(row[2]);
+
+        if( found ) {
+            free( report->format );
+        }
         report->format    = strdup(row[3]);
         report->enabled   = ( atoi(row[4]) == 0 ? FALSE : TRUE );
+        report->visited   = TRUE;
 
-        LinkedListAdd( mailbox->reports, (LinkedListItem_t *)report, LOCKED,
-                       AT_TAIL );
+        if( ChannelsLoaded ) {
+            report->server  = FindServerNum( report->serverId );
+
+            if( report->channelId > 0 ) {
+                report->channel = FindChannelNum( report->server, 
+                                                  report->channelId );
+            }
+        } else {
+            report->server  = NULL;
+            report->channel = NULL;
+        }
+
+        if( !found ) {
+            LinkedListAdd( mailbox->reports, (LinkedListItem_t *)report, 
+                           LOCKED, AT_TAIL );
+        }
     }
 
     LinkedListUnlock( mailbox->reports );

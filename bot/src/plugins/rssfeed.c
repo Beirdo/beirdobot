@@ -817,26 +817,26 @@ static void result_load_rssfeeds( MYSQL_RES *res, MYSQL_BIND *input,
         data->chanId   = atoi(row[1]);
         data->serverId = atoi(row[2]);
 
-        if( found && strcasecmp( data->url, row[3] ) ) {
+        if( found ) {
             free( data->url );
         }
         data->url      = strdup(row[3]);
 
-        if( found && data->userpass && strcmp( data->userpass, row[4] ) ) {
+        if( found && data->userpass ) {
             free( data->userpass );
         }
         data->userpass = (*row[4] ? strdup(row[4]) : NULL);
 
         data->authtype = atol(row[5]);
 
-        if( found && strcmp( data->prefix, row[6] ) ) {
+        if( found ) {
             free( data->prefix );
         }
         data->prefix   = strdup(row[6]);
         data->timeout  = atoi(row[7]);
         data->lastPost = atoi(row[8]);
 
-        if( found && strcmp( data->timeSpec, row[9] ) ) {
+        if( found ) {
             free( data->timeSpec );
         }
         data->timeSpec = strdup(row[9]);
@@ -846,6 +846,9 @@ static void result_load_rssfeeds( MYSQL_RES *res, MYSQL_BIND *input,
         if( ChannelsLoaded ) {
             data->server  = FindServerNum( data->serverId );
             data->channel = FindChannelNum( data->server, data->chanId );
+        } else {
+            data->server  = NULL;
+            data->channel = NULL;
         }
 
         if( !found || (!oldEnabled && data->enabled) ) {
@@ -864,6 +867,7 @@ static void result_load_rssfeeds( MYSQL_RES *res, MYSQL_BIND *input,
                                       LOCKED );
             if( item ) {
                 BalancedBTreeRemove( rssfeedActiveTree, item, LOCKED, FALSE );
+                free( item );
             }
         }
 

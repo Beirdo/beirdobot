@@ -1463,18 +1463,18 @@ void result_get_plugins( MYSQL_RES *res, MYSQL_BIND *input, void *arg )
             plugin = (Plugin_t *)item->item;
         }
 
-        if( found && strcasecmp(plugin->name, row[0]) ) {
+        if( found ) {
             free( plugin->name );
         }
         plugin->name    = strdup(row[0]);
 
-        if( found && strcmp(plugin->libName, row[1]) ) {
+        if( found ) {
             free( plugin->libName );
         }
         plugin->libName = strdup(row[1]);
         plugin->preload = atoi(row[2]);
 
-        if( found && strcmp(plugin->args, row[3]) ) {
+        if( found ) {
             free( plugin->args );
         }
         plugin->args    = strdup(row[3]);

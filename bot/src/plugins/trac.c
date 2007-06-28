@@ -518,22 +518,22 @@ static void result_load_channel_regexp( MYSQL_RES *res, MYSQL_BIND *input,
         tracItem->serverId  = atoi(row[0]);
         tracItem->chanId    = atoi(row[1]);
 
-        if( found && strcasecmp( tracItem->url, row[2] ) ) {
+        if( found ) {
             free( tracItem->url );
         }
         tracItem->url       = strdup(row[2]);
 
-        if( found && strcasecmp( tracItem->svnUrl, row[3] ) ) {
+        if( found ) {
             free( tracItem->svnUrl );
         }
         tracItem->svnUrl    = strdup(row[3]);
 
-        if( found && strcasecmp( tracItem->svnUser, row[4] ) ) {
+        if( found ) {
             free( tracItem->svnUser );
         }
         tracItem->svnUser   = strdup(row[4]);
 
-        if( found && strcmp( tracItem->svnPasswd, row[5] ) ) {
+        if( found ) {
             free( tracItem->svnPasswd );
         }
         tracItem->svnPasswd = strdup(row[5]);
