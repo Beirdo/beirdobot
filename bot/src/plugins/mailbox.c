@@ -681,8 +681,6 @@ bool mailboxFlushUnvisited( BalancedBTreeItem_t *node )
 
 void mailboxSighup( int signum, void *arg )
 {
-    LogPrint( LOG_CRIT, "Mailbox received signal %d", signum );
-
     threadReload = TRUE;
 
     /* kick the thread */
