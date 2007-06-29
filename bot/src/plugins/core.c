@@ -36,6 +36,7 @@
 #include <time.h>
 #include <mysql.h>
 #include <execinfo.h>
+#include <stdint.h>
 #include "botnet.h"
 #include "structs.h"
 #include "protos.h"
@@ -299,7 +300,7 @@ char *botHelpNotice( void *tag )
 void botCmdSymbol( IRCServer_t *server, IRCChannel_t *channel, char *who, 
                    char *msg, void *tag )
 {
-    long long int   addr;
+    uintptr_t       addr;
     void           *array[1];
     char          **strings;
 
