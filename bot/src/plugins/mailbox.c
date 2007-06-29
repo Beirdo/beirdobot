@@ -948,6 +948,8 @@ static void result_load_mailboxes( MYSQL_RES *res, MYSQL_BIND *input,
     int                     mailboxId;
     bool                    found;
     bool                    oldEnabled;
+    char                   *oldServerSpec;
+    bool                    newMailbox;
 
     if( !res || !(count = mysql_num_rows(res)) ) {
         return;
@@ -964,15 +966,18 @@ static void result_load_mailboxes( MYSQL_RES *res, MYSQL_BIND *input,
         if( item ) {
             mailbox = (Mailbox_t *)item->item;
             oldEnabled = mailbox->enabled;
+            oldServerSpec = strdup( mailbox->serverSpec );
             found = TRUE;
         } else {
             item = (BalancedBTreeItem_t *)malloc(sizeof(BalancedBTreeItem_t));
             mailbox = (Mailbox_t *)malloc(sizeof(Mailbox_t));
             memset( mailbox, 0x00, sizeof(Mailbox_t) );
             oldEnabled = FALSE;
+            oldServerSpec = NULL;
             found = FALSE;
         }
 
+        newMailbox = FALSE;
         mailbox->mailboxId = atoi(row[0]);
         
         if( found ) {
@@ -1008,13 +1013,6 @@ static void result_load_mailboxes( MYSQL_RES *res, MYSQL_BIND *input,
         mailbox->interval  = atoi(row[8]);
         mailbox->lastCheck = atol(row[9]);
         mailbox->lastRead  = atol(row[10]);
-        if( !found || (!oldEnabled && mailbox->enabled) ) {
-            if( mailbox->lastCheck + mailbox->interval <= nextpoll + 1 ) {
-                mailbox->nextPoll  = nextpoll++;
-            } else {
-                mailbox->nextPoll = mailbox->lastCheck + mailbox->interval;
-            }
-        }
         mailbox->enabled   = ( atoi(row[11]) == 0 ? FALSE : TRUE );
         mailbox->visited   = TRUE;
 
@@ -1045,7 +1043,19 @@ static void result_load_mailboxes( MYSQL_RES *res, MYSQL_BIND *input,
             BalancedBTreeAdd( mailboxTree, item, LOCKED, FALSE );
         }
 
-        if( found && oldEnabled && !mailbox->enabled ) {
+        if( found && strcmp( oldServerSpec, mailbox->serverSpec ) ) {
+            newMailbox = TRUE;
+        }
+
+        if( !found || ((!oldEnabled && mailbox->enabled) || newMailbox) ) {
+            if( mailbox->lastCheck + mailbox->interval <= nextpoll + 1 ) {
+                mailbox->nextPoll  = nextpoll++;
+            } else {
+                mailbox->nextPoll = mailbox->lastCheck + mailbox->interval;
+            }
+        }
+
+        if( found && ((oldEnabled && !mailbox->enabled) || newMailbox) ) {
             item = BalancedBTreeFind( mailboxActiveTree, &mailbox->nextPoll,
                                       UNLOCKED );
             if( item ) {
@@ -1063,7 +1073,7 @@ static void result_load_mailboxes( MYSQL_RES *res, MYSQL_BIND *input,
             }
         }
 
-        if( !mailbox->enabled || oldEnabled ) {
+        if( !mailbox->enabled || (oldEnabled && !newMailbox) ) {
             continue;
         }
 
