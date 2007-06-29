@@ -70,6 +70,8 @@ void signal_everyone( int signum, siginfo_t *info, void *secret );
 void signal_death( int signum, siginfo_t *info, void *secret );
 void MainDelayExit( void );
 void do_symbol( void *ptr );
+void serverUnvisit( BalancedBTreeItem_t *node );
+bool serverFlushUnvisited( BalancedBTreeItem_t *node );
 
 typedef void (*sigAction_t)(int, siginfo_t *, void *);
 
@@ -395,9 +397,6 @@ void signal_everyone( int signum, siginfo_t *info, void *secret )
 
     if( pthread_equal( myThreadId, mainThreadId ) ) {
         LogPrint( LOG_CRIT, "Received signal: %s", sys_siglist[signum] );
-
-        ThreadAllKill( signum );
-
     }
 
     sigFunc = ThreadGetHandler( myThreadId, signum, &arg );
@@ -410,6 +409,10 @@ void signal_everyone( int signum, siginfo_t *info, void *secret )
 #endif
         }
         sigFunc( signum, arg );
+    }
+
+    if( pthread_equal( myThreadId, mainThreadId ) ) {
+        ThreadAllKill( signum );
     }
 }
 
@@ -547,9 +550,88 @@ void mainSighup( int signum, void *arg )
     /*
      * Need to rescan the plugins
      */
+    LogPrintNoArg( LOG_INFO, "Reloading plugins..." );
     plugins_sighup();
+
+    /*
+     * Reload server & channel info -- NOTE: this happens before the bot
+     * threads get signalled
+     */
+    LogPrintNoArg( LOG_INFO, "Reloading servers & channels..." );
+    BalancedBTreeLock( ServerTree );
+    serverUnvisit( ServerTree->root );
+
+    db_load_servers();
+    db_load_channels();
+
+    while( serverFlushUnvisited( ServerTree->root ) ) {
+        /*
+         * If an unvisited entry is found, we need to loop as removing it can
+         * mess up the recursion
+         */
+    }
+
+    BalancedBTreeAdd( ServerTree, NULL, LOCKED, TRUE );
+    BalancedBTreeUnlock( ServerTree );
 }
 
+void serverUnvisit( BalancedBTreeItem_t *node )
+{
+    IRCServer_t        *server;
+    IRCChannel_t       *channel;
+    LinkedListItem_t   *item;
+
+    if( !node ) {
+        return;
+    }
+
+    serverUnvisit( node->left );
+
+    server = (IRCServer_t *)node->item;
+    server->visited = FALSE;
+
+    if( server->channels ) {
+        LinkedListLock( server->channels );
+
+        for( item = server->channels->head; item; item = item->next ) {
+            channel = (IRCChannel_t *)item;
+            channel->visited = FALSE;
+        }
+        LinkedListUnlock( server->channels );
+    }
+
+    serverUnvisit( node->right );
+}
+
+bool serverFlushUnvisited( BalancedBTreeItem_t *node )
+{
+    IRCServer_t        *server;
+
+    if( !node ) {
+        return( FALSE );
+    }
+
+    if( serverFlushUnvisited( node->left ) ) {
+        return( TRUE );
+    }
+
+    server = (IRCServer_t *)node->item;
+    if( !server->visited ) {
+        /* This server's a goner! */
+        serverKill( node, server, TRUE );
+        return( TRUE );
+    }
+
+    if( server->newServer && server->enabled ) {
+        serverStart( server );
+    }
+
+    if( serverFlushUnvisited( node->right ) ) {
+        return( TRUE );
+    }
+
+    return( FALSE );
+}
 
 /*
  * vim:ts=4:sw=4:ai:et:si:sts=4

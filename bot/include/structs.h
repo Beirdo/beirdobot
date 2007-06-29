@@ -67,6 +67,7 @@ typedef struct {
     bool                threadAbort;
     bool                enabled;
     bool                visited;
+    bool                newServer;
 } IRCServer_t;
 
 typedef struct {
@@ -83,6 +84,7 @@ typedef struct {
     bool                joined;
     bool                enabled;
     bool                visited;
+    bool                newChannel;
 } IRCChannel_t;
 
 typedef enum {
@@ -202,7 +204,8 @@ typedef enum {
     TX_NICK,
     TX_REGISTER,
     TX_WHO,
-    TX_QUIT
+    TX_QUIT,
+    TX_PART
 } TxType_t;
 
 typedef struct {

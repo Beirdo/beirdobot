@@ -151,6 +151,28 @@ void regexpBotCmdAdd( IRCServer_t *server, IRCChannel_t *channel )
                 regexpBotCmdParse, NULL );
 }
 
+void regexpBotCmdRemove( IRCServer_t *server, IRCChannel_t *channel )
+{
+    char           *chanRegexp;
+    char           *nickRegexp;
+
+    chanRegexp = (char *)malloc(256);
+    if( !chanRegexp ) {
+        return;
+    }
+
+    nickRegexp = (char *)malloc(256);
+    if( !nickRegexp ) {
+        free( chanRegexp );
+        return;
+    }
+    
+    snprintf( chanRegexp, 256, "(?i)^%s$", channel->fullspec );
+    snprintf( nickRegexp, 256, "(?i)^\\s*%s[:,]?\\s+(.*)$", server->nick );
+
+    regexp_remove( chanRegexp, nickRegexp );
+}
+
 void regexpBotCmdParse( IRCServer_t *server, IRCChannel_t *channel, char *who, 
                         char *msg, IRCMsgType_t type, int *ovector, 
                         int ovecsize, void *tag )

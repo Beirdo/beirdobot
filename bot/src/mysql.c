@@ -1269,6 +1269,11 @@ void result_load_servers( MYSQL_RES *res, MYSQL_BIND *input, void *arg )
     int                     i;
     int                     len;
     MYSQL_ROW               row;
+    int                     serverId;
+    bool                    found;
+    bool                    oldEnabled;
+    char                   *threadName;
+    bool                    killServer;
 
     if( !res || !(count = mysql_num_rows(res)) ) {
         return;
@@ -1277,27 +1282,65 @@ void result_load_servers( MYSQL_RES *res, MYSQL_BIND *input, void *arg )
     for( i = 0; i < count; i++ ) {
         row = mysql_fetch_row(res);
 
-        server = (IRCServer_t *)malloc(sizeof(IRCServer_t));
-        if( !server ) {
-            continue;
-        }
+        serverId = atoi(row[0]);
 
-        item = (BalancedBTreeItem_t *)malloc(sizeof(BalancedBTreeItem_t));
-        if( !item ) {
-            free( server );
-            continue;
-        }
+        item = BalancedBTreeFind( ServerTree, &serverId, LOCKED );
+        if( item ) {
+            server = (IRCServer_t *)item->item;
+            found = TRUE;
+            oldEnabled = server->enabled;
+        } else {
+            server = (IRCServer_t *)malloc(sizeof(IRCServer_t));
+            if( !server ) {
+                continue;
+            }
 
-        memset( server, 0, sizeof(IRCServer_t) );
+            item = (BalancedBTreeItem_t *)malloc(sizeof(BalancedBTreeItem_t));
+            if( !item ) {
+                free( server );
+                continue;
+            }
+            memset( server, 0, sizeof(IRCServer_t) );
+            found = FALSE;
+            oldEnabled = FALSE;
+        }
 
         server->serverId        = atoi(row[0]);
+
+        if( found ) {
+            free( server->server );
+        }
         server->server          = strdup(row[1]);
         server->port            = (uint16)atoi(row[2]);
+
+        if( found ) {
+            free( server->password );
+        }
         server->password        = strdup(row[3]);
+
+        if( found ) {
+            free( server->nick );
+        }
         server->nick            = strdup(row[4]);
+
+        if( found ) {
+            free( server->username );
+        }
         server->username        = strdup(row[5]);
+
+        if( found ) {
+            free( server->realname );
+        }
         server->realname        = strdup(row[6]);
+
+        if( found ) {
+            free( server->nickserv );
+        }
         server->nickserv        = strdup(row[7]);
+
+        if( found ) {
+            free( server->nickservmsg );
+        }
         server->nickservmsg     = strdup(row[8]);
         server->floodInterval   = atoi(row[9]);
         server->floodMaxTime    = atoi(row[10]);
@@ -1305,6 +1348,7 @@ void result_load_servers( MYSQL_RES *res, MYSQL_BIND *input, void *arg )
         server->floodMaxLine    = atoi(row[12]);
         server->enabled         = ( atoi(row[13]) == 0 ? FALSE : TRUE );
         server->visited         = TRUE;
+        server->newServer       = !found;
 
         if( server->floodInterval <= 0 ) {
             server->floodInterval = 1;
@@ -1314,21 +1358,57 @@ void result_load_servers( MYSQL_RES *res, MYSQL_BIND *input, void *arg )
             server->floodMaxTime = 4;
         }
 
-        server->floodList = LinkedListCreate();
-
+        killServer = FALSE;
         len = strlen(server->server) + strlen(server->nick) + 15;
-        server->threadName      = (char *)malloc(len) ;
-        sprintf( server->threadName, "thread_%s@%s:%d", server->nick,
-                 server->server, server->port );
+        threadName = (char *)malloc(len) ;
+        sprintf( threadName, "thread_%s@%s:%d", server->nick, server->server, 
+                             server->port );
+
+        if( found ) {
+            if( strcmp( threadName, server->threadName ) ) {
+                free( server->threadName );
+                server->threadName = threadName;
+                /* The server's been renamed, disconnect from the old one */
+                killServer = TRUE;
+                server->newServer = TRUE;
+            } else {
+                free( threadName );
+            }
+        } else {
+            server->threadName = threadName;
+        }
 
         len = strlen(server->server) + strlen(server->nick) + 18;
-        server->txThreadName    = (char *)malloc(len) ;
-        sprintf( server->txThreadName, "tx_thread_%s@%s:%d", server->nick,
-                 server->server, server->port );
+        threadName = (char *)malloc(len) ;
+        sprintf( threadName, "tx_thread_%s@%s:%d", server->nick, server->server,
+                             server->port );
 
-        item->item = (void *)server;
-        item->key  = (void *)&server->serverId;
-        BalancedBTreeAdd( ServerTree, item, LOCKED, FALSE );
+        if( found ) {
+            if( strcmp( threadName, server->txThreadName ) ) {
+                free( server->txThreadName );
+                server->txThreadName = threadName;
+                killServer = TRUE;
+                server->newServer = TRUE;
+            } else {
+                free( threadName );
+            }
+        } else {
+            server->txThreadName = threadName;
+        }
+
+        if( (found && oldEnabled && !server->enabled) || killServer ) {
+            serverKill( item, server, FALSE );
+        }
+
+        if( !server->floodList ) {
+            server->floodList = LinkedListCreate();
+        }
+
+        if( !found ) {
+            item->item = (void *)server;
+            item->key  = (void *)&server->serverId;
+            BalancedBTreeAdd( ServerTree, item, LOCKED, FALSE );
+        }
     }
     BalancedBTreeAdd( ServerTree, NULL, LOCKED, TRUE );
 }
@@ -1340,6 +1420,12 @@ void result_load_channels( MYSQL_RES *res, MYSQL_BIND *input, void *arg )
     int                 count;
     int                 i;
     MYSQL_ROW           row;
+    LinkedListItem_t   *item;
+    bool                found;
+    int                 channelId;
+    char               *fullSpec;
+    char               *oldChannel;
+    bool                oldEnabled;
 
     server = (IRCServer_t *)arg;
     
@@ -1347,9 +1433,12 @@ void result_load_channels( MYSQL_RES *res, MYSQL_BIND *input, void *arg )
         return;
     }
 
-    server->channels = LinkedListCreate();
-    server->channelName = BalancedBTreeCreate( BTREE_KEY_STRING );
-    server->channelNum  = BalancedBTreeCreate( BTREE_KEY_INT );
+    if( !server->channels ) {
+        server->channels = LinkedListCreate();
+        server->channelName = BalancedBTreeCreate( BTREE_KEY_STRING );
+        server->channelNum  = BalancedBTreeCreate( BTREE_KEY_INT );
+    }
+
     LinkedListLock( server->channels );
     BalancedBTreeLock( server->channelName );
     BalancedBTreeLock( server->channelNum );
@@ -1357,42 +1446,104 @@ void result_load_channels( MYSQL_RES *res, MYSQL_BIND *input, void *arg )
     for( i = 0; i < count; i++ ) {
         row = mysql_fetch_row(res);
 
-        channel = (IRCChannel_t *)malloc(sizeof(IRCChannel_t));
-        if( !channel ) {
-            continue;
+        channelId = atoi(row[0]);
+        oldChannel = NULL;
+        oldEnabled = FALSE;
+
+        for( found = FALSE, item = server->channels->head; item && !found;
+             item = item->next ) {
+            channel = (IRCChannel_t *)item;
+            if( channel->channelId == channelId ) {
+                found = TRUE;
+                oldChannel = strdup( channel->channel );
+                oldEnabled = channel->enabled;
+                break;
+            }
         }
 
-        memset( channel, 0, sizeof(IRCChannel_t) );
+        if( !found ) {
+            channel = (IRCChannel_t *)malloc(sizeof(IRCChannel_t));
+            if( !channel ) {
+                continue;
+            }
+            memset( channel, 0, sizeof(IRCChannel_t) );
+        }
 
         channel->channelId      = atoi(row[0]);
+
+        if( found ) {
+            free( channel->channel );
+        }
         channel->channel        = strdup(row[1]);
+
+        if( found ) {
+            free( channel->url );
+        }
         channel->url            = strdup(row[2]);
         channel->notifywindow   = atoi(row[3]);
         channel->cmdChar        = row[4][0];
         channel->enabled        = ( atoi(row[5]) == 0 ? FALSE : TRUE );
         channel->server         = server;
-        channel->joined         = FALSE;
+        if( !found ) {
+            channel->joined         = FALSE;
+        }
         channel->visited        = TRUE;
+        channel->newChannel     = (!found || (!oldEnabled && channel->enabled));
 
-        channel->fullspec       = (char *)malloc(strlen(server->nick) + 10 +
-                                                 strlen(server->server) +
-                                                 strlen(channel->channel));
-        sprintf( channel->fullspec, "%s@%s:%d/%s", server->nick,
-                 server->server, server->port, channel->channel );
-        LogPrint( LOG_NOTICE, "%s", channel->fullspec );
+        fullSpec = (char *)malloc(strlen(server->nick) + 10 + 
+                                  strlen(server->server) +
+                                  strlen(channel->channel));
+        sprintf( fullSpec, "%s@%s:%d/%s", server->nick, server->server, 
+                           server->port, channel->channel );
+        if( found ) {
+            if( strcmp( fullSpec, channel->fullspec ) || 
+                (oldEnabled && !channel->enabled) ) {
+                free( channel->fullspec );
+                channel->fullspec = fullSpec;
+                /* Leave the channel */
+                channelLeave( server, channel, oldChannel );
+                channel->newChannel = TRUE;
+                if( channel->enabled ) {
+                    regexpBotCmdAdd( server, channel );
+                }
+            } else {
+                free( fullSpec );
+            }
+        } else {
+            channel->fullspec = fullSpec;
+        }
+        LogPrint( LOG_NOTICE, "%s%s", channel->fullspec,
+                              ( channel->enabled ? "" : " (disabled)") );
 
-        channel->itemName.item  = (void *)channel;
-        channel->itemName.key   = (void *)&channel->channel;
-        channel->itemNum.item   = (void *)channel;
-        channel->itemNum.key    = (void *)&channel->channelId;
+        if( found && strcmp( oldChannel, channel->channel ) ) {
+            channel->itemName.key = (void *)&oldChannel;
+            BalancedBTreeRemove( server->channelName, &channel->itemName, 
+                                 LOCKED, FALSE );
+            channel->itemName.key = (void *)&channel->channel;
+            BalancedBTreeAdd( server->channelName, &channel->itemName, LOCKED,
+                              FALSE );
+        }
+        
+        if( !found ) {
+            channel->itemName.item  = (void *)channel;
+            channel->itemName.key   = (void *)&channel->channel;
+            channel->itemNum.item   = (void *)channel;
+            channel->itemNum.key    = (void *)&channel->channelId;
 
-        BalancedBTreeAdd( server->channelName, &channel->itemName, LOCKED,
-                          false );
-        BalancedBTreeAdd( server->channelNum, &channel->itemNum, LOCKED,
-                          false );
-        LinkedListAdd( server->channels, (LinkedListItem_t *)channel,
-                       LOCKED, AT_TAIL );
-        regexpBotCmdAdd( server, channel );
+            BalancedBTreeAdd( server->channelName, &channel->itemName, LOCKED,
+                              FALSE );
+            BalancedBTreeAdd( server->channelNum, &channel->itemNum, LOCKED,
+                              FALSE );
+            LinkedListAdd( server->channels, (LinkedListItem_t *)channel,
+                           LOCKED, AT_TAIL );
+            if( server->enabled ) {
+                regexpBotCmdAdd( server, channel );
+            }
+        }
+
+        if( oldChannel ) {
+            free( oldChannel );
+        }
     }
 
     /* Rebalance the trees */

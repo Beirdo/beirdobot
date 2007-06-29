@@ -140,6 +140,11 @@ void *transmit_thread(void *arg)
             snprintf(string, MAX_STRING_LENGTH, ":%s", item->message);
             msg = BN_MakeMessage(NULL, "QUIT", string);
             break;
+        case TX_PART:
+            snprintf(string, MAX_STRING_LENGTH, "%s :%s", item->channel,
+                             item->message);
+            msg = BN_MakeMessage(NULL, "PART", string);
+            break;
         }
 
         if( msg ) {

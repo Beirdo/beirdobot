@@ -90,6 +90,7 @@ void botCmd_initialize( void );
 void botCmd_add( const char **command, BotCmdFunc_t func,
                  BotCmdHelpFunc_t helpFunc, void *tag );
 void regexpBotCmdAdd( IRCServer_t *server, IRCChannel_t *channel );
+void regexpBotCmdRemove( IRCServer_t *server, IRCChannel_t *channel );
 int botCmd_parse( IRCServer_t *server, IRCChannel_t *channel, char *who, 
                   char *msg );
 void botCmd_remove( char *command );
@@ -169,6 +170,10 @@ my_bool mysql_thread_init(void);
 #endif
 
 void do_backtrace( int signum, void *ip );
+void serverKill( BalancedBTreeItem_t *node, IRCServer_t *server, bool unalloc );
+void serverStart( IRCServer_t *server );
+void channelLeave( IRCServer_t *server, IRCChannel_t *channel, 
+                   char *oldChannel );
 
 
 #endif
