@@ -75,6 +75,7 @@ bool serverFlushUnvisited( BalancedBTreeItem_t *node );
 
 typedef void (*sigAction_t)(int, siginfo_t *, void *);
 
+
 int main ( int argc, char **argv )
 {
     pthread_mutex_t     spinLockMutex;
