@@ -1,13 +1,13 @@
 # Process this file with autoconf to produce a configure script.
 AC_PREREQ(2.59)
 
-AC_INIT(beirdobot, [SVN], [gjhurlbu@gmail.com])
+AC_INIT(beirdobot, [0.3], [gjhurlbu@gmail.com])
 AC_CONFIG_AUX_DIR(scripts)
 AC_CONFIG_SRCDIR(bot/src/main.c)
 AM_CONFIG_HEADER(bot/include/config.h)
 AC_CANONICAL_SYSTEM
 
-AM_INIT_AUTOMAKE(beirdobot, "SVN")
+AM_INIT_AUTOMAKE(beirdobot, "0.3")
 
 
 
@@ -171,6 +171,7 @@ AC_C_CONST
 AC_TYPE_SIZE_T
 AC_HEADER_TIME
 AC_STRUCT_TM
+AC_TYPE_INTPTR_T
 
 #AC_CHECK_TYPES(socklen_t)
 
