@@ -177,7 +177,8 @@ typedef enum
 {
     LT_CONSOLE,
     LT_FILE,
-    LT_SYSLOG
+    LT_SYSLOG,
+    LT_NCURSES
 } LogFileType_t;
 
 /* Log File Descriptor Chain */
@@ -303,6 +304,8 @@ typedef struct _QueryItem_t {
 } QueryItem_t;
 
 typedef void (*SigFunc_t)( int, void * );
+
+typedef void (*CursesMenuFunc_t)(void *);
 
 #endif
 

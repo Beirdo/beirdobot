@@ -33,10 +33,13 @@
 #include <unistd.h>
 #include <sys/time.h>
 #include <ncurses.h>
+#include <menu.h>
 #include "botnet.h"
 #include "protos.h"
 #include "queue.h"
 #include "linked_list.h"
+#include "balanced_btree.h"
+#include "protected_data.h"
 #include "logging.h"
 
 
@@ -56,16 +59,26 @@ WINDOW         *winDetails;
 WINDOW         *winLog;
 WINDOW         *winTailer;
 
-void *curses_output_thread(void *arg);
-void *curses_input_thread(void *arg);
-void cursesWindowSet(void);
+void *curses_output_thread( void *arg );
+void *curses_input_thread( void *arg );
+void cursesWindowSet( void );
+void cursesMenuInitialize( void );
+void cursesMenuRegenerate( void );
+int cursesItemCount( BalancedBTree_t *tree );
+int cursesItemCountRecurse( BalancedBTreeItem_t *node );
+void cursesSubmenuRegenerate( int menuId, BalancedBTree_t *tree );
+void cursesItemAdd( ITEM **items, BalancedBTree_t *tree, int start );
+int cursesItemAddRecurse( ITEM **items, BalancedBTreeItem_t *node, int start );
+void cursesSubmenuAddAll( BalancedBTreeItem_t *node );
+void cursesDoSubMenu( void *arg );
 
 typedef enum {
     CURSES_TEXT_ADD,
     CURSES_TEXT_REMOVE,
     CURSES_WINDOW_CLEAR,
     CURSES_LOG_MESSAGE,
-    CURSES_MENU_ITEM,
+    CURSES_MENU_ITEM_ADD,
+    CURSES_MENU_ITEM_REMOVE,
     CURSES_KEYSTROKE,
     CURSES_SIGNAL
 } CursesType_t;
@@ -102,14 +115,10 @@ typedef struct {
     char               *message;
 } CursesLog_t;
 
-typedef void (*CursesMenuFunc_t)(int, void *);
 typedef struct {
-    int                 menuId;
     int                 level;
-    CursesMenuFunc_t    menuFunc;
-    char               *string;
-    bool                add;
-} CursesMenuItem_t;
+    int                 menuId;
+} CursesMenuItemNotify_t;
 
 typedef struct {
     int             keystroke;
@@ -118,37 +127,89 @@ typedef struct {
 typedef struct {
     CursesType_t    type;
     union {
-        CursesText_t        text;
-        CursesLog_t         log;
-        CursesMenuItem_t    menuItem;
-        CursesKeystroke_t   key;
+        CursesText_t            text;
+        CursesLog_t             log;
+        CursesMenuItemNotify_t  menu;
+        CursesKeystroke_t       key;
     } data;
 } CursesItem_t;
 
 LinkedList_t       *textEntries[WINDOW_COUNT];
 
-void cursesWindowSet(void)
+
+typedef struct {
+    int                 menuId;
+    int                 menuParentId;
+    char               *string;
+    ITEM               *menuItem;
+    CursesMenuFunc_t    menuFunc;
+    void               *menuFuncArg;
+    BalancedBTree_t    *subMenuTree;
+} CursesMenuItem_t;
+
+typedef enum {
+    MENU_SYSTEM,
+    MENU_SERVERS,
+    MENU_CHANNELS,
+    MENU_DATABASE,
+    MENU_PLUGINS
+} CursesMenuNum_t;
+
+static CursesMenuItem_t menu1Static[] = {
+    { 0, -1, "System",   NULL, cursesDoSubMenu, NULL, NULL },
+    { 1, -1, "Servers",  NULL, cursesDoSubMenu, NULL, NULL },
+    { 2, -1, "Channels", NULL, cursesDoSubMenu, NULL, NULL },
+    { 3, -1, "Database", NULL, cursesDoSubMenu, NULL, NULL },
+    { 4, -1, "Plugins",  NULL, cursesDoSubMenu, NULL, NULL }
+};
+static int menu1StaticCount = NELEMENTS(menu1Static);
+static BalancedBTree_t *menu1Tree;
+static BalancedBTree_t *menu1NumTree;
+
+typedef struct {
+    MENU           *menu;
+    ITEM          **items;
+    int             itemCount;
+    bool            posted;
+    int             current;
+} CursesMenu_t;
+
+static CursesMenu_t   **menus = NULL;
+static int              menusCount = 0;
+
+static ProtectedData_t  *nextMenuId;
+static int               currMenuId = -1;
+
+CursesMenuItem_t *cursesMenu1Find( int menuId );
+
+
+void cursesWindowSet( void )
 {
     int         lines;
 
-    lines = (LINES-4)/2;
 
     initscr();
+    curs_set(0);
+    cbreak();
+    noecho();
+    keypad(stdscr, TRUE);
+
+    lines = (LINES-5)/2;
+
     winFull    = newwin( 0, 0, 0, 0 );
     winHeader  = subwin( winFull, 2, COLS, 0, 0 );
     winMenu1   = subwin( winFull, lines, 15, 2, 0 );
     winMenu2   = subwin( winFull, lines, (COLS / 2) - 15, 2, 15 );
     winDetails = subwin( winFull, lines, COLS / 2, 2, COLS / 2 );
-    winLog     = subwin( winFull, lines, COLS, lines + 2, 0 );
-    winTailer  = subwin( winFull, 2, COLS, (2 * lines) + 2, 0 );
+    winLog     = subwin( winFull, lines + ((LINES-5) & 1), COLS, lines + 3, 0 );
+    winTailer  = subwin( winFull, 2, COLS, LINES-2, 0 );
 
-    curs_set(0);
-    nodelay(stdscr, TRUE);
-    cbreak();
-    noecho();
+    wclear( winFull );
+    mvwhline( winFull, lines + 2, 0, ACS_HLINE, COLS );
+    wrefresh( winFull );
 }
 
-void curses_start(void)
+void curses_start( void )
 {
     int         i;
 
@@ -157,6 +218,7 @@ void curses_start(void)
     }
 
     cursesWindowSet();
+    cursesMenuInitialize();
 
     CursesQ    = QueueCreate(2048);
     CursesLogQ = QueueCreate(2048);
@@ -167,7 +229,7 @@ void curses_start(void)
                    "thread_curses_in", NULL, NULL );
 }
 
-void *curses_output_thread(void *arg)
+void *curses_output_thread( void *arg )
 {
     CursesItem_t       *item;
     CursesWindow_t      winNum;
@@ -177,10 +239,13 @@ void *curses_output_thread(void *arg)
     bool                found;
     bool                scrolledBack;
     int                 count;
-    int                 logTop;
+    int                 logTop = 0;
     int                 lines;
     int                 logEntry;
     int                 i;
+    ITEM               *currItem;
+    CursesMenuItem_t   *menuItem;
+    int                 mainMenu = -1;
 
     scrolledBack = FALSE;
 
@@ -263,10 +328,97 @@ void *curses_output_thread(void *arg)
                 QueueUnlock( CursesLogQ );
             }
             break;
-        case CURSES_MENU_ITEM:
+        case CURSES_MENU_ITEM_ADD:
+        case CURSES_MENU_ITEM_REMOVE:
+            /* The real work is done in cursesMenuItemAdd */
+            cursesMenuRegenerate();
             break;
         case CURSES_KEYSTROKE:
             LogPrint( LOG_CRIT, "Keystroke: %d", item->data.key.keystroke );
+            switch( item->data.key.keystroke ) {
+            case KEY_UP:
+                if( currMenuId == -1 ) {
+                    menu_driver( menus[0]->menu, REQ_UP_ITEM );
+                }
+                break;
+            case KEY_DOWN:
+                if( currMenuId == -1 ) {
+                    menu_driver( menus[0]->menu, REQ_DOWN_ITEM );
+                }
+                break;
+            case KEY_LEFT:
+                if( currMenuId != -1 ) {
+                    menu_driver( menus[currMenuId+1]->menu, REQ_UP_ITEM );
+                }
+                break;
+            case KEY_RIGHT:
+                if( currMenuId != -1 ) {
+                    menu_driver( menus[currMenuId+1]->menu, REQ_DOWN_ITEM );
+                }
+                break;
+            case KEY_PPAGE:
+                QueueLock( CursesLogQ );
+                lines = (LINES-5)/2 + ((LINES-5) & 1);
+                count = QueueUsed( CursesLogQ );
+
+                if( count <= lines ) {
+                    scrolledBack = FALSE;
+                    QueueUnlock( CursesLogQ );
+                    break;
+                }
+
+                scrolledBack = TRUE;
+                if( scrolledBack ) {
+                    count = (logTop + CursesLogQ->numElements - 
+                             CursesLogQ->tail) & CursesLogQ->numMask;
+                    if( count < lines ) {
+                        logTop = CursesLogQ->tail;
+                    } else {
+                        logTop = (logTop + CursesLogQ->numElements - lines) &
+                                 CursesLogQ->numMask;
+                    }
+                }
+                QueueUnlock( CursesLogQ );
+                break;
+            case KEY_NPAGE:
+                if( !scrolledBack ) {
+                    break;
+                }
+
+                QueueLock( CursesLogQ );
+                lines = (LINES-5)/2 + ((LINES-5) & 1);
+                count = QueueUsed( CursesLogQ );
+
+                if( count <= lines ) {
+                    scrolledBack = FALSE;
+                    QueueUnlock( CursesLogQ );
+                    break;
+                }
+
+                count = (CursesLogQ->head + CursesLogQ->numElements - logTop) &
+                        CursesLogQ->numMask;
+                if( count <= 2 * lines ) {
+                    scrolledBack = FALSE;
+                } else {
+                    logTop = (logTop + lines) & CursesLogQ->numMask;
+                }
+                QueueUnlock( CursesLogQ );
+                break;
+            case 10:    /* Enter */
+                currItem = current_item( menus[currMenuId+1]->menu );
+                menuItem = (CursesMenuItem_t *)item_userptr(currItem);
+                pos_menu_cursor( menus[currMenuId+1]->menu );
+                menuItem->menuFunc( menuItem->menuFuncArg );
+                break;
+            case 27:    /* Escape */
+                if( currMenuId != -1 ) {
+                    pos_menu_cursor( menus[currMenuId+1]->menu );
+                    cursesDoSubMenu( &mainMenu );
+                }
+                break;
+            default:
+                break;
+            }
             break;
         case CURSES_SIGNAL:
 
@@ -298,14 +450,15 @@ void *curses_output_thread(void *arg)
     UpdateLogs:
 #endif
         QueueLock( CursesLogQ );
-        lines = (LINES-4)/2;
+        lines = (LINES-5)/2 + ((LINES-5) & 1);
 
         count = QueueUsed( CursesLogQ );
         if( count > lines ) {
             if( !scrolledBack ) {
-                logTop = (CursesLogQ->head + CursesLogQ->numElements - lines) &
-                         CursesLogQ->numMask;
+                logTop = (CursesLogQ->head + CursesLogQ->numElements - 
+                          lines) & CursesLogQ->numMask;
             }
+            count = lines;
         } else {
             logTop = CursesLogQ->tail;
         }
@@ -324,10 +477,11 @@ void *curses_output_thread(void *arg)
     }
 
     LogPrintNoArg( LOG_NOTICE, "Ending curses output thread" );
+    endwin();
     return(NULL);
 }
 
-void *curses_input_thread(void *arg)
+void *curses_input_thread( void *arg )
 {
     int                 ch;
     CursesItem_t       *item;
@@ -335,7 +489,7 @@ void *curses_input_thread(void *arg)
     LogPrintNoArg( LOG_NOTICE, "Starting curses input thread" );
 
     while( !GlobalAbort ) {
-        ch = wgetch( winFull );
+        ch = wgetch( stdscr );
         if( ch == ERR ) {
             /* No character, timed out */
             continue;
@@ -351,6 +505,384 @@ void *curses_input_thread(void *arg)
     return(NULL);
 }
 
+int cursesMenuAddItem( int level, int menuId, char *string, 
+                       CursesMenuFunc_t menuFunc, void *menuFuncArg )
+{
+    CursesMenuItem_t       *menuItem;
+    CursesItem_t           *cursesItem;
+    BalancedBTreeItem_t    *item;
+    BalancedBTree_t        *tree;
+    int                    *id;
+    int                     retval;
+
+    if( level == 1 ) {
+        menuItem = (CursesMenuItem_t *)malloc(sizeof(CursesMenuItem_t));
+        
+        ProtectedDataLock( nextMenuId );
+        id = (int *)nextMenuId->data;
+        menuItem->menuId       = (*id)++;
+        ProtectedDataUnlock( nextMenuId );
+
+        menuItem->menuParentId = -1;
+        menuItem->string       = string;
+        menuItem->menuItem     = new_item( menuItem->string, "" );
+        set_item_userptr( menuItem->menuItem, (void *)menuItem );
+        menuItem->menuFunc     = cursesDoSubMenu;
+        menuItem->menuFuncArg  = (void *)&menuItem->menuId;
+        menuItem->subMenuTree  = BalancedBTreeCreate( BTREE_KEY_STRING );
+
+        item = (BalancedBTreeItem_t *)malloc(sizeof(BalancedBTreeItem_t));
+        item->item = (void *)menuItem;
+        item->key  = (void *)&menuItem->menuId;
+        BalancedBTreeAdd( menu1NumTree, item, UNLOCKED, TRUE );
+
+        tree = menu1Tree;
+        retval = menuItem->menuId;
+    } else {
+        menuItem = cursesMenu1Find( menuId );
+        if( !menuItem ) {
+            return( -1 );
+        }
+
+        tree = menuItem->subMenuTree;
+
+        menuItem = (CursesMenuItem_t *)malloc(sizeof(CursesMenuItem_t));
+        menuItem->menuId       = -1;
+        menuItem->menuParentId = menuId;
+        menuItem->string       = string;
+        menuItem->menuFunc     = menuFunc;
+        menuItem->menuFuncArg  = menuFuncArg;
+        menuItem->menuItem     = new_item( menuItem->string, "" );
+        set_item_userptr( menuItem->menuItem, (void *)menuItem );
+        menuItem->subMenuTree  = NULL;
+
+        retval = menuId;
+    }
+
+    item = (BalancedBTreeItem_t *)malloc(sizeof(BalancedBTreeItem_t));
+    item->item = (void *)menuItem;
+    item->key  = (void *)&menuItem->string;
+    BalancedBTreeAdd( tree, item, UNLOCKED, TRUE );
+
+    cursesItem = (CursesItem_t *)malloc(sizeof(CursesItem_t));
+    cursesItem->type = CURSES_MENU_ITEM_ADD;
+    cursesItem->data.menu.level  = (level == 1 ? 1 : 2);
+    cursesItem->data.menu.menuId = retval;
+    QueueEnqueueItem( CursesQ, (void *)cursesItem );
+
+    return( retval );
+}
+
+void cursesMenuAddRemove( int level, int menuId, char *string )
+{
+    CursesMenuItem_t       *menuItem;
+    CursesMenuItem_t       *subMenuItem;
+    CursesItem_t           *cursesItem;
+    BalancedBTreeItem_t    *item;
+
+    if( level == 1 ) {
+        BalancedBTreeLock( menu1Tree );
+        item = BalancedBTreeFind( menu1Tree, &string, LOCKED );
+        if( !item ) {
+            BalancedBTreeUnlock( menu1Tree );
+            return;
+        }
+
+        menuItem = (CursesMenuItem_t *)item->item;
+        BalancedBTreeRemove( menu1Tree, item, LOCKED, TRUE );
+        BalancedBTreeUnlock( menu1Tree );
+        free( item );
+        free( menuItem->string );
+        free_item( menuItem->menuItem );
+
+        BalancedBTreeLock( menu1NumTree );
+        item = BalancedBTreeFind( menu1NumTree, &menuItem->menuId, LOCKED );
+        if( item ) {
+            BalancedBTreeRemove( menu1NumTree, item, LOCKED, TRUE );
+            free( item );
+        }
+        BalancedBTreeUnlock( menu1NumTree );
+        
+        BalancedBTreeLock( menuItem->subMenuTree );
+        while( (item = menuItem->subMenuTree->root) ) {
+            subMenuItem = (CursesMenuItem_t *)item->item;
+            BalancedBTreeRemove( menuItem->subMenuTree, item, LOCKED, FALSE );
+            free( item );
+
+            free( subMenuItem->string );
+            free_item( subMenuItem->menuItem );
+            free( subMenuItem );
+        }
+        BalancedBTreeDestroy( menuItem->subMenuTree );
+        free( menuItem );
+    } else {
+        menuItem = cursesMenu1Find( menuId );
+        if( !menuItem ) {
+            return;
+        }
+
+        BalancedBTreeLock( menuItem->subMenuTree );
+        item = BalancedBTreeFind( menuItem->subMenuTree, &string, LOCKED );
+        if( !item ) {
+            BalancedBTreeUnlock( menuItem->subMenuTree );
+            return;
+        }
+        BalancedBTreeRemove( menuItem->subMenuTree, item, LOCKED, TRUE );
+        BalancedBTreeUnlock( menuItem->subMenuTree );
+        subMenuItem = (CursesMenuItem_t *)item->item;
+        free( item );
+
+        free( subMenuItem->string );
+        free_item( subMenuItem->menuItem );
+        free( subMenuItem );
+    }
+
+    cursesItem = (CursesItem_t *)malloc(sizeof(CursesItem_t));
+    cursesItem->type = CURSES_MENU_ITEM_REMOVE;
+    cursesItem->data.menu.level  = (level == 1 ? 1 : 2);
+    cursesItem->data.menu.menuId = menuId;
+    QueueEnqueueItem( CursesQ, (void *)cursesItem );
+}
+
+CursesMenuItem_t *cursesMenu1Find( int menuId )
+{
+    BalancedBTreeItem_t    *item;
+    CursesMenuItem_t       *menuItem;
+
+    if( menuId < 0 ) {
+        return( NULL );
+    }
+
+    if( menuId < menu1StaticCount ) {
+        return( &menu1Static[menuId] );
+    }
+
+    item = BalancedBTreeFind( menu1NumTree, &menuId, UNLOCKED );
+    if( !item ) {
+        return( NULL );
+    }
+
+    menuItem = (CursesMenuItem_t *)item->item;
+    return( menuItem );
+}
+
+void cursesDoSubMenu( void *arg )
+{
+    int        *item;
+
+    item = (int *)arg;
+}
+
+void cursesMenuInitialize( void )
+{
+    int             i;
+
+    nextMenuId = ProtectedDataCreate();
+    nextMenuId->data = (void *)malloc(sizeof(int));
+    *(int *)nextMenuId->data = NELEMENTS(menu1Static);
+
+    for( i = 0; i < menu1StaticCount; i++ ) {
+        menu1Static[i].menuItem = new_item( menu1Static[i].string, "" );
+        set_item_userptr( menu1Static[i].menuItem, (void *)&menu1Static[i] );
+        menu1Static[i].subMenuTree = BalancedBTreeCreate( BTREE_KEY_STRING );
+    }
+
+    menu1Tree = BalancedBTreeCreate( BTREE_KEY_STRING );
+    menu1NumTree = BalancedBTreeCreate( BTREE_KEY_INT );
+
+    cursesMenuRegenerate();
+}
+
+void cursesMenuRegenerate( void )
+{
+    int             count;
+    int             i;
+
+    ProtectedDataLock( nextMenuId );
+    count = *(int *)nextMenuId->data;
+    ProtectedDataUnlock( nextMenuId );
+
+    /* Account for the main menu at 0 */
+    count++;
+
+    if( count > menusCount ) {
+        menus = (CursesMenu_t **)realloc(menus, count * sizeof(CursesMenu_t *));
+        for( i = menusCount; i < count; i++ ) {
+            menus[i] = (CursesMenu_t *)malloc(sizeof(CursesMenu_t));
+            memset( menus[i], 0x00, sizeof(CursesMenu_t) );
+        }
+        menusCount = count;
+    }
+
+    /* Unpost and free all menus so we can mess with them */
+    for( i = 0; i < menusCount; i++ ) {
+        if( menus[i]->menu ) {
+            menus[i]->current = item_index( current_item( menus[i]->menu ) );
+            if( menus[i]->posted ) {
+                unpost_menu( menus[i]->menu );
+            }
+            free_menu( menus[i]->menu );
+        }
+    }
+
+    /* Regenerate main menu */
+    BalancedBTreeLock( menu1Tree );
+    menus[0]->itemCount = menu1StaticCount + cursesItemCount( menu1Tree );
+    count = menus[0]->itemCount + 1;
+    menus[0]->items = (ITEM **)realloc(menus[0]->items, count * sizeof(ITEM *));
+    for( i = 0; i < menu1StaticCount; i++ ) {
+        menus[0]->items[i] = menu1Static[i].menuItem;
+
+        cursesSubmenuRegenerate( menu1Static[i].menuId, 
+                                 menu1Static[i].subMenuTree );
+    }
+
+    cursesItemAdd( menus[0]->items, menu1Tree, i );
+    cursesSubmenuAddAll( menu1Tree->root );
+    BalancedBTreeUnlock( menu1Tree );
+
+    /* Recreate & repost menus */
+    for( i = 0; i < menusCount; i++ ) {
+        if( menus[i]->items ) {
+            menus[i]->menu = new_menu( menus[i]->items );
+            if( i == 0 ) {
+                set_menu_format( menus[i]->menu, (LINES-5)/2, 1 );
+                set_menu_win( menus[i]->menu, winMenu1 );
+                set_menu_sub( menus[i]->menu, winMenu1 );
+                menus[i]->posted = TRUE;
+            } else {
+                set_menu_format( menus[i]->menu, 1, (COLS/2) - 15 );
+                set_menu_win( menus[i]->menu, winMenu2 );
+                set_menu_sub( menus[i]->menu, winMenu2 );
+            }
+
+            if( menus[i]->current >= menus[i]->itemCount ) {
+                menus[i]->current = menus[i]->itemCount - 1;
+            }
+            if( menus[i]->current < 0 ) {
+                menus[i]->current = 0;
+            }
+            count = menus[i]->current;
+            set_current_item( menus[i]->menu, menus[i]->items[count] );
+            if( menus[i]->posted ) {
+                post_menu( menus[i]->menu );
+            }
+        } else {
+            menus[i]->posted = FALSE;
+        }
+    }
+}
+
+int cursesItemCount( BalancedBTree_t *tree )
+{
+    if( !tree ) {
+        return( 0 );
+    }
+
+    return( cursesItemCountRecurse( tree->root ) );
+}
+
+int cursesItemCountRecurse( BalancedBTreeItem_t *node )
+{
+    int         retval = 0;
+
+    if( !node ) {
+        return( 0 );
+    }
+
+    retval += cursesItemCountRecurse( node->left );
+
+    retval++;
+
+    retval += cursesItemCountRecurse( node->right );
+
+    return( retval );
+}
+
+void cursesSubmenuRegenerate( int menuId, BalancedBTree_t *tree )
+{
+    CursesMenu_t       *menu;
+    int                 count;
+
+    if( menuId > menusCount ) {
+        return;
+    }
+
+    menu = menus[menuId+1];
+
+    if( !tree ) {
+        if( menu->items ) {
+            free( menu->items );
+        }
+        if( menu->menu ) {
+            free_menu( menu->menu );
+        }
+        memset( menu, 0x00, sizeof(CursesMenu_t) );
+        return;
+    }
+
+    BalancedBTreeLock( tree );
+    menu->itemCount = cursesItemCount( tree );
+    count = menu->itemCount + 1;
+    menu->items = (ITEM **)realloc(menu->items, count * sizeof(ITEM *));
+    cursesItemAdd( menu->items, tree, 0 );
+    BalancedBTreeUnlock( tree );
+}
+
+void cursesItemAdd( ITEM **items, BalancedBTree_t *tree, int start )
+{
+    if( !tree || !items ) {
+        return;
+    }
+
+    start = cursesItemAddRecurse( items, tree->root, start );
+    items[start] = NULL;
+}
+
+int cursesItemAddRecurse( ITEM **items, BalancedBTreeItem_t *node, int start )
+{
+    CursesMenuItem_t   *item;
+
+    if( !items || !node ) {
+        return( start );
+    }
+
+    start = cursesItemAddRecurse( items, node->left, start );
+
+    item = (CursesMenuItem_t *)node->item;
+    items[start++] = item->menuItem;
+
+    start = cursesItemAddRecurse( items, node->right, start );
+    return( start );
+}
+
+void cursesSubmenuAddAll( BalancedBTreeItem_t *node )
+{
+    CursesMenuItem_t   *menuItem;
+
+    if( !node ) {
+        return;
+    }
+
+    cursesSubmenuAddAll( node->left );
+
+    menuItem = (CursesMenuItem_t *)node->item;
+    if( menuItem->menuId < menusCount ) {
+        cursesSubmenuRegenerate( menuItem->menuId, menuItem->subMenuTree );
+    }
+    
+    cursesSubmenuAddAll( node->left );
+}
+
+void cursesLogWrite( char *message )
+{
+    CursesItem_t       *cursesItem;
+
+    cursesItem = (CursesItem_t *)malloc(sizeof(CursesItem_t));
+    cursesItem->type = CURSES_LOG_MESSAGE;
+    cursesItem->data.log.message = strdup(message);
+    QueueEnqueueItem( CursesQ, (void *)cursesItem );
+}
 
 /*
  * vim:ts=4:sw=4:ai:et:si:sts=4

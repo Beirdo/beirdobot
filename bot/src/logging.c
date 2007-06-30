@@ -141,7 +141,11 @@ void logging_initialize( void )
     LoggingQ = QueueCreate(1024);
     LogList = LinkedListCreate();
 
+#if 0
     LogStdoutAdd();
+#else
+    LogNcursesAdd();
+#endif
     LogSyslogAdd( LOG_LOCAL7 );
     if( Debug ) {
         LogFileAdd( DEBUG_FILE );
@@ -248,6 +252,9 @@ void LogOutputAdd( int fd, LogFileType_t type, void *identifier )
         case LT_CONSOLE:
             item->fd = fd;
             break;
+        case LT_NCURSES:
+            item->fd = -1;
+            break;
         default:
             /* UNKNOWN! */
             free( item );
@@ -334,6 +341,14 @@ bool LogFileAdd( char * filename )
 
     LogOutputAdd( fd, LT_FILE, filename );
     LogPrint( LOG_INFO, "Added log file: %s", filename );
+
+    return( TRUE );
+}
+
+bool LogNcursesAdd( void )
+{
+    LogOutputAdd( -1, LT_NCURSES, NULL );
+    LogPrintNoArg( LOG_INFO, "Added logging to ncurses" );
 
     return( TRUE );
 }
@@ -425,6 +440,10 @@ void LogItemOutput( void *vitem )
                      item->file, item->line, item->function, 
                      item->message );
             LogWrite( logFile, line, strlen(line) );
+            break;
+        case LT_NCURSES:
+            sprintf( line, "%s %s\n", timestamp, item->message );
+            cursesLogWrite( line );
             break;
         default:
             break;

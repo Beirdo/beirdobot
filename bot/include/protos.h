@@ -132,6 +132,7 @@ void LogOutputAdd( int fd, LogFileType_t type, void *identifier );
 bool LogOutputRemove( LogFileChain_t *logfile );
 bool LogSyslogAdd( int facility );
 bool LogStdoutAdd( void );
+bool LogNcursesAdd( void );
 bool LogFileAdd( char * filename );
 bool LogFileRemove( char *filename );
 void LogItemOutput( void *vitem );
@@ -174,6 +175,12 @@ void serverKill( BalancedBTreeItem_t *node, IRCServer_t *server, bool unalloc );
 void serverStart( IRCServer_t *server );
 void channelLeave( IRCServer_t *server, IRCChannel_t *channel, 
                    char *oldChannel );
+
+void curses_start( void );
+int cursesMenuAddItem( int level, int menuId, char *string, 
+                       CursesMenuFunc_t menuFunc, void *menuFuncArg );
+void cursesMenuAddRemove( int level, int menuId, char *string );
+void cursesLogWrite( char *message );
 
 
 #endif

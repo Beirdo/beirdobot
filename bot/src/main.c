@@ -165,6 +165,8 @@ int main ( int argc, char **argv )
     sigaction( SIGILL, &sa, NULL );
     sigaction( SIGFPE, &sa, NULL );
 
+    curses_start();
+
     /* Print the startup log messages */
     LogBanner();
 
