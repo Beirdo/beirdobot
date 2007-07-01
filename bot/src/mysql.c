@@ -1653,9 +1653,11 @@ void result_get_plugins( MYSQL_RES *res, MYSQL_BIND *input, void *arg )
         }
 
         if( found ) {
+            cursesMenuItemRemove( 2, MENU_PLUGINS, plugin->name );
             free( plugin->name );
         }
         plugin->name    = strdup(row[0]);
+        cursesMenuItemAdd( 2, MENU_PLUGINS, plugin->name, NULL, NULL );
 
         if( found ) {
             free( plugin->libName );
