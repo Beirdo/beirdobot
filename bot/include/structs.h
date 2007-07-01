@@ -307,6 +307,25 @@ typedef void (*SigFunc_t)( int, void * );
 
 typedef void (*CursesMenuFunc_t)(void *);
 
+typedef enum {
+    WINDOW_HEADER,
+    WINDOW_MENU1,
+    WINDOW_MENU2,
+    WINDOW_DETAILS,
+    WINDOW_LOG,
+    WINDOW_TAILER,
+    WINDOW_COUNT
+} CursesWindow_t;
+
+typedef enum {
+    MENU_SYSTEM,
+    MENU_SERVERS,
+    MENU_CHANNELS,
+    MENU_DATABASE,
+    MENU_PLUGINS
+} CursesMenuNum_t;
+
+
 #endif
 
 /*

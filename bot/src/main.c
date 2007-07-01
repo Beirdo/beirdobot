@@ -121,6 +121,7 @@ int main ( int argc, char **argv )
     sigdelset( &sigmsk, SIGUSR1 );
     sigdelset( &sigmsk, SIGUSR2 );
     sigdelset( &sigmsk, SIGHUP );
+    sigdelset( &sigmsk, SIGWINCH );
     sigdelset( &sigmsk, SIGINT );
     sigdelset( &sigmsk, SIGSEGV );
     sigdelset( &sigmsk, SIGILL );
@@ -156,6 +157,7 @@ int main ( int argc, char **argv )
     sa.sa_flags = SA_RESTART | SA_SIGINFO;
     sigaction( SIGUSR2, &sa, NULL );
     sigaction( SIGHUP, &sa, NULL );
+    sigaction( SIGWINCH, &sa, NULL );
 
     /* Setup signal handlers for SEGV, ILL, FPE */
     sa.sa_sigaction = signal_death;
@@ -205,8 +207,12 @@ int main ( int argc, char **argv )
 
 void LogBanner( void )
 {
-    LogPrintNoArg( LOG_CRIT, "beirdobot  (c) 2006 Gavin Hurlbut" );
+    LogPrintNoArg( LOG_CRIT, "beirdobot  (c) 2007 Gavin Hurlbut" );
     LogPrint( LOG_CRIT, "%s", svn_version() );
+
+    cursesTextAdd( WINDOW_HEADER, 0, 0, "beirdobot" );
+    cursesTextAdd( WINDOW_HEADER, 10, 0, (char *)svn_version() );
+    cursesTextAdd( WINDOW_HEADER, 40, 0, "(c) 2007 Gavin Hurlbut" );
 }
 
 
@@ -398,9 +404,11 @@ void signal_everyone( int signum, siginfo_t *info, void *secret )
     uc = (ucontext_t *)secret;
     myThreadId = pthread_self();
 
+#if 0
     if( pthread_equal( myThreadId, mainThreadId ) ) {
         LogPrint( LOG_CRIT, "Received signal: %s", sys_siglist[signum] );
     }
+#endif
 
     sigFunc = ThreadGetHandler( myThreadId, signum, &arg );
     if( sigFunc ) {

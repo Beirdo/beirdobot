@@ -71,6 +71,8 @@ void cursesItemAdd( ITEM **items, BalancedBTree_t *tree, int start );
 int cursesItemAddRecurse( ITEM **items, BalancedBTreeItem_t *node, int start );
 void cursesSubmenuAddAll( BalancedBTreeItem_t *node );
 void cursesDoSubMenu( void *arg );
+void cursesAtExit( void );
+void cursesReloadScreen( void );
 
 typedef enum {
     CURSES_TEXT_ADD,
@@ -83,15 +85,6 @@ typedef enum {
     CURSES_SIGNAL
 } CursesType_t;
 
-typedef enum {
-    WINDOW_HEADER,
-    WINDOW_MENU1,
-    WINDOW_MENU2,
-    WINDOW_DETAILS,
-    WINDOW_LOG,
-    WINDOW_TAILER,
-    WINDOW_COUNT
-} CursesWindow_t;
 
 WINDOW        **windows[] = {
     &winHeader,
@@ -146,14 +139,6 @@ typedef struct {
     void               *menuFuncArg;
     BalancedBTree_t    *subMenuTree;
 } CursesMenuItem_t;
-
-typedef enum {
-    MENU_SYSTEM,
-    MENU_SERVERS,
-    MENU_CHANNELS,
-    MENU_DATABASE,
-    MENU_PLUGINS
-} CursesMenuNum_t;
 
 static CursesMenuItem_t menu1Static[] = {
     { 0, -1, "System",   NULL, cursesDoSubMenu, NULL, NULL },
@@ -248,6 +233,7 @@ void *curses_output_thread( void *arg )
     int                 mainMenu = -1;
 
     scrolledBack = FALSE;
+    atexit( cursesAtExit );
 
     LogPrintNoArg( LOG_NOTICE, "Starting curses output thread" );
 
@@ -334,31 +320,31 @@ void *curses_output_thread( void *arg )
             cursesMenuRegenerate();
             break;
         case CURSES_KEYSTROKE:
+#if 0
             LogPrint( LOG_CRIT, "Keystroke: %d", item->data.key.keystroke );
+#endif
             switch( item->data.key.keystroke ) {
             case KEY_UP:
-                if( currMenuId == -1 ) {
-                    menu_driver( menus[0]->menu, REQ_UP_ITEM );
-                }
+                menu_driver( menus[currMenuId+1]->menu, REQ_UP_ITEM );
                 break;
             case KEY_DOWN:
-                if( currMenuId == -1 ) {
-                    menu_driver( menus[0]->menu, REQ_DOWN_ITEM );
-                }
+                menu_driver( menus[currMenuId+1]->menu, REQ_DOWN_ITEM );
                 break;
+#if 0
             case KEY_LEFT:
                 if( currMenuId != -1 ) {
-                    menu_driver( menus[currMenuId+1]->menu, REQ_UP_ITEM );
+                    menu_driver( menus[currMenuId+1]->menu, REQ_LEFT_ITEM );
                 }
                 break;
             case KEY_RIGHT:
                 if( currMenuId != -1 ) {
-                    menu_driver( menus[currMenuId+1]->menu, REQ_DOWN_ITEM );
+                    menu_driver( menus[currMenuId+1]->menu, REQ_RIGHT_ITEM );
                 }
                 break;
+#endif
             case KEY_PPAGE:
                 QueueLock( CursesLogQ );
-                lines = (LINES-5)/2 + ((LINES-5) & 1);
+                lines = ((LINES-5)/2) + ((LINES-5) & 1);
                 count = QueueUsed( CursesLogQ );
 
                 if( count <= lines ) {
@@ -408,7 +394,12 @@ void *curses_output_thread( void *arg )
                 currItem = current_item( menus[currMenuId+1]->menu );
                 menuItem = (CursesMenuItem_t *)item_userptr(currItem);
                 pos_menu_cursor( menus[currMenuId+1]->menu );
-                menuItem->menuFunc( menuItem->menuFuncArg );
+                if( menuItem->menuFunc ) {
+                    menuItem->menuFunc( menuItem->menuFuncArg );
+                }
+                break;
+            case 18:    /* Ctrl-R */
+                cursesReloadScreen();
                 break;
             case 27:    /* Escape */
                 if( currMenuId != -1 ) {
@@ -421,7 +412,7 @@ void *curses_output_thread( void *arg )
             }
             break;
         case CURSES_SIGNAL:
-
+            cursesReloadScreen();
             break;
         default:
             break;
@@ -437,8 +428,8 @@ void *curses_output_thread( void *arg )
                  listItem = listItem->next ) {
                 textItem = (CursesText_t *)listItem;
 
-                mvwprintw( *windows[i], textItem->y, textItem->x, "%s",
-                           textItem->string );
+                mvwaddnstr( *windows[i], textItem->y, textItem->x, 
+                            textItem->string, textItem->len );
             }
             LinkedListUnlock( textEntries[i] );
 
@@ -477,8 +468,42 @@ void *curses_output_thread( void *arg )
     }
 
     LogPrintNoArg( LOG_NOTICE, "Ending curses output thread" );
+    cursesAtExit();
+#if 0
+    curs_set(1);
     endwin();
+#endif
     return(NULL);
+}
+
+void cursesReloadScreen( void )
+{
+    int         i;
+
+    delwin( winTailer );
+    delwin( winLog );
+    delwin( winDetails );
+    delwin( winMenu2 );
+    delwin( winMenu1 );
+    delwin( winHeader );
+    delwin( winFull );
+    endwin();
+    cursesWindowSet();
+
+    for( i = 0; i < menusCount; i++ ) {
+        menus[i]->posted = FALSE;
+    }
+    cursesMenuRegenerate();
+}
+
+void cursesAtExit( void )
+{
+    curs_set(1);
+    echo();
+    nl();
+    wmove( winFull, LINES, 0);
+    wrefresh( winFull );
+    endwin();
 }
 
 void *curses_input_thread( void *arg )
@@ -669,8 +694,25 @@ CursesMenuItem_t *cursesMenu1Find( int menuId )
 void cursesDoSubMenu( void *arg )
 {
     int        *item;
+    int         menuId;
 
     item = (int *)arg;
+    if( !item ) {
+        return;
+    }
+    menuId = *item;
+
+    if( currMenuId != -1 ) {
+        unpost_menu( menus[currMenuId+1]->menu );
+        menus[currMenuId+1]->posted = FALSE;
+        wrefresh( winFull );
+    }
+    currMenuId = *item;
+    if( !menus[menuId+1]->posted ) {
+        menus[menuId+1]->posted = TRUE;
+        post_menu( menus[menuId+1]->menu );
+        wrefresh( winFull );
+    }
 }
 
 void cursesMenuInitialize( void )
@@ -682,8 +724,9 @@ void cursesMenuInitialize( void )
     *(int *)nextMenuId->data = NELEMENTS(menu1Static);
 
     for( i = 0; i < menu1StaticCount; i++ ) {
-        menu1Static[i].menuItem = new_item( menu1Static[i].string, "" );
+        menu1Static[i].menuItem    = new_item( menu1Static[i].string, "" );
         set_item_userptr( menu1Static[i].menuItem, (void *)&menu1Static[i] );
+        menu1Static[i].menuFuncArg = (void *)&menu1Static[i].menuId;
         menu1Static[i].subMenuTree = BalancedBTreeCreate( BTREE_KEY_STRING );
     }
 
@@ -751,7 +794,11 @@ void cursesMenuRegenerate( void )
                 set_menu_sub( menus[i]->menu, winMenu1 );
                 menus[i]->posted = TRUE;
             } else {
+#if 0
                 set_menu_format( menus[i]->menu, 1, (COLS/2) - 15 );
+#else
+                set_menu_format( menus[i]->menu, (LINES-5)/2, 1 );
+#endif
                 set_menu_win( menus[i]->menu, winMenu2 );
                 set_menu_sub( menus[i]->menu, winMenu2 );
             }
@@ -881,6 +928,41 @@ void cursesLogWrite( char *message )
     cursesItem = (CursesItem_t *)malloc(sizeof(CursesItem_t));
     cursesItem->type = CURSES_LOG_MESSAGE;
     cursesItem->data.log.message = strdup(message);
+    QueueEnqueueItem( CursesQ, (void *)cursesItem );
+}
+
+void cursesTextAdd( CursesWindow_t window, int x, int y, char *string )
+{
+    CursesItem_t       *cursesItem;
+
+    cursesItem = (CursesItem_t *)malloc(sizeof(CursesItem_t));
+    cursesItem->type = CURSES_TEXT_ADD;
+    cursesItem->data.text.window = window;
+    cursesItem->data.text.x      = x;
+    cursesItem->data.text.y      = y;
+    cursesItem->data.text.string = strdup( string );
+    cursesItem->data.text.len    = strlen( string );
+    QueueEnqueueItem( CursesQ, (void *)cursesItem );
+}
+
+void cursesTextRemove( CursesWindow_t window, int x, int y )
+{
+    CursesItem_t       *cursesItem;
+
+    cursesItem = (CursesItem_t *)malloc(sizeof(CursesItem_t));
+    cursesItem->type = CURSES_TEXT_REMOVE;
+    cursesItem->data.text.window = window;
+    cursesItem->data.text.x      = x;
+    cursesItem->data.text.y      = y;
+    QueueEnqueueItem( CursesQ, (void *)cursesItem );
+}
+
+void cursesSigwinch( int signum, void *arg )
+{
+    CursesItem_t       *cursesItem;
+
+    cursesItem = (CursesItem_t *)malloc(sizeof(CursesItem_t));
+    cursesItem->type = CURSES_SIGNAL;
     QueueEnqueueItem( CursesQ, (void *)cursesItem );
 }
 

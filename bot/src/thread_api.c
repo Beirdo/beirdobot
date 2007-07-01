@@ -41,6 +41,7 @@ static char ident[] _UNUSED_=
 
 BalancedBTree_t    *ThreadTree = NULL;
 extern pthread_t    mainThreadId;
+extern pthread_t    cursesOutThreadId;
 
 typedef struct {
     pthread_t  *threadId;
@@ -152,6 +153,7 @@ void ThreadRecurseKill( BalancedBTreeItem_t *node, int signum )
         switch( signum ) {
         case SIGUSR2:
         case SIGHUP:
+        case SIGWINCH:
 #if 0
             LogPrint( LOG_DEBUG, "Killing thread %s with signal %d",
                                  thread->name, signum );
@@ -188,6 +190,11 @@ SigFunc_t ThreadGetHandler( pthread_t threadId, int signum, void **parg )
         break;
     case SIGHUP:
         return( thread->sighupFunc );
+        break;
+    case SIGWINCH:
+        if( pthread_equal( threadId, cursesOutThreadId ) ) {
+            return( cursesSigwinch );
+        }
         break;
     default:
         break;

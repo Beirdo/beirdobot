@@ -181,6 +181,9 @@ int cursesMenuAddItem( int level, int menuId, char *string,
                        CursesMenuFunc_t menuFunc, void *menuFuncArg );
 void cursesMenuAddRemove( int level, int menuId, char *string );
 void cursesLogWrite( char *message );
+void cursesTextAdd( CursesWindow_t window, int x, int y, char *string );
+void cursesTextRemove( CursesWindow_t window, int x, int y );
+void cursesSigwinch( int signum, void *arg );
 
 
 #endif
