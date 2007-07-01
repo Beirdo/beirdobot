@@ -920,7 +920,7 @@ void cursesSubmenuAddAll( BalancedBTreeItem_t *node )
         cursesSubmenuRegenerate( menuItem->menuId, menuItem->subMenuTree );
     }
     
-    cursesSubmenuAddAll( node->left );
+    cursesSubmenuAddAll( node->right );
 }
 
 void cursesLogWrite( char *message )
