@@ -77,6 +77,7 @@ typedef struct {
     MAILSTREAM         *stream;
     LinkedList_t       *reports;
     bool                visited;
+    char               *menuText;
 } Mailbox_t;
 
 typedef struct {
@@ -202,6 +203,7 @@ BalancedBTree_t        *mailboxTree;
 BalancedBTree_t        *mailboxActiveTree;
 BalancedBTree_t        *mailboxStreamTree;
 static bool             threadReload = FALSE;
+int                     mailboxMenuId;
 
 
 void plugin_initialize( char *args )
@@ -216,6 +218,8 @@ void plugin_initialize( char *args )
     pthread_mutex_init( &shutdownMutex, NULL );
     pthread_mutex_init( &signalMutex, NULL );
     pthread_cond_init( &kickCond, NULL );
+
+    mailboxMenuId = cursesMenuItemAdd( 1, -1, "Mailbox", NULL, NULL );
 
     thread_create( &mailboxThreadId, mailbox_thread, NULL, "thread_mailbox",
                    mailboxSighup, NULL );
@@ -242,6 +246,8 @@ void plugin_shutdown( void )
     /* Clean up stuff once the thread stops */
     pthread_mutex_lock( &shutdownMutex );
     pthread_mutex_destroy( &shutdownMutex );
+
+    cursesMenuItemRemove( 1, mailboxMenuId, "Mailbox" );
 
     pthread_mutex_lock( &signalMutex );
     pthread_cond_broadcast( &kickCond );
@@ -273,6 +279,8 @@ void plugin_shutdown( void )
         free( mailbox->options );
         free( mailbox->mailbox );
         free( mailbox->serverSpec );
+        cursesMenuItemRemove( 2, mailboxMenuId, mailbox->menuText );
+        free( mailbox->menuText );
 
         if( mailbox->reports ) {
             LinkedListLock( mailbox->reports );
@@ -618,6 +626,8 @@ bool mailboxFlushUnvisited( BalancedBTreeItem_t *node )
         free( mailbox->options );
         free( mailbox->mailbox );
         free( mailbox->serverSpec );
+        cursesMenuItemRemove( 2, mailboxMenuId, mailbox->menuText );
+        free( mailbox->menuText );
 
         if( mailbox->reports ) {
             LinkedListLock( mailbox->reports );
@@ -950,6 +960,7 @@ static void result_load_mailboxes( MYSQL_RES *res, MYSQL_BIND *input,
     bool                    oldEnabled;
     char                   *oldServerSpec;
     bool                    newMailbox;
+    char                   *menuText;
 
     if( !res || !(count = mysql_num_rows(res)) ) {
         return;
@@ -1035,6 +1046,27 @@ static void result_load_mailboxes( MYSQL_RES *res, MYSQL_BIND *input,
         mailbox->serverSpec = (char *)malloc(len);
         snprintf( mailbox->serverSpec, len, "{%s%s%s%s%s}%s", mailbox->server,
                   port, user, service, mailbox->options, mailbox->mailbox );
+
+        len = strlen( mailbox->server ) + strlen( mailbox->user ) + 
+              strlen( mailbox->protocol ) + 30;
+        menuText = (char *)malloc(len);
+        snprintf( menuText, len, "%d - %s@%s (%s)", mailbox->mailboxId,
+                            mailbox->user, mailbox->server, mailbox->protocol );
+        if( found ) {
+            if( strcmp( menuText, mailbox->menuText ) ) {
+                cursesMenuItemRemove( 2, mailboxMenuId, mailbox->menuText );
+                free( mailbox->menuText );
+                mailbox->menuText = menuText;
+                cursesMenuItemAdd( 2, mailboxMenuId, mailbox->menuText, NULL,
+                                   NULL );
+            } else {
+                free( menuText );
+            }
+        } else {
+            mailbox->menuText = menuText;
+            cursesMenuItemAdd( 2, mailboxMenuId, mailbox->menuText, NULL,
+                               NULL );
+        }
 
         /* Store by ID */
         if( !found ) {

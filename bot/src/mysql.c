@@ -1402,6 +1402,7 @@ void result_load_servers( MYSQL_RES *res, MYSQL_BIND *input, void *arg )
                              server->server, server->port );
         if( found ) {
             if( strcmp( threadName, server->menuText ) ) {
+                cursesMenuItemRemove( 2, MENU_SERVERS, server->menuText );
                 free( server->menuText );
                 server->menuText = threadName;
                 cursesMenuItemAdd( 2, MENU_SERVERS, server->menuText, NULL,
@@ -1538,6 +1539,7 @@ void result_load_channels( MYSQL_RES *res, MYSQL_BIND *input, void *arg )
                            channel->channel );
         if( found ) {
             if( strcmp( fullSpec, channel->menuText ) ) {
+                cursesMenuItemRemove( 2, MENU_CHANNELS, channel->menuText );
                 free( channel->menuText );
                 channel->menuText = fullSpec;
                 cursesMenuItemAdd( 2, MENU_CHANNELS, channel->menuText, NULL,
