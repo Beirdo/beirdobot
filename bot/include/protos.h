@@ -184,6 +184,7 @@ void cursesLogWrite( char *message );
 void cursesTextAdd( CursesWindow_t window, int x, int y, char *string );
 void cursesTextRemove( CursesWindow_t window, int x, int y );
 void cursesSigwinch( int signum, void *arg );
+void cursesDoSubMenu( void *arg );
 
 
 #endif

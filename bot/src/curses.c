@@ -70,7 +70,6 @@ void cursesSubmenuRegenerate( int menuId, BalancedBTree_t *tree );
 void cursesItemAdd( ITEM **items, BalancedBTree_t *tree, int start );
 int cursesItemAddRecurse( ITEM **items, BalancedBTreeItem_t *node, int start );
 void cursesSubmenuAddAll( BalancedBTreeItem_t *node );
-void cursesDoSubMenu( void *arg );
 void cursesAtExit( void );
 void cursesReloadScreen( void );
 

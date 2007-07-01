@@ -95,6 +95,7 @@ static const struct luaL_reg mylib [] = {
 };
 
 BalancedBTree_t *luascriptTree = NULL;
+int              luascriptMenuId;
 
 #define CURRENT_SCHEMA_LUASCRIPT 1
 
@@ -162,6 +163,8 @@ void plugin_initialize( char *args )
                      CURRENT_SCHEMA_LUASCRIPT, defSchema, defSchemaCount,
                      schemaUpgrade );
 
+    luascriptMenuId = cursesMenuItemAdd( 1, -1, "LUAScript", NULL, NULL );
+
     luascriptTree = db_get_luascripts();
     if( !luascriptTree ) {
         LogPrintNoArg( LOG_NOTICE, "No LUA scripts defined, unloading "
@@ -192,6 +195,7 @@ void plugin_shutdown( void )
     LogPrintNoArg( LOG_NOTICE, "Removing luascript..." );
     botCmd_remove( "luascript" );
 
+    cursesMenuItemRemove( 1, luascriptMenuId, "LUAScript" );
     if( !luascriptTree ) {
         return;
     }
@@ -199,6 +203,7 @@ void plugin_shutdown( void )
     while( (item = luascriptTree->root) ) {
         luascript = (Luascript_t *)item->item;
 
+        cursesMenuItemRemove( 2, luascriptMenuId, luascript->name );
         if( luascript->loaded ) {
             luascriptUnloadItem( luascript );
         }
@@ -285,6 +290,8 @@ void result_get_luascripts( MYSQL_RES *res, MYSQL_BIND *input, void *arg )
         item->key  = (void *)&luascript->name;
 
         BalancedBTreeAdd( tree, item, LOCKED, FALSE );
+
+        cursesMenuItemAdd( 2, luascriptMenuId, luascript->name, NULL, NULL );
     }
 
     /* Rebalance the tree */
