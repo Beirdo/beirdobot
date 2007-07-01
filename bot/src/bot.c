@@ -729,6 +729,9 @@ void serverKill( BalancedBTreeItem_t *node, IRCServer_t *server, bool unalloc )
                 BalancedBTreeRemove( server->channelNum, item, LOCKED, 
                                      FALSE );
             }
+
+            cursesMenuItemRemove( 2, MENU_CHANNELS, channel->menuText );
+            free( channel->menuText );
             free( channel->channel );
             free( channel->fullspec );
             free( channel->url );
@@ -763,6 +766,8 @@ void serverKill( BalancedBTreeItem_t *node, IRCServer_t *server, bool unalloc )
     }
     LinkedListDestroy( server->floodList );
     server->floodList = NULL;
+
+    cursesMenuItemRemove( 2, MENU_SERVERS, server->menuText );
 
     if( unalloc ) {
         free( server->threadName );
@@ -986,6 +991,8 @@ void botSighup( int signum, void *arg )
                                          FALSE );
                 }
 
+                cursesMenuItemRemove( 2, MENU_CHANNELS, channel->menuText );
+                free( channel->menuText );
                 free( channel->channel );
                 free( channel->fullspec );
                 free( channel->url );

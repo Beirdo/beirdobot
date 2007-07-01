@@ -177,9 +177,9 @@ void channelLeave( IRCServer_t *server, IRCChannel_t *channel,
                    char *oldChannel );
 
 void curses_start( void );
-int cursesMenuAddItem( int level, int menuId, char *string, 
+int cursesMenuItemAdd( int level, int menuId, char *string, 
                        CursesMenuFunc_t menuFunc, void *menuFuncArg );
-void cursesMenuAddRemove( int level, int menuId, char *string );
+void cursesMenuItemRemove( int level, int menuId, char *string );
 void cursesLogWrite( char *message );
 void cursesTextAdd( CursesWindow_t window, int x, int y, char *string );
 void cursesTextRemove( CursesWindow_t window, int x, int y );

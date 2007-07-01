@@ -68,6 +68,7 @@ typedef struct {
     bool                enabled;
     bool                visited;
     bool                newServer;
+    char               *menuText;
 } IRCServer_t;
 
 typedef struct {
@@ -85,6 +86,7 @@ typedef struct {
     bool                enabled;
     bool                visited;
     bool                newChannel;
+    char               *menuText;
 } IRCChannel_t;
 
 typedef enum {

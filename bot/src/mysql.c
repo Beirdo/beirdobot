@@ -1396,6 +1396,24 @@ void result_load_servers( MYSQL_RES *res, MYSQL_BIND *input, void *arg )
             server->txThreadName = threadName;
         }
 
+        len = strlen(server->server) + strlen(server->nick) + 18;
+        threadName = (char *)malloc(len);
+        sprintf( threadName, "%d - %s@%s:%d", server->serverId, server->nick,
+                             server->server, server->port );
+        if( found ) {
+            if( strcmp( threadName, server->menuText ) ) {
+                free( server->menuText );
+                server->menuText = threadName;
+                cursesMenuItemAdd( 2, MENU_SERVERS, server->menuText, NULL,
+                                   NULL );
+            } else {
+                free( threadName );
+            }
+        } else {
+            server->menuText = threadName;
+            cursesMenuItemAdd( 2, MENU_SERVERS, server->menuText, NULL, NULL );
+        }
+
         if( (found && oldEnabled && !server->enabled) || killServer ) {
             serverKill( item, server, FALSE );
         }
@@ -1514,6 +1532,24 @@ void result_load_channels( MYSQL_RES *res, MYSQL_BIND *input, void *arg )
         }
         LogPrint( LOG_NOTICE, "%s%s", channel->fullspec,
                               ( channel->enabled ? "" : " (disabled)") );
+
+        fullSpec = (char *)malloc(30 + strlen(channel->channel));
+        sprintf( fullSpec, "%d - (%d) %s", channel->channelId, server->serverId,
+                           channel->channel );
+        if( found ) {
+            if( strcmp( fullSpec, channel->menuText ) ) {
+                free( channel->menuText );
+                channel->menuText = fullSpec;
+                cursesMenuItemAdd( 2, MENU_CHANNELS, channel->menuText, NULL,
+                                   NULL );
+            } else {
+                free( fullSpec );
+            }
+        } else {
+            channel->menuText = fullSpec;
+            cursesMenuItemAdd( 2, MENU_CHANNELS, channel->menuText, NULL,
+                               NULL );
+        }
 
         if( found && strcmp( oldChannel, channel->channel ) ) {
             channel->itemName.key = (void *)&oldChannel;

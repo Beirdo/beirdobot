@@ -261,7 +261,7 @@ void pluginLoadItem( Plugin_t *plugin )
     }
 
     plugin->init(plugin->args);
-    cursesMenuAddItem( 2, MENU_PLUGINS, plugin->name, NULL, NULL );
+    cursesMenuItemAdd( 2, MENU_PLUGINS, plugin->name, NULL, NULL );
     plugin->loaded = true;
 }
 
@@ -276,7 +276,7 @@ void pluginUnloadItem( Plugin_t *plugin )
     plugin->shutdown();
 
     LogPrint( LOG_NOTICE, "Unloading plugin %s", plugin->name );
-    cursesMenuAddRemove( 2, MENU_PLUGINS, plugin->name );
+    cursesMenuItemRemove( 2, MENU_PLUGINS, plugin->name );
     dlclose( plugin->handle );
     plugin->handle = NULL;
     if( (error = dlerror()) != NULL ) {

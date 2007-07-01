@@ -191,6 +191,7 @@ void cursesWindowSet( void )
 
     wclear( winFull );
     mvwhline( winFull, lines + 2, 0, ACS_HLINE, COLS );
+    touchline( winFull, lines + 2, 1 );
     wrefresh( winFull );
 }
 
@@ -330,18 +331,6 @@ void *curses_output_thread( void *arg )
             case KEY_DOWN:
                 menu_driver( menus[currMenuId+1]->menu, REQ_DOWN_ITEM );
                 break;
-#if 0
-            case KEY_LEFT:
-                if( currMenuId != -1 ) {
-                    menu_driver( menus[currMenuId+1]->menu, REQ_LEFT_ITEM );
-                }
-                break;
-            case KEY_RIGHT:
-                if( currMenuId != -1 ) {
-                    menu_driver( menus[currMenuId+1]->menu, REQ_RIGHT_ITEM );
-                }
-                break;
-#endif
             case KEY_PPAGE:
                 QueueLock( CursesLogQ );
                 lines = ((LINES-5)/2) + ((LINES-5) & 1);
@@ -391,6 +380,7 @@ void *curses_output_thread( void *arg )
                 QueueUnlock( CursesLogQ );
                 break;
             case 10:    /* Enter */
+            case KEY_RIGHT:
                 currItem = current_item( menus[currMenuId+1]->menu );
                 menuItem = (CursesMenuItem_t *)item_userptr(currItem);
                 pos_menu_cursor( menus[currMenuId+1]->menu );
@@ -402,6 +392,7 @@ void *curses_output_thread( void *arg )
                 cursesReloadScreen();
                 break;
             case 27:    /* Escape */
+            case KEY_LEFT:
                 if( currMenuId != -1 ) {
                     pos_menu_cursor( menus[currMenuId+1]->menu );
                     cursesDoSubMenu( &mainMenu );
@@ -480,6 +471,18 @@ void cursesReloadScreen( void )
 {
     int         i;
 
+    /* Unpost and free all menus so we can mess with them */
+    for( i = 0; i < menusCount; i++ ) {
+        if( menus[i]->menu ) {
+            menus[i]->current = item_index( current_item( menus[i]->menu ) );
+            if( menus[i]->posted ) {
+                unpost_menu( menus[i]->menu );
+            }
+            free_menu( menus[i]->menu );
+            menus[i]->menu = NULL;
+        }
+    }
+
     delwin( winTailer );
     delwin( winLog );
     delwin( winDetails );
@@ -489,10 +492,6 @@ void cursesReloadScreen( void )
     delwin( winFull );
     endwin();
     cursesWindowSet();
-
-    for( i = 0; i < menusCount; i++ ) {
-        menus[i]->posted = FALSE;
-    }
     cursesMenuRegenerate();
 }
 
@@ -530,7 +529,7 @@ void *curses_input_thread( void *arg )
     return(NULL);
 }
 
-int cursesMenuAddItem( int level, int menuId, char *string, 
+int cursesMenuItemAdd( int level, int menuId, char *string, 
                        CursesMenuFunc_t menuFunc, void *menuFuncArg )
 {
     CursesMenuItem_t       *menuItem;
@@ -549,7 +548,7 @@ int cursesMenuAddItem( int level, int menuId, char *string,
         ProtectedDataUnlock( nextMenuId );
 
         menuItem->menuParentId = -1;
-        menuItem->string       = string;
+        menuItem->string       = strdup( string );
         menuItem->menuItem     = new_item( menuItem->string, "" );
         set_item_userptr( menuItem->menuItem, (void *)menuItem );
         menuItem->menuFunc     = cursesDoSubMenu;
@@ -574,7 +573,7 @@ int cursesMenuAddItem( int level, int menuId, char *string,
         menuItem = (CursesMenuItem_t *)malloc(sizeof(CursesMenuItem_t));
         menuItem->menuId       = -1;
         menuItem->menuParentId = menuId;
-        menuItem->string       = string;
+        menuItem->string       = strdup( string );
         menuItem->menuFunc     = menuFunc;
         menuItem->menuFuncArg  = menuFuncArg;
         menuItem->menuItem     = new_item( menuItem->string, "" );
@@ -598,7 +597,7 @@ int cursesMenuAddItem( int level, int menuId, char *string,
     return( retval );
 }
 
-void cursesMenuAddRemove( int level, int menuId, char *string )
+void cursesMenuItemRemove( int level, int menuId, char *string )
 {
     CursesMenuItem_t       *menuItem;
     CursesMenuItem_t       *subMenuItem;
@@ -701,6 +700,10 @@ void cursesDoSubMenu( void *arg )
         return;
     }
     menuId = *item;
+
+    if( menus[menuId+1]->itemCount == 0 ) {
+        return;
+    }
 
     if( currMenuId != -1 ) {
         unpost_menu( menus[currMenuId+1]->menu );
