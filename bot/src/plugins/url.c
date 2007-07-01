@@ -132,6 +132,7 @@ static void result_list_keywords( MYSQL_RES *res, MYSQL_BIND *input,
                                   void *args );
 
 static char *urlRegexp = "(?i)(?:\\s|^)((?:https?|ftp)\\:\\/\\/\\S+)(?:\\s|$)";
+int         urlMenuId;
 
 void plugin_initialize( char *args )
 {
@@ -142,6 +143,8 @@ void plugin_initialize( char *args )
     db_check_schema( "dbSchemaUrl", "URL", CURRENT_SCHEMA_URL, defSchema,
                      defSchemaCount, schemaUpgrade );
 
+    urlMenuId = cursesMenuItemAdd( 1, -1, "URL", NULL, NULL );
+
     botCmd_add( (const char **)&command, botCmdUrl, botHelpUrl, NULL );
     regexp_add( NULL, (const char *)urlRegexp, regexpFuncUrl, NULL );
 }
@@ -149,6 +152,7 @@ void plugin_initialize( char *args )
 void plugin_shutdown( void )
 {
     LogPrintNoArg( LOG_NOTICE, "Removing url plugin..." );
+    cursesMenuItemRemove( 1, urlMenuId, "URL" );
     regexp_remove( NULL, urlRegexp );
     botCmd_remove( "url" );
 }

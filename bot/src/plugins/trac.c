@@ -137,6 +137,7 @@ typedef struct {
     svn_client_ctx_t   *svnContext;
     bool                enabled;
     bool                visited;
+    char               *menuText;
 } TracURL_t;
 
 typedef struct {
@@ -170,6 +171,7 @@ static bool             apr_initialized = FALSE;
 static pthread_mutex_t  shutdownMutex;
 static pthread_mutex_t  signalMutex;
 static pthread_cond_t   kickCond;
+int                     tracMenuId;
 
 int tracSvnInitialize( TracURL_t *tracItem );
 char *tracDetailsTicket( TracURL_t *tracItem, int number );
@@ -182,6 +184,8 @@ void plugin_initialize( char *args )
 
     db_check_schema( "dbSchemaTrac", "Trac", CURRENT_SCHEMA_TRAC,
                      defSchema, defSchemaCount, schemaUpgrade );
+
+    tracMenuId = cursesMenuItemAdd( 1, -1, "Trac", NULL, NULL );
 
     urlTree = BalancedBTreeCreate( BTREE_KEY_INT );
 
@@ -233,6 +237,8 @@ void plugin_shutdown( void )
             item = urlTree->root;
             BalancedBTreeRemove( urlTree, item, LOCKED, FALSE );
             tracItem = (TracURL_t *)item->item;
+            cursesMenuItemRemove( 2, tracMenuId, tracItem->menuText );
+            free( tracItem->menuText );
             free( tracItem->url );
             free( tracItem->svnUrl );
             free( tracItem->svnUser );
@@ -247,6 +253,8 @@ void plugin_shutdown( void )
         apr_terminate();
         apr_initialized = FALSE;
     }
+
+    cursesMenuItemRemove( 1, tracMenuId, "Trac" );
 
     thread_deregister( tracThreadId );
 }
@@ -372,6 +380,8 @@ bool tracFlushUnvisited( BalancedBTreeItem_t *node )
     tracItem = (TracURL_t *)node->item;
     if( !tracItem->visited ) {
         BalancedBTreeRemove( node->btree, node, LOCKED, FALSE );
+        cursesMenuItemRemove( 2, tracMenuId, tracItem->menuText );
+        free( tracItem->menuText );
         free( tracItem->url );
         free( tracItem->svnUrl );
         free( tracItem->svnUser );
@@ -492,6 +502,8 @@ static void result_load_channel_regexp( MYSQL_RES *res, MYSQL_BIND *input,
     bool                    oldEnabled;
     int                     chanid;
     bool                    found;
+    int                     len;
+    char                   *menuText;
 
     if( !res || !(count = mysql_num_rows(res)) ) {
         channelRegexp = NULL;
@@ -539,6 +551,24 @@ static void result_load_channel_regexp( MYSQL_RES *res, MYSQL_BIND *input,
         tracItem->svnPasswd = strdup(row[5]);
         tracItem->enabled   = ( atoi(row[6]) == 0 ? FALSE : TRUE );
         tracItem->visited   = TRUE;
+
+        len = strlen( tracItem->url ) + 20;
+        menuText = (char *)malloc(len);
+        snprintf( menuText, len, "%d - %s", tracItem->chanId, tracItem->url );
+        if( found ) {
+            if( strcmp( menuText, tracItem->menuText ) ) {
+                cursesMenuItemRemove( 2, tracMenuId, tracItem->menuText );
+                free( tracItem->menuText );
+                tracItem->menuText = menuText;
+                cursesMenuItemAdd( 2, tracMenuId, tracItem->menuText, NULL, 
+                                   NULL );
+            } else {
+                free( menuText );
+            }
+        } else {
+            tracItem->menuText = menuText;
+            cursesMenuItemAdd( 2, tracMenuId, tracItem->menuText, NULL, NULL );
+        }
 
         if( found && oldEnabled && !tracItem->enabled ) {
             /* It was enabled, but isn't now */

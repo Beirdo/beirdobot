@@ -602,6 +602,7 @@ void cursesMenuItemRemove( int level, int menuId, char *string )
     CursesMenuItem_t       *subMenuItem;
     CursesItem_t           *cursesItem;
     BalancedBTreeItem_t    *item;
+    int                     mainMenu = -1;
 
     if( level == 1 ) {
         BalancedBTreeLock( menu1Tree );
@@ -637,6 +638,10 @@ void cursesMenuItemRemove( int level, int menuId, char *string )
             free( subMenuItem );
         }
         BalancedBTreeDestroy( menuItem->subMenuTree );
+
+        if( currMenuId == menuItem->menuId ) {
+            cursesDoSubMenu( &mainMenu );
+        }
         free( menuItem );
     } else {
         menuItem = cursesMenu1Find( menuId );
