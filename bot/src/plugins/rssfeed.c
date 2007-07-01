@@ -125,6 +125,7 @@ typedef struct {
     char           *timeSpec;
     long            offset;
     bool            visited;
+    char           *menuText;
 } RssFeed_t;
 
 typedef struct {
@@ -169,6 +170,7 @@ static pthread_mutex_t  shutdownMutex;
 static pthread_mutex_t  signalMutex;
 static pthread_cond_t   kickCond;
 static bool             threadReload = FALSE;
+int                     rssfeedMenuId;
 
 
 void plugin_initialize( char *args )
@@ -181,6 +183,8 @@ void plugin_initialize( char *args )
 
     db_check_schema( "dbSchemaRssfeed", "RSSfeed", CURRENT_SCHEMA_RSSFEED,
                      defSchema, defSchemaCount, schemaUpgrade );
+
+    rssfeedMenuId = cursesMenuItemAdd( 1, -1, "RSSfeed", NULL, NULL );
 
     rssfeedTree = BalancedBTreeCreate( BTREE_KEY_INT );
     rssfeedActiveTree = BalancedBTreeCreate( BTREE_KEY_INT );
@@ -220,6 +224,7 @@ void plugin_shutdown( void )
     pthread_mutex_lock( &shutdownMutex );
     pthread_mutex_destroy( &shutdownMutex );
 
+
     pthread_mutex_lock( &signalMutex );
     pthread_cond_broadcast( &kickCond );
     pthread_cond_destroy( &kickCond );
@@ -240,6 +245,8 @@ void plugin_shutdown( void )
         }
         free( feed->prefix );
         free( feed->timeSpec );
+        cursesMenuItemRemove( 2, rssfeedMenuId, feed->menuText );
+        free( feed->menuText );
         free( feed );
         free( item );
     }
@@ -257,6 +264,8 @@ void plugin_shutdown( void )
         free( item );
     }
     BalancedBTreeDestroy( rssItemTree );
+
+    cursesMenuItemRemove( 1, rssfeedMenuId, "RSSfeed" );
 
     thread_deregister( rssfeedThreadId );
 }
@@ -578,6 +587,8 @@ bool rssfeedFlushUnvisited( BalancedBTreeItem_t *node )
         }
         free( feed->prefix );
         free( feed->timeSpec );
+        cursesMenuItemRemove( 2, rssfeedMenuId, feed->menuText );
+        free( feed->menuText );
         free( feed );
         free( node );
         return( TRUE );
@@ -788,6 +799,8 @@ static void result_load_rssfeeds( MYSQL_RES *res, MYSQL_BIND *input,
     int                     feedId;
     bool                    found;
     bool                    oldEnabled;
+    int                     len;
+    char                   *menuText;
 
     if( !res || !(count = mysql_num_rows(res)) ) {
         return;
@@ -842,6 +855,25 @@ static void result_load_rssfeeds( MYSQL_RES *res, MYSQL_BIND *input,
         data->timeSpec = strdup(row[9]);
         data->offset   = atol(row[10]);
         data->enabled  = ( atoi(row[11]) == 0 ? FALSE : TRUE );
+
+        len = strlen( data->prefix ) + 20;
+        menuText = (char *)malloc(len);
+        snprintf( menuText, len, "%d - %s (%d)", data->feedId, data->prefix,
+                            data->chanId );
+        if( found ) {
+            if( strcmp( menuText, data->menuText ) ) {
+                cursesMenuItemRemove( 2, rssfeedMenuId, data->menuText );
+                free( data->menuText );
+                data->menuText = menuText;
+                cursesMenuItemAdd( 2, rssfeedMenuId, data->menuText, NULL, 
+                                   NULL );
+            } else {
+                free( menuText );
+            }
+        } else {
+            data->menuText = menuText;
+            cursesMenuItemAdd( 2, rssfeedMenuId, data->menuText, NULL, NULL );
+        }
         
         if( ChannelsLoaded ) {
             data->server  = FindServerNum( data->serverId );
