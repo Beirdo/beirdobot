@@ -533,23 +533,38 @@ void *curses_output_thread( void *arg )
                                  * middle and nastily hyphenate it
                                  */
                                 mvwaddnstr( *windows[i].window, y, textItem->x,
-                                            string, linewidth-1 );
+                                            string, linewidth-2 );
                                 mvwaddnstr( *windows[i].window, y, 
-                                            windows[i].width-2, "-", 1 );
-                                string += linewidth - 1;
+                                            linewidth-2, "-", 1 );
+                                string += linewidth - 2;
                                 word    = string;
-                                len    -= linewidth - 1;
+                                len    -= linewidth - 2;
                             }
                             y++;
                             continue;
                         }
 
                         if( ch - string > linewidth ) {
-                            mvwaddnstr( *windows[i].window, y, textItem->x,
-                                        string, linelen );
-                            string += linelen + 1;
-                            len    -= linelen + 1;
-                            word    = string;
+                            if( linelen == 0 ) {
+                                /* 
+                                 * no whitespace left... chop a word in the
+                                 * middle and nastily hyphenate it
+                                 */
+                                mvwaddnstr( *windows[i].window, y, textItem->x,
+                                            string, linewidth-2 );
+                                mvwaddnstr( *windows[i].window, y, 
+                                            linewidth-2, "-", 1 );
+                                string += linewidth - 2;
+                                word    = string;
+                                len    -= linewidth - 2;
+                            } else {
+                                mvwaddnstr( *windows[i].window, y, textItem->x,
+                                            string, linelen );
+                                string += linelen + 1;
+                                len    -= linelen + 1;
+                                linelen = 0;
+                                word    = string;
+                            }
                             y++;
                         } else if( *ch == '\n' || *ch == '\r' ) {
                             /* OK, we have whitespace */
@@ -560,6 +575,7 @@ void *curses_output_thread( void *arg )
                             string  = ch + 1;
                             len    -= linelen + 1;
                             word    = string;
+                            linelen = 0;
                             y++;
                         } else {
                             /* Either tab or space */
@@ -949,13 +965,13 @@ void cursesMenuRegenerate( void )
             menus[i]->menu = new_menu( menus[i]->items );
             if( i == 0 ) {
                 getmaxyx( winMenu1, y, x );
-                set_menu_format( menus[i]->menu, (y-5)/2, 1 );
+                set_menu_format( menus[i]->menu, y, 1 );
                 set_menu_win( menus[i]->menu, winMenu1 );
                 set_menu_sub( menus[i]->menu, winMenu1 );
                 menus[i]->posted = TRUE;
             } else {
                 getmaxyx( winMenu2, y, x );
-                set_menu_format( menus[i]->menu, (y-5)/2, 1 );
+                set_menu_format( menus[i]->menu, y, 1 );
                 set_menu_win( menus[i]->menu, winMenu2 );
                 set_menu_sub( menus[i]->menu, winMenu2 );
             }
