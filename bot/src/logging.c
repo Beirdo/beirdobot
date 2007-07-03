@@ -347,6 +347,10 @@ bool LogFileAdd( char * filename )
 
 bool LogNcursesAdd( void )
 {
+    if( Daemon ) {
+        return( FALSE );
+    }
+
     LogOutputAdd( -1, LT_NCURSES, NULL );
     LogPrintNoArg( LOG_INFO, "Added logging to ncurses" );
 

@@ -192,7 +192,7 @@ SigFunc_t ThreadGetHandler( pthread_t threadId, int signum, void **parg )
         return( thread->sighupFunc );
         break;
     case SIGWINCH:
-        if( pthread_equal( threadId, cursesOutThreadId ) ) {
+        if( !Daemon && pthread_equal( threadId, cursesOutThreadId ) ) {
             return( cursesSigwinch );
         }
         break;

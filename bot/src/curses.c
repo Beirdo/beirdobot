@@ -242,6 +242,10 @@ void curses_start( void )
 {
     int         i;
 
+    if( Daemon ) {
+        return;
+    }
+
     for( i = 0; i < WINDOW_COUNT; i++ ) {
         textEntries[i] = LinkedListCreate();
     }
@@ -705,6 +709,10 @@ int cursesMenuItemAdd( int level, int menuId, char *string,
     int                    *id;
     int                     retval;
 
+    if( Daemon ) {
+        return( -1 );
+    }
+
     if( level == 1 ) {
         menuItem = (CursesMenuItem_t *)malloc(sizeof(CursesMenuItem_t));
         
@@ -770,6 +778,10 @@ void cursesMenuItemRemove( int level, int menuId, char *string )
     CursesItem_t           *cursesItem;
     BalancedBTreeItem_t    *item;
     int                     mainMenu = -1;
+
+    if( Daemon ) {
+        return;
+    }
 
     if( level == 1 ) {
         BalancedBTreeLock( menu1Tree );
@@ -1098,6 +1110,10 @@ void cursesLogWrite( char *message )
 {
     CursesItem_t       *cursesItem;
 
+    if( Daemon ) {
+        return;
+    }
+
     cursesItem = (CursesItem_t *)malloc(sizeof(CursesItem_t));
     cursesItem->type = CURSES_LOG_MESSAGE;
     cursesItem->data.log.message = strdup(message);
@@ -1108,6 +1124,10 @@ void cursesTextAdd( CursesWindow_t window, CursesTextAlign_t align, int x,
                     int y, char *string )
 {
     CursesItem_t       *cursesItem;
+
+    if( Daemon ) {
+        return;
+    }
 
     cursesItem = (CursesItem_t *)malloc(sizeof(CursesItem_t));
     cursesItem->type = CURSES_TEXT_ADD;
@@ -1125,6 +1145,10 @@ void cursesTextRemove( CursesWindow_t window, CursesTextAlign_t align, int x,
 {
     CursesItem_t       *cursesItem;
 
+    if( Daemon ) {
+        return;
+    }
+
     cursesItem = (CursesItem_t *)malloc(sizeof(CursesItem_t));
     cursesItem->type = CURSES_TEXT_REMOVE;
     cursesItem->data.text.window = window;
@@ -1137,6 +1161,10 @@ void cursesTextRemove( CursesWindow_t window, CursesTextAlign_t align, int x,
 void cursesSigwinch( int signum, void *arg )
 {
     CursesItem_t       *cursesItem;
+
+    if( Daemon ) {
+        return;
+    }
 
     cursesItem = (CursesItem_t *)malloc(sizeof(CursesItem_t));
     cursesItem->type = CURSES_SIGNAL;
