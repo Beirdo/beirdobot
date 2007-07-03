@@ -327,6 +327,13 @@ typedef enum {
     MENU_PLUGINS
 } CursesMenuNum_t;
 
+typedef enum {
+    ALIGN_LEFT,
+    ALIGN_RIGHT,
+    ALIGN_CENTER,       /* Center in window */
+    ALIGN_FROM_CENTER,  /* Align left side of text to offset from center */
+    ALIGN_WRAP          /* left aligned, wrapped */
+} CursesTextAlign_t;
 
 #endif
 

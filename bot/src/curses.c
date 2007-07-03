@@ -72,6 +72,7 @@ int cursesItemAddRecurse( ITEM **items, BalancedBTreeItem_t *node, int start );
 void cursesSubmenuAddAll( BalancedBTreeItem_t *node );
 void cursesAtExit( void );
 void cursesReloadScreen( void );
+void cursesWindowClear( CursesWindow_t window );
 
 typedef enum {
     CURSES_TEXT_ADD,
@@ -84,19 +85,28 @@ typedef enum {
     CURSES_SIGNAL
 } CursesType_t;
 
+typedef struct {
+    WINDOW        **window;
+    int             startx;
+    int             starty;
+    int             width;
+    int             height;
+} CursesWindowDef_t;
 
-WINDOW        **windows[] = {
-    &winHeader,
-    &winMenu1,
-    &winMenu2,
-    &winDetails,
-    &winLog,
-    &winTailer
+CursesWindowDef_t   windows[] = {
+    { &winHeader,  0, 0, 0, 0 },
+    { &winMenu1,   0, 0, 0, 0 },
+    { &winMenu2,   0, 0, 0, 0 },
+    { &winDetails, 0, 0, 0, 0 },
+    { &winLog,     0, 0, 0, 0 },
+    { &winTailer,  0, 0, 0, 0 }
 };
+
 
 typedef struct {
     LinkedListItem_t    linkage;
     CursesWindow_t      window;
+    CursesTextAlign_t   align;
     int                 x;
     int                 y;
     char               *string;
@@ -170,6 +180,8 @@ CursesMenuItem_t *cursesMenu1Find( int menuId );
 void cursesWindowSet( void )
 {
     int         lines;
+    int         i;
+    int         x, y;
 
 
     initscr();
@@ -178,18 +190,50 @@ void cursesWindowSet( void )
     noecho();
     keypad(stdscr, TRUE);
 
-    lines = (LINES-5)/2;
-
     winFull    = newwin( 0, 0, 0, 0 );
-    winHeader  = subwin( winFull, 2, COLS, 0, 0 );
-    winMenu1   = subwin( winFull, lines, 15, 2, 0 );
-    winMenu2   = subwin( winFull, lines, (COLS / 2) - 15, 2, 15 );
-    winDetails = subwin( winFull, lines, COLS / 2, 2, COLS / 2 );
-    winLog     = subwin( winFull, lines + ((LINES-5) & 1), COLS, lines + 3, 0 );
-    winTailer  = subwin( winFull, 2, COLS, LINES-2, 0 );
+    getmaxyx( winFull, y, x );
+    LogPrint( LOG_INFO, "Window size: %d x %d", x, y );
+
+    lines = (y-5)/2;
+
+    windows[WINDOW_HEADER].startx = 0;
+    windows[WINDOW_HEADER].starty = 0;
+    windows[WINDOW_HEADER].width  = x;
+    windows[WINDOW_HEADER].height = 2;
+
+    windows[WINDOW_MENU1].startx = 0;
+    windows[WINDOW_MENU1].starty = 2;
+    windows[WINDOW_MENU1].width  = 15;
+    windows[WINDOW_MENU1].height = lines;
+
+    windows[WINDOW_MENU2].startx = 15;
+    windows[WINDOW_MENU2].starty = 2;
+    windows[WINDOW_MENU2].width  = (x / 2) - 15;
+    windows[WINDOW_MENU2].height = lines;
+
+    windows[WINDOW_DETAILS].startx = x / 2;
+    windows[WINDOW_DETAILS].starty = 2;
+    windows[WINDOW_DETAILS].width  = x - (x / 2);
+    windows[WINDOW_DETAILS].height = lines;
+
+    windows[WINDOW_LOG].startx = 0;
+    windows[WINDOW_LOG].starty = lines + 3;
+    windows[WINDOW_LOG].width  = x;
+    windows[WINDOW_LOG].height = lines + ((y-5) & 1);
+
+    windows[WINDOW_TAILER].startx = 0;
+    windows[WINDOW_TAILER].starty = y - 2;
+    windows[WINDOW_TAILER].width  = x;
+    windows[WINDOW_TAILER].height = 2;
+
+    for( i = 0; i < WINDOW_COUNT; i++ ) {
+        *windows[i].window = subwin( winFull, windows[i].height, 
+                                     windows[i].width, windows[i].starty,
+                                     windows[i].startx );
+    }
 
     wclear( winFull );
-    mvwhline( winFull, lines + 2, 0, ACS_HLINE, COLS );
+    mvwhline( winFull, lines + 2, 0, ACS_HLINE, x );
     touchline( winFull, lines + 2, 1 );
     wrefresh( winFull );
 }
@@ -231,6 +275,14 @@ void *curses_output_thread( void *arg )
     ITEM               *currItem;
     CursesMenuItem_t   *menuItem;
     int                 mainMenu = -1;
+    int                 len;
+    char               *string;
+    char               *word;
+    char               *ch;
+    int                 x, y;
+    int                 linewidth;
+    int                 linelen;
+    bool                inSubMenuFunc = FALSE;
 
     scrolledBack = FALSE;
     atexit( cursesAtExit );
@@ -260,11 +312,13 @@ void *curses_output_thread( void *arg )
             winNum = item->data.text.window;
 
             if( winNum >= 0 && winNum <= WINDOW_COUNT ) {
+                werase( *windows[item->data.text.window].window );
                 LinkedListLock( textEntries[winNum] );
                 for( listItem = textEntries[winNum]->head, found = FALSE;
                      listItem && !found; listItem = listItem->next ) {
                     textItem = (CursesText_t *)listItem;
-                    if( textItem->x == item->data.text.x &&
+                    if( textItem->align == item->data.text.align &&
+                        textItem->x == item->data.text.x &&
                         textItem->y == item->data.text.y ) {
                         found = TRUE;
                         LinkedListRemove( textEntries[winNum], listItem,
@@ -278,14 +332,7 @@ void *curses_output_thread( void *arg )
             winNum = item->data.text.window;
 
             if( winNum >= 0 && winNum <= WINDOW_COUNT ) {
-                LinkedListLock( textEntries[winNum] );
-                while( (listItem = textEntries[winNum]->head) ) {
-                    textItem = (CursesText_t *)listItem;
-                    LinkedListRemove( textEntries[winNum], listItem, LOCKED );
-                    free( textItem->string );
-                    free( textItem );
-                }
-                LinkedListUnlock( textEntries[winNum] );
+                cursesWindowClear( winNum );
             }
             break;
         case CURSES_LOG_MESSAGE:
@@ -325,14 +372,18 @@ void *curses_output_thread( void *arg )
 #endif
             switch( item->data.key.keystroke ) {
             case KEY_UP:
-                menu_driver( menus[currMenuId+1]->menu, REQ_UP_ITEM );
+                if( !inSubMenuFunc ) {
+                    menu_driver( menus[currMenuId+1]->menu, REQ_UP_ITEM );
+                }
                 break;
             case KEY_DOWN:
-                menu_driver( menus[currMenuId+1]->menu, REQ_DOWN_ITEM );
+                if( !inSubMenuFunc ) {
+                    menu_driver( menus[currMenuId+1]->menu, REQ_DOWN_ITEM );
+                }
                 break;
             case KEY_PPAGE:
                 QueueLock( CursesLogQ );
-                lines = ((LINES-5)/2) + ((LINES-5) & 1);
+                getmaxyx( winLog, lines, x );
                 count = QueueUsed( CursesLogQ );
 
                 if( count <= lines ) {
@@ -360,7 +411,7 @@ void *curses_output_thread( void *arg )
                 }
 
                 QueueLock( CursesLogQ );
-                lines = (LINES-5)/2 + ((LINES-5) & 1);
+                getmaxyx( winLog, lines, x );
                 count = QueueUsed( CursesLogQ );
 
                 if( count <= lines ) {
@@ -380,11 +431,16 @@ void *curses_output_thread( void *arg )
                 break;
             case 10:    /* Enter */
             case KEY_RIGHT:
-                currItem = current_item( menus[currMenuId+1]->menu );
-                menuItem = (CursesMenuItem_t *)item_userptr(currItem);
-                pos_menu_cursor( menus[currMenuId+1]->menu );
-                if( menuItem->menuFunc ) {
-                    menuItem->menuFunc( menuItem->menuFuncArg );
+                if( !inSubMenuFunc ) {
+                    currItem = current_item( menus[currMenuId+1]->menu );
+                    menuItem = (CursesMenuItem_t *)item_userptr(currItem);
+                    pos_menu_cursor( menus[currMenuId+1]->menu );
+                    if( menuItem->menuFunc ) {
+                        if( menuItem->menuFunc != cursesDoSubMenu ) {
+                            inSubMenuFunc = TRUE;
+                        }
+                        menuItem->menuFunc( menuItem->menuFuncArg );
+                    }
                 }
                 break;
             case 18:    /* Ctrl-R */
@@ -392,9 +448,14 @@ void *curses_output_thread( void *arg )
                 break;
             case 27:    /* Escape */
             case KEY_LEFT:
-                if( currMenuId != -1 ) {
-                    pos_menu_cursor( menus[currMenuId+1]->menu );
-                    cursesDoSubMenu( &mainMenu );
+                if( !inSubMenuFunc ) {
+                    if( currMenuId != -1 ) {
+                        pos_menu_cursor( menus[currMenuId+1]->menu );
+                        cursesDoSubMenu( &mainMenu );
+                    }
+                } else {
+                    inSubMenuFunc = FALSE;
+                    cursesWindowClear( WINDOW_DETAILS );
                 }
                 break;
             default:
@@ -418,20 +479,108 @@ void *curses_output_thread( void *arg )
                  listItem = listItem->next ) {
                 textItem = (CursesText_t *)listItem;
 
-                mvwaddnstr( *windows[i], textItem->y, textItem->x, 
-                            textItem->string, textItem->len );
+                switch( textItem->align ) {
+                case ALIGN_LEFT:
+                    mvwaddnstr( *windows[i].window, textItem->y, textItem->x, 
+                                textItem->string, textItem->len );
+                    break;
+                case ALIGN_RIGHT:
+                    mvwaddnstr( *windows[i].window, textItem->y, 
+                                windows[i].width - textItem->x - textItem->len, 
+                                textItem->string, textItem->len );
+                    break;
+                case ALIGN_CENTER:
+                    mvwaddnstr( *windows[i].window, textItem->y, 
+                                ((windows[i].width - textItem->len) / 2) + 
+                                textItem->x, textItem->string, textItem->len );
+                    break;
+                case ALIGN_FROM_CENTER:
+                    mvwaddnstr( *windows[i].window, textItem->y, 
+                                (windows[i].width / 2) + textItem->x, 
+                                textItem->string, textItem->len );
+                    break;
+                case ALIGN_WRAP:
+                    string    = textItem->string;
+                    len       = textItem->len;
+                    y         = textItem->y;
+                    linewidth = windows[i].width - textItem->x;
+
+
+                    linelen = 0;
+                    word = string;
+                    while( len && *string ) {
+                        if( len <= linewidth ) {
+                            mvwaddnstr( *windows[i].window, y, textItem->x,
+                                        string, len );
+                            len = 0;
+                            continue;
+                        }
+                        
+                        ch = strpbrk( word, " \t\n\r" );
+                        if( !ch ) {
+                            if( linelen ) {
+                                /*
+                                 * We accumulated words
+                                 */
+                                mvwaddnstr( *windows[i].window, y, textItem->x,
+                                            string, linelen );
+                                string += linelen - 1;
+                                word    = string;
+                                len    -= linelen - 1;
+                            } else {
+                                /* 
+                                 * no whitespace left... chop a word in the
+                                 * middle and nastily hyphenate it
+                                 */
+                                mvwaddnstr( *windows[i].window, y, textItem->x,
+                                            string, linewidth-1 );
+                                mvwaddnstr( *windows[i].window, y, 
+                                            windows[i].width-2, "-", 1 );
+                                string += linewidth - 1;
+                                word    = string;
+                                len    -= linewidth - 1;
+                            }
+                            y++;
+                            continue;
+                        }
+
+                        if( ch - string > linewidth ) {
+                            mvwaddnstr( *windows[i].window, y, textItem->x,
+                                        string, linelen );
+                            string += linelen + 1;
+                            len    -= linelen + 1;
+                            word    = string;
+                            y++;
+                        } else if( *ch == '\n' || *ch == '\r' ) {
+                            /* OK, we have whitespace */
+                            linelen = ch - string;
+                            mvwaddnstr( *windows[i].window, y, textItem->x,
+                                        string, linelen );
+
+                            string  = ch + 1;
+                            len    -= linelen + 1;
+                            word    = string;
+                            y++;
+                        } else {
+                            /* Either tab or space */
+                            linelen = ch - string;
+                            word    = ch + 1;
+                        }
+                    }
+                    break;
+                }
             }
             LinkedListUnlock( textEntries[i] );
 
             /* sync updates to the full window */
-            wsyncup( *windows[i] );
+            wsyncup( *windows[i].window );
         }
 
 #if 0
     UpdateLogs:
 #endif
         QueueLock( CursesLogQ );
-        lines = (LINES-5)/2 + ((LINES-5) & 1);
+        getmaxyx( winLog, lines, x );
 
         count = QueueUsed( CursesLogQ );
         if( count > lines ) {
@@ -496,10 +645,12 @@ void cursesReloadScreen( void )
 
 void cursesAtExit( void )
 {
+    int         x, y;
     curs_set(1);
     echo();
     nl();
-    wmove( winFull, LINES, 0);
+    getmaxyx( winFull, y, x );
+    wmove( winFull, y, 0);
     wrefresh( winFull );
     endwin();
 }
@@ -747,6 +898,7 @@ void cursesMenuRegenerate( void )
 {
     int             count;
     int             i;
+    int             x, y;
 
     ProtectedDataLock( nextMenuId );
     count = *(int *)nextMenuId->data;
@@ -796,16 +948,14 @@ void cursesMenuRegenerate( void )
         if( menus[i]->items ) {
             menus[i]->menu = new_menu( menus[i]->items );
             if( i == 0 ) {
-                set_menu_format( menus[i]->menu, (LINES-5)/2, 1 );
+                getmaxyx( winMenu1, y, x );
+                set_menu_format( menus[i]->menu, (y-5)/2, 1 );
                 set_menu_win( menus[i]->menu, winMenu1 );
                 set_menu_sub( menus[i]->menu, winMenu1 );
                 menus[i]->posted = TRUE;
             } else {
-#if 0
-                set_menu_format( menus[i]->menu, 1, (COLS/2) - 15 );
-#else
-                set_menu_format( menus[i]->menu, (LINES-5)/2, 1 );
-#endif
+                getmaxyx( winMenu2, y, x );
+                set_menu_format( menus[i]->menu, (y-5)/2, 1 );
                 set_menu_win( menus[i]->menu, winMenu2 );
                 set_menu_sub( menus[i]->menu, winMenu2 );
             }
@@ -938,13 +1088,15 @@ void cursesLogWrite( char *message )
     QueueEnqueueItem( CursesQ, (void *)cursesItem );
 }
 
-void cursesTextAdd( CursesWindow_t window, int x, int y, char *string )
+void cursesTextAdd( CursesWindow_t window, CursesTextAlign_t align, int x, 
+                    int y, char *string )
 {
     CursesItem_t       *cursesItem;
 
     cursesItem = (CursesItem_t *)malloc(sizeof(CursesItem_t));
     cursesItem->type = CURSES_TEXT_ADD;
     cursesItem->data.text.window = window;
+    cursesItem->data.text.align  = align;
     cursesItem->data.text.x      = x;
     cursesItem->data.text.y      = y;
     cursesItem->data.text.string = strdup( string );
@@ -952,13 +1104,15 @@ void cursesTextAdd( CursesWindow_t window, int x, int y, char *string )
     QueueEnqueueItem( CursesQ, (void *)cursesItem );
 }
 
-void cursesTextRemove( CursesWindow_t window, int x, int y )
+void cursesTextRemove( CursesWindow_t window, CursesTextAlign_t align, int x, 
+                       int y )
 {
     CursesItem_t       *cursesItem;
 
     cursesItem = (CursesItem_t *)malloc(sizeof(CursesItem_t));
     cursesItem->type = CURSES_TEXT_REMOVE;
     cursesItem->data.text.window = window;
+    cursesItem->data.text.align  = align;
     cursesItem->data.text.x      = x;
     cursesItem->data.text.y      = y;
     QueueEnqueueItem( CursesQ, (void *)cursesItem );
@@ -971,6 +1125,22 @@ void cursesSigwinch( int signum, void *arg )
     cursesItem = (CursesItem_t *)malloc(sizeof(CursesItem_t));
     cursesItem->type = CURSES_SIGNAL;
     QueueEnqueueItem( CursesQ, (void *)cursesItem );
+}
+
+void cursesWindowClear( CursesWindow_t window )
+{
+    CursesText_t       *textItem;
+    LinkedListItem_t   *listItem;
+
+    werase( *windows[window].window );
+    LinkedListLock( textEntries[window] );
+    while( (listItem = textEntries[window]->head) ) {
+        textItem = (CursesText_t *)listItem;
+        LinkedListRemove( textEntries[window], listItem, LOCKED );
+        free( textItem->string );
+        free( textItem );
+    }
+    LinkedListUnlock( textEntries[window] );
 }
 
 /*

@@ -72,6 +72,7 @@ void MainDelayExit( void );
 void do_symbol( void *ptr );
 void serverUnvisit( BalancedBTreeItem_t *node );
 bool serverFlushUnvisited( BalancedBTreeItem_t *node );
+void mainAbout( void *arg );
 
 typedef void (*sigAction_t)(int, siginfo_t *, void *);
 
@@ -169,6 +170,8 @@ int main ( int argc, char **argv )
 
     curses_start();
 
+    cursesMenuItemAdd( 2, MENU_SYSTEM, "About", mainAbout, NULL );
+
     /* Print the startup log messages */
     LogBanner();
 
@@ -210,9 +213,10 @@ void LogBanner( void )
     LogPrintNoArg( LOG_CRIT, "beirdobot  (c) 2007 Gavin Hurlbut" );
     LogPrint( LOG_CRIT, "%s", svn_version() );
 
-    cursesTextAdd( WINDOW_HEADER, 0, 0, "beirdobot" );
-    cursesTextAdd( WINDOW_HEADER, 10, 0, (char *)svn_version() );
-    cursesTextAdd( WINDOW_HEADER, 40, 0, "(c) 2007 Gavin Hurlbut" );
+    cursesTextAdd( WINDOW_HEADER, ALIGN_LEFT, 0, 0, "beirdobot" );
+    cursesTextAdd( WINDOW_HEADER, ALIGN_LEFT, 10, 0, (char *)svn_version() );
+    cursesTextAdd( WINDOW_HEADER, ALIGN_FROM_CENTER, 0, 0, 
+                   "(c) 2007 Gavin Hurlbut" );
 }
 
 
@@ -642,6 +646,22 @@ bool serverFlushUnvisited( BalancedBTreeItem_t *node )
     }
 
     return( FALSE );
+}
+
+static char        *copyrightNotice = 
+    "Bug reports should be emailed to gjhurlbu@gmail.com, or preferrably "
+    "reported at http://trac.beirdo.ca/projects/beirdobot\n\n"
+    "All of beirdobot except the plugin interface is licensed under the terms "
+    "of the GNU General Public License (GPL) version 2 or later.\n"
+    "The plugin interface and included plugins are licensed under the terms of "
+    "the GNU Lesser General Public License (LGPL) version 2.1 or later.\n\n"
+    "The reason that the plugin interface is licensed differently is to allow "
+    "plugins to be linked against libraries that are not GPL-compatible, but "
+    "are LGPL-compatible.";
+
+void mainAbout( void *arg )
+{
+    cursesTextAdd( WINDOW_DETAILS, ALIGN_WRAP, 0, 0, copyrightNotice );
 }
 
 /*
