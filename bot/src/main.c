@@ -73,6 +73,7 @@ void do_symbol( void *ptr );
 void serverUnvisit( BalancedBTreeItem_t *node );
 bool serverFlushUnvisited( BalancedBTreeItem_t *node );
 void mainAbout( void *arg );
+void mainLicensing( void *arg );
 
 typedef void (*sigAction_t)(int, siginfo_t *, void *);
 
@@ -171,6 +172,7 @@ int main ( int argc, char **argv )
     curses_start();
 
     cursesMenuItemAdd( 2, MENU_SYSTEM, "About", mainAbout, NULL );
+    cursesMenuItemAdd( 2, MENU_SYSTEM, "Licensing", mainLicensing, NULL );
 
     /* Print the startup log messages */
     LogBanner();
@@ -648,11 +650,15 @@ bool serverFlushUnvisited( BalancedBTreeItem_t *node )
     return( FALSE );
 }
 
-static char        *copyrightNotice = 
+static char        *aboutNotice = 
+    "The beirdobot project is open source software.  See the System->Licensing "
+    "page for license details.\n\n"
     "Bug reports should be emailed to gjhurlbu@gmail.com, or preferrably "
-    "reported at http://trac.beirdo.ca/projects/beirdobot\n\n"
+    "reported at http://trac.beirdo.ca/projects/beirdobot\n";
+
+static char        *copyrightNotice = 
     "All of beirdobot except the plugin interface is licensed under the terms "
-    "of the GNU General Public License (GPL) version 2 or later.\n"
+    "of the GNU General Public License (GPL) version 2 or later.\n\n"
     "The plugin interface and included plugins are licensed under the terms of "
     "the GNU Lesser General Public License (LGPL) version 2.1 or later.\n\n"
     "The reason that the plugin interface is licensed differently is to allow "
@@ -660,6 +666,11 @@ static char        *copyrightNotice =
     "are LGPL-compatible.";
 
 void mainAbout( void *arg )
+{
+    cursesTextAdd( WINDOW_DETAILS, ALIGN_WRAP, 0, 0, aboutNotice );
+}
+
+void mainLicensing( void *arg )
 {
     cursesTextAdd( WINDOW_DETAILS, ALIGN_WRAP, 0, 0, copyrightNotice );
 }

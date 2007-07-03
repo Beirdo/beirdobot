@@ -524,9 +524,9 @@ void *curses_output_thread( void *arg )
                                  */
                                 mvwaddnstr( *windows[i].window, y, textItem->x,
                                             string, linelen );
-                                string += linelen - 1;
+                                string += linelen + 1;
                                 word    = string;
-                                len    -= linelen - 1;
+                                len    -= linelen + 1;
                             } else {
                                 /* 
                                  * no whitespace left... chop a word in the
