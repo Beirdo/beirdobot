@@ -62,6 +62,7 @@ bool                GlobalAbort = FALSE;
 bool                BotDone = FALSE;
 pthread_t           mainThreadId;
 BalancedBTree_t    *versionTree;
+char               *pthreadsVersion = NULL;
 
 void mainSighup( int signum, void *arg );
 void LogBanner( void );
@@ -94,11 +95,25 @@ int main ( int argc, char **argv )
     pid_t               childPid;
     struct sigaction    sa;
     sigset_t            sigmsk;
+    size_t              len;
 
     GlobalAbort = false;
 
     /* Parse the command line options */
     MainParseArgs( argc, argv );
+
+    len = confstr( _CS_GNU_LIBPTHREAD_VERSION, NULL, 0 );
+    if( len ) {
+        pthreadsVersion = (char *)malloc(len);
+        confstr( _CS_GNU_LIBPTHREAD_VERSION, pthreadsVersion, len );
+    }
+
+    if( !pthreadsVersion || strstr( pthreadsVersion, "linuxthreads" ) ) {
+        fprintf( stderr, "beirdobot requires NPTL to operate correctly.\n\n"
+                         "The signal handling in linuxthreads is just too "
+                         "broken to use.\n\n" );
+        exit( 1 );
+    }
 
     /* Do we need to detach? */
     if( Daemon ) {
@@ -180,6 +195,8 @@ int main ( int argc, char **argv )
     sigaction( SIGFPE, &sa, NULL );
 
     versionTree = BalancedBTreeCreate( BTREE_KEY_STRING );
+
+    versionAdd( "pthreads", pthreadsVersion );
 
     curses_start();
     cursesMenuItemAdd( 2, MENU_SYSTEM, "About", mainAbout, NULL );
