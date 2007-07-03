@@ -59,6 +59,8 @@ WINDOW         *winDetails;
 WINDOW         *winLog;
 WINDOW         *winTailer;
 
+LinkedList_t   *textEntries[WINDOW_COUNT];
+
 void *curses_output_thread( void *arg );
 void *curses_input_thread( void *arg );
 void cursesWindowSet( void );
@@ -73,6 +75,7 @@ void cursesSubmenuAddAll( BalancedBTreeItem_t *node );
 void cursesAtExit( void );
 void cursesReloadScreen( void );
 void cursesWindowClear( CursesWindow_t window );
+void cursesUpdateLines( void );
 
 typedef enum {
     CURSES_TEXT_ADD,
@@ -101,7 +104,6 @@ CursesWindowDef_t   windows[] = {
     { &winLog,     0, 0, 0, 0 },
     { &winTailer,  0, 0, 0, 0 }
 };
-
 
 typedef struct {
     LinkedListItem_t    linkage;
@@ -136,9 +138,6 @@ typedef struct {
     } data;
 } CursesItem_t;
 
-LinkedList_t       *textEntries[WINDOW_COUNT];
-
-
 typedef struct {
     int                 menuId;
     int                 menuParentId;
@@ -168,11 +167,39 @@ typedef struct {
     int             current;
 } CursesMenu_t;
 
+typedef enum {
+    LINE_HLINE,
+    LINE_VLINE,
+    LINE_DOWN_TEE,
+    LINE_UP_TEE
+} CursesLineType_t;
+
+typedef struct {
+    CursesLineType_t    type;
+    int                 startx;
+    int                 starty;
+    int                 x;
+    int                 y;
+} CursesLine_t;
+
 static CursesMenu_t   **menus = NULL;
 static int              menusCount = 0;
 
 static ProtectedData_t  *nextMenuId;
 static int               currMenuId = -1;
+
+static CursesLine_t      menuLines[] = {
+    { LINE_HLINE, 0, 1, 0, 0 },
+    { LINE_HLINE, 0, 0, 0, 0 },
+    { LINE_HLINE, 0, 0, 0, 0 },
+    { LINE_VLINE, 15, 2, 0, 0 },
+    { LINE_VLINE, 0, 2, 0, 0 },
+    { LINE_DOWN_TEE, 15, 1, 0, 0 },
+    { LINE_DOWN_TEE, 0, 2, 0, 0 },
+    { LINE_UP_TEE, 15, 0, 0, 0 },
+    { LINE_UP_TEE, 0, 0, 0, 0 }
+};
+static int menuLinesCount = NELEMENTS( menuLines );
 
 CursesMenuItem_t *cursesMenu1Find( int menuId );
 
@@ -182,7 +209,6 @@ void cursesWindowSet( void )
     int         lines;
     int         i;
     int         x, y;
-
 
     initscr();
     curs_set(0);
@@ -196,24 +222,63 @@ void cursesWindowSet( void )
 
     lines = (y-5)/2;
 
+    /* hlines */
+    menuLines[0].startx = 0;
+    menuLines[0].starty = 1;
+    menuLines[0].x      = x;
+
+    menuLines[1].startx = 0;
+    menuLines[1].starty = lines + 2;
+    menuLines[1].x      = x;
+
+    menuLines[2].startx = 0;
+    menuLines[2].starty = y - 2;
+    menuLines[2].x      = x;
+
+    /* vlines */
+    menuLines[3].startx = 15;
+    menuLines[3].starty = 2;
+    menuLines[3].y      = lines;
+
+    menuLines[4].startx = x / 2;
+    menuLines[4].starty = 2;
+    menuLines[4].y      = lines;
+
+    /* down-facing tees */
+    menuLines[5].startx = 15;
+    menuLines[5].starty = 1;
+
+    menuLines[6].startx = x / 2;
+    menuLines[6].starty = 1;
+
+    /* up-facing tees */
+    menuLines[7].startx = 15;
+    menuLines[7].starty = lines + 2;
+
+    menuLines[8].startx = x / 2;
+    menuLines[8].starty = lines + 2;
+
+    cursesUpdateLines();
+    wrefresh( winFull );
+
     windows[WINDOW_HEADER].startx = 0;
     windows[WINDOW_HEADER].starty = 0;
     windows[WINDOW_HEADER].width  = x;
-    windows[WINDOW_HEADER].height = 2;
+    windows[WINDOW_HEADER].height = 1;
 
     windows[WINDOW_MENU1].startx = 0;
     windows[WINDOW_MENU1].starty = 2;
     windows[WINDOW_MENU1].width  = 15;
     windows[WINDOW_MENU1].height = lines;
 
-    windows[WINDOW_MENU2].startx = 15;
+    windows[WINDOW_MENU2].startx = 16;
     windows[WINDOW_MENU2].starty = 2;
-    windows[WINDOW_MENU2].width  = (x / 2) - 15;
+    windows[WINDOW_MENU2].width  = (x / 2) - 16;
     windows[WINDOW_MENU2].height = lines;
 
-    windows[WINDOW_DETAILS].startx = x / 2;
+    windows[WINDOW_DETAILS].startx = (x / 2) + 1;
     windows[WINDOW_DETAILS].starty = 2;
-    windows[WINDOW_DETAILS].width  = x - (x / 2);
+    windows[WINDOW_DETAILS].width  = (x - (x / 2)) - 1;
     windows[WINDOW_DETAILS].height = lines;
 
     windows[WINDOW_LOG].startx = 0;
@@ -222,9 +287,9 @@ void cursesWindowSet( void )
     windows[WINDOW_LOG].height = lines + ((y-5) & 1);
 
     windows[WINDOW_TAILER].startx = 0;
-    windows[WINDOW_TAILER].starty = y - 2;
+    windows[WINDOW_TAILER].starty = y - 1;
     windows[WINDOW_TAILER].width  = x;
-    windows[WINDOW_TAILER].height = 2;
+    windows[WINDOW_TAILER].height = 1;
 
     for( i = 0; i < WINDOW_COUNT; i++ ) {
         *windows[i].window = subwin( winFull, windows[i].height, 
@@ -232,9 +297,6 @@ void cursesWindowSet( void )
                                      windows[i].startx );
     }
 
-    wclear( winFull );
-    mvwhline( winFull, lines + 2, 0, ACS_HLINE, x );
-    touchline( winFull, lines + 2, 1 );
     wrefresh( winFull );
 }
 
@@ -252,6 +314,11 @@ void curses_start( void )
 
     cursesWindowSet();
     cursesMenuInitialize();
+
+    /* Since the stupid hlines just won't work! */
+#if 0
+    cursesReloadScreen();
+#endif
 
     CursesQ    = QueueCreate(2048);
     CursesLogQ = QueueCreate(2048);
@@ -476,6 +543,8 @@ void *curses_output_thread( void *arg )
         free( item );
 
     UpdateScreen:
+        cursesUpdateLines();
+
         for( i = 0; i < WINDOW_COUNT; i++ ) {
             LinkedListLock( textEntries[i] );
 
@@ -670,7 +739,8 @@ void cursesAtExit( void )
     echo();
     nl();
     getmaxyx( winFull, y, x );
-    wmove( winFull, y, 0);
+    wmove( winFull, y, 0 );
+    wdeleteln( winFull );
     wrefresh( winFull );
     endwin();
 }
@@ -1185,6 +1255,32 @@ void cursesWindowClear( CursesWindow_t window )
         free( textItem );
     }
     LinkedListUnlock( textEntries[window] );
+}
+
+void cursesUpdateLines( void )
+{
+    int         i;
+
+    for( i = 0; i < menuLinesCount; i++ ) {
+        switch( menuLines[i].type ) {
+        case LINE_HLINE:
+            mvwhline( winFull, menuLines[i].starty, menuLines[i].startx,
+                      ACS_HLINE, menuLines[i].x );
+            break;
+        case LINE_VLINE:
+            mvwvline( winFull, menuLines[i].starty, menuLines[i].startx,
+                      ACS_VLINE, menuLines[i].y );
+            break;
+        case LINE_DOWN_TEE:
+            mvwaddch( winFull, menuLines[i].starty, menuLines[i].startx,
+                      ACS_TTEE );
+            break;
+        case LINE_UP_TEE:
+            mvwaddch( winFull, menuLines[i].starty, menuLines[i].startx,
+                      ACS_BTEE );
+            break;
+        }
+    }
 }
 
 /*
