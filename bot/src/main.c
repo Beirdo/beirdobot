@@ -691,7 +691,7 @@ static char        *aboutNotice =
     "page for license details.\n\n"
     "Bug reports should be emailed to gjhurlbu@gmail.com, or preferrably "
     "reported at http://trac.beirdo.ca/projects/beirdobot\n\n"
-    "Note: the URL doesn't have a - in it, if one shows, it's due to your"
+    "Note: the URL doesn't have a - in it, if one shows, it's due to your "
     "window size.\n";
 
 static char        *copyrightNotice = 
