@@ -44,22 +44,24 @@
 #include "release.h"
 #include "queue.h"
 #include "logging.h"
+#include "balanced_btree.h"
 
 
 static char ident[] _UNUSED_= 
     "$Id$";
 
-char       *mysql_host;
-uint16      mysql_portnum;
-char       *mysql_user;
-char       *mysql_password;
-char       *mysql_db;
-bool        verbose;
-bool        Daemon;
-bool        Debug;
-bool        GlobalAbort = FALSE;
-bool        BotDone = FALSE;
-pthread_t   mainThreadId;
+char               *mysql_host;
+uint16              mysql_portnum;
+char               *mysql_user;
+char               *mysql_password;
+char               *mysql_db;
+bool                verbose;
+bool                Daemon;
+bool                Debug;
+bool                GlobalAbort = FALSE;
+bool                BotDone = FALSE;
+pthread_t           mainThreadId;
+BalancedBTree_t    *versionTree;
 
 void mainSighup( int signum, void *arg );
 void LogBanner( void );
@@ -74,8 +76,16 @@ void serverUnvisit( BalancedBTreeItem_t *node );
 bool serverFlushUnvisited( BalancedBTreeItem_t *node );
 void mainAbout( void *arg );
 void mainLicensing( void *arg );
+void mainVersions( void *arg );
+int versionShowRecurse( BalancedBTreeItem_t *node, int line );
 
 typedef void (*sigAction_t)(int, siginfo_t *, void *);
+
+typedef struct {
+    char       *what;
+    char       *version;
+    int         count;
+} Version_t;
 
 
 int main ( int argc, char **argv )
@@ -169,10 +179,12 @@ int main ( int argc, char **argv )
     sigaction( SIGILL, &sa, NULL );
     sigaction( SIGFPE, &sa, NULL );
 
-    curses_start();
+    versionTree = BalancedBTreeCreate( BTREE_KEY_STRING );
 
+    curses_start();
     cursesMenuItemAdd( 2, MENU_SYSTEM, "About", mainAbout, NULL );
     cursesMenuItemAdd( 2, MENU_SYSTEM, "Licensing", mainLicensing, NULL );
+    cursesMenuItemAdd( 2, MENU_SYSTEM, "Versions", mainVersions, NULL );
 
     /* Print the startup log messages */
     LogBanner();
@@ -219,6 +231,8 @@ void LogBanner( void )
     cursesTextAdd( WINDOW_HEADER, ALIGN_LEFT, 10, 0, (char *)svn_version() );
     cursesTextAdd( WINDOW_HEADER, ALIGN_FROM_CENTER, 0, 0, 
                    "(c) 2007 Gavin Hurlbut" );
+
+    versionAdd( "beirdobot", (char *)svn_version() );
 }
 
 
@@ -673,6 +687,82 @@ void mainAbout( void *arg )
 void mainLicensing( void *arg )
 {
     cursesTextAdd( WINDOW_DETAILS, ALIGN_WRAP, 0, 0, copyrightNotice );
+}
+
+void versionAdd( char *what, char *version )
+{
+    BalancedBTreeItem_t    *item;
+    Version_t              *vItem;
+
+    item = BalancedBTreeFind( versionTree, &what, UNLOCKED );
+    if( item ) {
+        vItem = (Version_t *)item->item;
+        vItem->count++;
+        return;
+    }
+
+    vItem = (Version_t *)malloc(sizeof(Version_t));
+    item = (BalancedBTreeItem_t *)malloc(sizeof(BalancedBTreeItem_t));
+
+    vItem->what    = strdup( what );
+    vItem->version = strdup( version );
+    vItem->count   = 1;
+
+    item->item     = (void *)vItem;
+    item->key      = (void *)&vItem->what;
+
+    BalancedBTreeAdd( versionTree, item, UNLOCKED, TRUE );
+}
+
+void versionRemove( char *what )
+{
+    BalancedBTreeItem_t    *item;
+    Version_t              *vItem;
+    
+    item = BalancedBTreeFind( versionTree, &what, UNLOCKED );
+    if( !item ) {
+        return;
+    }
+
+    vItem = (Version_t *)item->item;
+    vItem->count--;
+
+    if( !vItem->count ) {
+        BalancedBTreeRemove( versionTree, item, UNLOCKED, TRUE );
+
+        free( vItem->what );
+        free( vItem->version );
+        free( vItem );
+        free( item );
+    }
+}
+
+void mainVersions( void *arg )
+{
+    BalancedBTreeLock( versionTree );
+    versionShowRecurse( versionTree->root, 0 );
+    BalancedBTreeUnlock( versionTree );
+}
+
+int versionShowRecurse( BalancedBTreeItem_t *node, int line )
+{
+    Version_t          *vItem;
+    static char         buf[256];
+
+    if( !node ) {
+        return( line );
+    }
+
+    line = versionShowRecurse( node->left, line );
+
+    vItem = (Version_t *)node->item;
+    snprintf( buf, 256, "%-15s %s", vItem->what, vItem->version );
+    cursesTextAdd( WINDOW_DETAILS, ALIGN_LEFT, 0, line, buf );
+    line++;
+
+    line = versionShowRecurse( node->right, line );
+
+    return( line );
 }
 
 /*

@@ -45,6 +45,7 @@
 #include "linked_list.h"
 #include "logging.h"
 #include "mrss.h"
+#include <curl/curl.h>
 
 
 
@@ -176,6 +177,7 @@ int                     rssfeedMenuId;
 void plugin_initialize( char *args )
 {
     static char            *command = "rssfeed";
+    static char             buf[32];
 
     LogPrintNoArg( LOG_NOTICE, "Initializing rssfeed..." );
 
@@ -185,6 +187,11 @@ void plugin_initialize( char *args )
                      defSchema, defSchemaCount, schemaUpgrade );
 
     rssfeedMenuId = cursesMenuItemAdd( 1, -1, "RSSfeed", NULL, NULL );
+
+    snprintf( buf, 32, "%d.%d.%d", (LIBCURL_VERSION_NUM >> 16) & 0xFF,
+                       (LIBCURL_VERSION_NUM >> 8) & 0xFF,
+                       LIBCURL_VERSION_NUM & 0xFF );
+    versionAdd( "CURL", buf );
 
     rssfeedTree = BalancedBTreeCreate( BTREE_KEY_INT );
     rssfeedActiveTree = BalancedBTreeCreate( BTREE_KEY_INT );
@@ -212,6 +219,8 @@ void plugin_shutdown( void )
 
     LogPrintNoArg( LOG_NOTICE, "Removing rssfeed..." );
     botCmd_remove( "rssfeed" );
+
+    versionRemove( "CURL" );
 
     threadAbort = TRUE;
 

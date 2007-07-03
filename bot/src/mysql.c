@@ -210,6 +210,8 @@ void *mysql_thread( void *arg ) {
                     if( !connected ) {
                         LogPrintNoArg( LOG_NOTICE, "MySQL session disconnected,"
                                                    " reconnecting." );
+                        versionRemove( "MySQL client" );
+                        versionRemove( "MySQL server" );
                         connected = db_server_connect( protItem->sql );
                     }
 
@@ -313,6 +315,7 @@ bool db_server_connect( MYSQL *mysql )
 {
     my_bool         my_true;
     unsigned long   serverVers;
+    static char     buf[30];
 
     LogPrint( LOG_CRIT, "Using database %s at %s:%d", mysql_db, mysql_host, 
               mysql_portnum);
@@ -332,14 +335,18 @@ bool db_server_connect( MYSQL *mysql )
     (void)my_true;
 #endif
 
-    LogPrint( LOG_CRIT, "MySQL client version %d.%d.%d", 
-                        MYSQL_VERSION_ID / 10000,
-                        (MYSQL_VERSION_ID / 100 ) % 100,
-                        MYSQL_VERSION_ID % 100 );
+    snprintf( buf, 30, "%d.%d.%d", MYSQL_VERSION_ID / 10000,
+                       (MYSQL_VERSION_ID / 100 ) % 100, 
+                       MYSQL_VERSION_ID % 100 );
+    LogPrint( LOG_CRIT, "MySQL client version %s", buf );
+    versionAdd( "MySQL client", buf );
+
     serverVers = mysql_get_server_version( mysql );
-    LogPrint( LOG_CRIT, "MySQL server version %d.%d.%d", 
-                        serverVers / 10000, (serverVers / 100) % 100,
-                        serverVers % 100 );
+    snprintf( buf, 30, "%ld.%ld.%ld", serverVers / 10000, 
+                       (serverVers / 100) % 100,
+                       serverVers % 100 );
+    LogPrint( LOG_CRIT, "MySQL server version %s", buf );
+    versionAdd( "MySQL server", buf );
 
     return( TRUE );
 }

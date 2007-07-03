@@ -188,6 +188,8 @@ void cursesTextRemove( CursesWindow_t window, CursesTextAlign_t align, int x,
 void cursesSigwinch( int signum, void *arg );
 void cursesDoSubMenu( void *arg );
 
+void versionAdd( char *what, char *version );
+void versionRemove( char *what );
 
 #endif
 

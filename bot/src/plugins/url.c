@@ -137,6 +137,7 @@ int         urlMenuId;
 void plugin_initialize( char *args )
 {
     static char    *command = "url";
+    static char     buf[32];
 
     LogPrintNoArg( LOG_NOTICE, "Initializing url plugin..." );
 
@@ -144,6 +145,11 @@ void plugin_initialize( char *args )
                      defSchemaCount, schemaUpgrade );
 
     urlMenuId = cursesMenuItemAdd( 1, -1, "URL", NULL, NULL );
+
+    snprintf( buf, 32, "%d.%d.%d", (LIBCURL_VERSION_NUM >> 16) & 0xFF,
+                       (LIBCURL_VERSION_NUM >> 8) & 0xFF,
+                       LIBCURL_VERSION_NUM & 0xFF );
+    versionAdd( "CURL", buf );
 
     botCmd_add( (const char **)&command, botCmdUrl, botHelpUrl, NULL );
     regexp_add( NULL, (const char *)urlRegexp, regexpFuncUrl, NULL );
@@ -155,6 +161,8 @@ void plugin_shutdown( void )
     cursesMenuItemRemove( 1, urlMenuId, "URL" );
     regexp_remove( NULL, urlRegexp );
     botCmd_remove( "url" );
+    versionRemove( "CURL" );
+
 }
 
 

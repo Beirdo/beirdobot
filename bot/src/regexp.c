@@ -33,6 +33,7 @@
 #include "botnet.h"
 #include "environment.h"
 #include "structs.h"
+#include "protos.h"
 #include "linked_list.h"
 #include "logging.h"
 
@@ -48,6 +49,8 @@ LinkedList_t   *regexpList;
 void regexp_initialize( void )
 {
     regexpList = LinkedListCreate();
+
+    versionAdd( "pcre", (char *)pcre_version() );
 }
 
 void regexp_add( const char *channelRegexp, const char *contentRegexp, 

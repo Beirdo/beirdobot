@@ -156,6 +156,7 @@ void plugin_initialize( char *args )
 
     LogPrintNoArg( LOG_NOTICE, "Initializing luascript..." );
     LogPrint( LOG_NOTICE, "Using %s", LUA_VERSION );
+    versionAdd( "LUA", LUA_VERSION );
     LogPrint( LOG_NOTICE, "%s", LUA_COPYRIGHT );
     LogPrint( LOG_NOTICE, "Script path: %s", PLUGIN_PATH );
 
@@ -194,6 +195,8 @@ void plugin_shutdown( void )
 
     LogPrintNoArg( LOG_NOTICE, "Removing luascript..." );
     botCmd_remove( "luascript" );
+
+    versionRemove( "LUA" );
 
     cursesMenuItemRemove( 1, luascriptMenuId, "LUAScript" );
     if( !luascriptTree ) {

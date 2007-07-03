@@ -146,7 +146,7 @@ void BN_CreateDCCSendProcess(BN_PInfo,BN_PSend,const int);
 void BN_CreateDCCGetProcess(BN_PInfo,BN_PSend);
 
 /* From botnet.c */
-#define BOTNET_VERSION "1.6.4"
+#define BOTNET_VERSION "1.6.4-beirdobot"
 #define BOTNET_COPYRIGHT "Botnet version " BOTNET_VERSION " (c) Christophe CALMEJANE (Ze KiLleR / SkyTech) 1999'03"
 /* Disconnects from the server */
 void BN_Disconnect(BN_PInfo);

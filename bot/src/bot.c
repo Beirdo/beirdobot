@@ -590,6 +590,8 @@ void bot_start(void)
     /* Create the server tree */
     ServerTree = BalancedBTreeCreate( BTREE_KEY_INT );
 
+    versionAdd( "botnet", BN_GetVersion() );
+
     BalancedBTreeLock( ServerTree );
 
     /* Read the list of servers */

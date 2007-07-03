@@ -180,7 +180,18 @@ void uninit_apr( void );
 
 void plugin_initialize( char *args )
 {
+    static char     buf[128];
+
     LogPrintNoArg( LOG_NOTICE, "Initializing trac..." );
+
+    snprintf( buf, 128, "%d.%d.%d%s", SVN_VER_MAJOR, SVN_VER_MINOR,
+                        SVN_VER_PATCH, SVN_VER_TAG );
+    versionAdd( "libsvn", buf );
+
+    snprintf( buf, 32, "%d.%d.%d", (LIBCURL_VERSION_NUM >> 16) & 0xFF,
+                       (LIBCURL_VERSION_NUM >> 8) & 0xFF,
+                       LIBCURL_VERSION_NUM & 0xFF );
+    versionAdd( "CURL", buf );
 
     db_check_schema( "dbSchemaTrac", "Trac", CURRENT_SCHEMA_TRAC,
                      defSchema, defSchemaCount, schemaUpgrade );
@@ -213,6 +224,9 @@ void plugin_shutdown( void )
     if( commandInit ) {
         botCmd_remove( "trac" );
     }
+
+    versionRemove( "libsvn" );
+    versionRemove( "CURL" );
 
     if( channelRegexp ) {
         regexp_remove( channelRegexp, ticketRegexp );

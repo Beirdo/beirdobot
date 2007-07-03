@@ -96,8 +96,12 @@ void plugin_initialize( char *args )
     static char            *command = "dig";
     int                     i;
     BalancedBTreeItem_t    *item;
+    static char             buf[32];
 
     LogPrintNoArg( LOG_NOTICE, "Initializing dns..." );
+
+    snprintf( buf, 32, "%d", __RES );
+    versionAdd( "libresolv", buf );
 
     pthread_mutex_init( &shutdownMutex, NULL );
     thread_create( &dnsThreadId, dns_thread, NULL, "thread_dns", NULL, NULL );
@@ -135,6 +139,8 @@ void plugin_shutdown( void )
 {
     LogPrintNoArg( LOG_NOTICE, "Removing dns..." );
     botCmd_remove( "dig" );
+
+    versionRemove( "libresolv" );
 
     threadAbort = TRUE;
 
