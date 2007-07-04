@@ -566,6 +566,7 @@ void *curses_output_thread( void *arg )
                         inSubMenuFunc = FALSE;
                         currDetailKeyhandler = NULL;
                         cursesWindowClear( WINDOW_DETAILS );
+                        curs_set(0);
                     }
                     break;
                 default:
