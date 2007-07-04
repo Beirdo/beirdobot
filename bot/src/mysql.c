@@ -1412,14 +1412,15 @@ void result_load_servers( MYSQL_RES *res, MYSQL_BIND *input, void *arg )
                 cursesMenuItemRemove( 2, MENU_SERVERS, server->menuText );
                 free( server->menuText );
                 server->menuText = threadName;
-                cursesMenuItemAdd( 2, MENU_SERVERS, server->menuText, NULL,
-                                   NULL );
+                cursesMenuItemAdd( 2, MENU_SERVERS, server->menuText, 
+                                   cursesServerDisplay, (void *)server );
             } else {
                 free( threadName );
             }
         } else {
             server->menuText = threadName;
-            cursesMenuItemAdd( 2, MENU_SERVERS, server->menuText, NULL, NULL );
+            cursesMenuItemAdd( 2, MENU_SERVERS, server->menuText, 
+                               cursesServerDisplay, (void *)server );
         }
 
         if( (found && oldEnabled && !server->enabled) || killServer ) {

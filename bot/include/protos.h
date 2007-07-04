@@ -187,9 +187,19 @@ void cursesTextRemove( CursesWindow_t window, CursesTextAlign_t align, int x,
                        int y );
 void cursesSigwinch( int signum, void *arg );
 void cursesDoSubMenu( void *arg );
+bool cursesDetailsKeyhandle( int ch );
+bool cursesFormKeyhandle( int ch );
+void cursesKeyhandleRegister( CursesKeyhandleFunc_t func );
+void cursesFieldAdd( CursesFieldType_t type, int startx, int starty, int width,
+                     int height, char *string, int maxLen, void *fieldType, 
+                     CursesFieldTypeArgs_t *fieldArgs );
+void cursesFormClear( void );
 
 void versionAdd( char *what, char *version );
 void versionRemove( char *what );
+
+void cursesServerDisplay( void *arg );
+void cursesChannelDisplay( void *arg );
 
 #endif
 

@@ -314,6 +314,7 @@ typedef enum {
     WINDOW_MENU1,
     WINDOW_MENU2,
     WINDOW_DETAILS,
+    WINDOW_DETAILS_FORM,
     WINDOW_LOG,
     WINDOW_TAILER,
     WINDOW_COUNT
@@ -334,6 +335,35 @@ typedef enum {
     ALIGN_FROM_CENTER,  /* Align left side of text to offset from center */
     ALIGN_WRAP          /* left aligned, wrapped */
 } CursesTextAlign_t;
+
+typedef bool (*CursesKeyhandleFunc_t)(int);
+
+typedef union {
+    int         minLen;
+    struct {
+        char  **stringList;
+        int     caseSensitive;
+        int     partialMatch;
+    } enumArgs;
+    struct {
+        int     precision;
+        long    minValue;
+        long    maxValue;
+    } integerArgs;
+    struct {
+        int     precision;
+        double  minValue;
+        double  maxValue;
+    } numericArgs;
+    char       *regexp;
+} CursesFieldTypeArgs_t;
+
+typedef enum {
+    FIELD_LABEL,
+    FIELD_FIELD,
+    FIELD_BUTTON
+} CursesFieldType_t;
+
 
 #endif
 

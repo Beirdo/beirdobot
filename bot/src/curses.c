@@ -34,6 +34,7 @@
 #include <sys/time.h>
 #include <ncurses.h>
 #include <menu.h>
+#include <form.h>
 #include "botnet.h"
 #include "protos.h"
 #include "queue.h"
@@ -58,6 +59,10 @@ WINDOW         *winMenu2;
 WINDOW         *winDetails;
 WINDOW         *winLog;
 WINDOW         *winTailer;
+WINDOW         *winDetailsForm;
+
+FORM           *detailsForm = NULL;
+FIELD         **detailsFields = NULL;
 
 LinkedList_t   *textEntries[WINDOW_COUNT];
 
@@ -66,6 +71,7 @@ void *curses_input_thread( void *arg );
 void cursesWindowSet( void );
 void cursesMenuInitialize( void );
 void cursesMenuRegenerate( void );
+void cursesFormRegenerate( void );
 int cursesItemCount( BalancedBTree_t *tree );
 int cursesItemCountRecurse( BalancedBTreeItem_t *node );
 void cursesSubmenuRegenerate( int menuId, BalancedBTree_t *tree );
@@ -84,6 +90,8 @@ typedef enum {
     CURSES_LOG_MESSAGE,
     CURSES_MENU_ITEM_ADD,
     CURSES_MENU_ITEM_REMOVE,
+    CURSES_FORM_ITEM_ADD,
+    CURSES_FORM_ITEM_REMOVE,
     CURSES_KEYSTROKE,
     CURSES_SIGNAL
 } CursesType_t;
@@ -97,12 +105,13 @@ typedef struct {
 } CursesWindowDef_t;
 
 CursesWindowDef_t   windows[] = {
-    { &winHeader,  0, 0, 0, 0 },
-    { &winMenu1,   0, 0, 0, 0 },
-    { &winMenu2,   0, 0, 0, 0 },
-    { &winDetails, 0, 0, 0, 0 },
-    { &winLog,     0, 0, 0, 0 },
-    { &winTailer,  0, 0, 0, 0 }
+    { &winHeader,       0, 0, 0, 0 },
+    { &winMenu1,        0, 0, 0, 0 },
+    { &winMenu2,        0, 0, 0, 0 },
+    { &winDetails,      0, 0, 0, 0 },
+    { &winDetailsForm,  0, 0, 0, 0 },
+    { &winLog,          0, 0, 0, 0 },
+    { &winTailer,       0, 0, 0, 0 }
 };
 
 typedef struct {
@@ -158,6 +167,7 @@ static CursesMenuItem_t menu1Static[] = {
 static int menu1StaticCount = NELEMENTS(menu1Static);
 static BalancedBTree_t *menu1Tree;
 static BalancedBTree_t *menu1NumTree;
+CursesMenuItem_t *cursesMenu1Find( int menuId );
 
 typedef struct {
     MENU           *menu;
@@ -185,8 +195,10 @@ typedef struct {
 static CursesMenu_t   **menus = NULL;
 static int              menusCount = 0;
 
-static ProtectedData_t  *nextMenuId;
-static int               currMenuId = -1;
+static ProtectedData_t         *nextMenuId;
+static int                      currMenuId = -1;
+static CursesKeyhandleFunc_t    currDetailKeyhandler = NULL;
+static bool                     inSubMenuFunc = FALSE;
 
 static CursesLine_t      menuLines[] = {
     { LINE_HLINE, 0, 1, 0, 0 },
@@ -201,8 +213,22 @@ static CursesLine_t      menuLines[] = {
 };
 static int menuLinesCount = NELEMENTS( menuLines );
 
-CursesMenuItem_t *cursesMenu1Find( int menuId );
+typedef struct {
+    LinkedListItem_t        linkage;
+    CursesFieldType_t       type;
+    int                     startx;
+    int                     starty;
+    int                     width;
+    int                     height;
+    char                   *string;
+    int                     len;
+    int                     maxLen;
+    FIELDTYPE              *fieldType;
+    CursesFieldTypeArgs_t   fieldArgs;
+    FIELD                  *field;
+} CursesField_t;
 
+LinkedList_t   *formList;
 
 void cursesWindowSet( void )
 {
@@ -281,6 +307,11 @@ void cursesWindowSet( void )
     windows[WINDOW_DETAILS].width  = (x - (x / 2)) - 1;
     windows[WINDOW_DETAILS].height = lines;
 
+    windows[WINDOW_DETAILS_FORM].startx = (x / 2) + 1;
+    windows[WINDOW_DETAILS_FORM].starty = 2;
+    windows[WINDOW_DETAILS_FORM].width  = (x - (x / 2)) - 1;
+    windows[WINDOW_DETAILS_FORM].height = lines;
+
     windows[WINDOW_LOG].startx = 0;
     windows[WINDOW_LOG].starty = lines + 3;
     windows[WINDOW_LOG].width  = x;
@@ -292,9 +323,15 @@ void cursesWindowSet( void )
     windows[WINDOW_TAILER].height = 1;
 
     for( i = 0; i < WINDOW_COUNT; i++ ) {
-        *windows[i].window = subwin( winFull, windows[i].height, 
-                                     windows[i].width, windows[i].starty,
-                                     windows[i].startx );
+        if( i == WINDOW_DETAILS_FORM ) {
+            *windows[i].window = subwin( winDetails, windows[i].height, 
+                                         windows[i].width, windows[i].starty,
+                                         windows[i].startx );
+        } else {
+            *windows[i].window = subwin( winFull, windows[i].height, 
+                                         windows[i].width, windows[i].starty,
+                                         windows[i].startx );
+        }
     }
 
     wrefresh( winFull );
@@ -315,13 +352,9 @@ void curses_start( void )
     cursesWindowSet();
     cursesMenuInitialize();
 
-    /* Since the stupid hlines just won't work! */
-#if 0
-    cursesReloadScreen();
-#endif
-
     CursesQ    = QueueCreate(2048);
     CursesLogQ = QueueCreate(2048);
+    formList   = LinkedListCreate();
 
     thread_create( &cursesOutThreadId, curses_output_thread, NULL, 
                    "thread_curses_out", NULL, NULL );
@@ -353,7 +386,6 @@ void *curses_output_thread( void *arg )
     int                 x, y;
     int                 linewidth;
     int                 linelen;
-    bool                inSubMenuFunc = FALSE;
 
     scrolledBack = FALSE;
     atexit( cursesAtExit );
@@ -375,8 +407,8 @@ void *curses_output_thread( void *arg )
                 textItem = (CursesText_t *)malloc(sizeof(CursesText_t));
                 memcpy( textItem, &item->data.text, sizeof(CursesText_t) );
                 LinkedListAdd( textEntries[winNum], 
-                               (LinkedListItem_t *)textItem, AT_TAIL, 
-                               UNLOCKED );
+                               (LinkedListItem_t *)textItem, UNLOCKED,
+                               AT_TAIL );
             }
             break;
         case CURSES_TEXT_REMOVE:
@@ -437,72 +469,71 @@ void *curses_output_thread( void *arg )
             /* The real work is done in cursesMenuItemAdd */
             cursesMenuRegenerate();
             break;
+        case CURSES_FORM_ITEM_ADD:
+        case CURSES_FORM_ITEM_REMOVE:
+            /* The real work is done in cursesMenuItemAdd */
+            cursesFormRegenerate();
+            break;
         case CURSES_KEYSTROKE:
-#if 0
-            LogPrint( LOG_CRIT, "Keystroke: %d", item->data.key.keystroke );
-#endif
-            switch( item->data.key.keystroke ) {
-            case KEY_UP:
-                if( !inSubMenuFunc ) {
+            if( !inSubMenuFunc || !currDetailKeyhandler ||
+                currDetailKeyhandler( item->data.key.keystroke ) ) {
+                switch( item->data.key.keystroke ) {
+                case KEY_UP:
                     menu_driver( menus[currMenuId+1]->menu, REQ_UP_ITEM );
-                }
-                break;
-            case KEY_DOWN:
-                if( !inSubMenuFunc ) {
+                    break;
+                case KEY_DOWN:
                     menu_driver( menus[currMenuId+1]->menu, REQ_DOWN_ITEM );
-                }
-                break;
-            case KEY_PPAGE:
-                QueueLock( CursesLogQ );
-                getmaxyx( winLog, lines, x );
-                count = QueueUsed( CursesLogQ );
-
-                if( count <= lines ) {
-                    scrolledBack = FALSE;
-                    QueueUnlock( CursesLogQ );
                     break;
-                }
+                case KEY_PPAGE:
+                    QueueLock( CursesLogQ );
+                    getmaxyx( winLog, lines, x );
+                    count = QueueUsed( CursesLogQ );
 
-                scrolledBack = TRUE;
-                if( scrolledBack ) {
-                    count = (logTop + CursesLogQ->numElements - 
-                             CursesLogQ->tail) & CursesLogQ->numMask;
-                    if( count < lines ) {
-                        logTop = CursesLogQ->tail;
-                    } else {
-                        logTop = (logTop + CursesLogQ->numElements - lines) &
-                                 CursesLogQ->numMask;
+                    if( count <= lines ) {
+                        scrolledBack = FALSE;
+                        QueueUnlock( CursesLogQ );
+                        break;
                     }
-                }
-                QueueUnlock( CursesLogQ );
-                break;
-            case KEY_NPAGE:
-                if( !scrolledBack ) {
-                    break;
-                }
 
-                QueueLock( CursesLogQ );
-                getmaxyx( winLog, lines, x );
-                count = QueueUsed( CursesLogQ );
-
-                if( count <= lines ) {
-                    scrolledBack = FALSE;
+                    scrolledBack = TRUE;
+                    if( scrolledBack ) {
+                        count = (logTop + CursesLogQ->numElements - 
+                                 CursesLogQ->tail) & CursesLogQ->numMask;
+                        if( count < lines ) {
+                            logTop = CursesLogQ->tail;
+                        } else {
+                            logTop = (logTop + CursesLogQ->numElements - 
+                                      lines) & CursesLogQ->numMask;
+                        }
+                    }
                     QueueUnlock( CursesLogQ );
                     break;
-                }
+                case KEY_NPAGE:
+                    if( !scrolledBack ) {
+                        break;
+                    }
 
-                count = (CursesLogQ->head + CursesLogQ->numElements - logTop) &
-                        CursesLogQ->numMask;
-                if( count <= 2 * lines ) {
-                    scrolledBack = FALSE;
-                } else {
-                    logTop = (logTop + lines) & CursesLogQ->numMask;
-                }
-                QueueUnlock( CursesLogQ );
-                break;
-            case 10:    /* Enter */
-            case KEY_RIGHT:
-                if( !inSubMenuFunc ) {
+                    QueueLock( CursesLogQ );
+                    getmaxyx( winLog, lines, x );
+                    count = QueueUsed( CursesLogQ );
+
+                    if( count <= lines ) {
+                        scrolledBack = FALSE;
+                        QueueUnlock( CursesLogQ );
+                        break;
+                    }
+
+                    count = (CursesLogQ->head + CursesLogQ->numElements - 
+                             logTop) & CursesLogQ->numMask;
+                    if( count <= 2 * lines ) {
+                        scrolledBack = FALSE;
+                    } else {
+                        logTop = (logTop + lines) & CursesLogQ->numMask;
+                    }
+                    QueueUnlock( CursesLogQ );
+                    break;
+                case 10:    /* Enter */
+                case KEY_RIGHT:
                     currItem = current_item( menus[currMenuId+1]->menu );
                     menuItem = (CursesMenuItem_t *)item_userptr(currItem);
                     pos_menu_cursor( menus[currMenuId+1]->menu );
@@ -511,26 +542,35 @@ void *curses_output_thread( void *arg )
                             inSubMenuFunc = TRUE;
                         }
                         menuItem->menuFunc( menuItem->menuFuncArg );
+                        if( detailsForm ) {
+                            /* 
+                             * That was a form, put the cursor at the first
+                             * item on the page
+                             */
+                            form_driver( detailsForm, REQ_SFIRST_FIELD );
+                            form_driver( detailsForm, REQ_END_LINE );
+                        }
                     }
-                }
-                break;
-            case 18:    /* Ctrl-R */
-                cursesReloadScreen();
-                break;
-            case 27:    /* Escape */
-            case KEY_LEFT:
-                if( !inSubMenuFunc ) {
-                    if( currMenuId != -1 ) {
-                        pos_menu_cursor( menus[currMenuId+1]->menu );
-                        cursesDoSubMenu( &mainMenu );
+                    break;
+                case 18:    /* Ctrl-R */
+                    cursesReloadScreen();
+                    break;
+                case 27:    /* Escape */
+                case KEY_LEFT:
+                    if( !inSubMenuFunc ) {
+                        if( currMenuId != -1 ) {
+                            pos_menu_cursor( menus[currMenuId+1]->menu );
+                            cursesDoSubMenu( &mainMenu );
+                        }
+                    } else {
+                        inSubMenuFunc = FALSE;
+                        currDetailKeyhandler = NULL;
+                        cursesWindowClear( WINDOW_DETAILS );
                     }
-                } else {
-                    inSubMenuFunc = FALSE;
-                    cursesWindowClear( WINDOW_DETAILS );
+                    break;
+                default:
+                    break;
                 }
-                break;
-            default:
-                break;
             }
             break;
         case CURSES_SIGNAL:
@@ -693,14 +733,15 @@ void *curses_output_thread( void *arg )
         /* sync updates to the full window */
         wsyncup( winLog );
         wrefresh( winFull );
+
+        if( inSubMenuFunc && detailsForm ) {
+            pos_form_cursor( detailsForm );
+            wrefresh( winFull );
+        }
     }
 
     LogPrintNoArg( LOG_NOTICE, "Ending curses output thread" );
     cursesAtExit();
-#if 0
-    curs_set(1);
-    endwin();
-#endif
     return(NULL);
 }
 
@@ -720,6 +761,18 @@ void cursesReloadScreen( void )
         }
     }
 
+    if( detailsForm ) {
+        unpost_form( detailsForm );
+        free_form( detailsForm );
+
+        for( i = 0; detailsFields && detailsFields[i]; i++ ) {
+            free_field( detailsFields[i] );
+        }
+        free( detailsFields );
+        detailsFields = NULL;
+        detailsForm = NULL;
+    }
+
     delwin( winTailer );
     delwin( winLog );
     delwin( winDetails );
@@ -730,6 +783,7 @@ void cursesReloadScreen( void )
     endwin();
     cursesWindowSet();
     cursesMenuRegenerate();
+    cursesFormRegenerate();
 }
 
 void cursesAtExit( void )
@@ -1282,6 +1336,347 @@ void cursesUpdateLines( void )
         }
     }
 }
+
+bool cursesDetailsKeyhandle( int ch )
+{
+    switch( ch ) {
+    case KEY_LEFT:
+    case KEY_PPAGE:
+    case KEY_NPAGE:
+    case 18:    /* Ctrl-R */
+        return( TRUE );
+    case KEY_UP:
+        break;
+    case KEY_DOWN:
+        break;
+    case KEY_RIGHT:
+    default:
+        break;
+    }
+
+    return( FALSE );
+}
+
+void cursesKeyhandleRegister( CursesKeyhandleFunc_t func )
+{
+    if( !func ) {
+        return;
+    }
+
+    currDetailKeyhandler = func;
+}
+
+void cursesFieldAdd( CursesFieldType_t type, int startx, int starty, int width,
+                     int height, char *string, int maxLen, void *fieldType, 
+                     CursesFieldTypeArgs_t *fieldArgs )
+{
+    CursesItem_t   *cursesItem;
+    CursesField_t  *field;
+
+    if( !inSubMenuFunc ) {
+        return;
+    }
+
+    field = (CursesField_t *)malloc(sizeof(CursesField_t));
+    memset( field, 0x00, sizeof(CursesField_t) );
+    field->type      = type;
+    field->startx    = startx;
+    field->starty    = starty;
+    field->width     = width;
+    field->height    = height;
+    field->string    = strdup(string);
+    field->len       = strlen(string);
+    field->maxLen    = maxLen;
+    field->fieldType = (FIELDTYPE *)fieldType;
+    if( fieldArgs ) {
+        memcpy( &field->fieldArgs, fieldArgs, sizeof(CursesFieldTypeArgs_t));
+    }
+
+    LinkedListAdd( formList, (LinkedListItem_t *)field, UNLOCKED, AT_TAIL );
+
+    cursesItem = (CursesItem_t *)malloc(sizeof(CursesItem_t));
+    cursesItem->type = CURSES_FORM_ITEM_ADD;
+    QueueEnqueueItem( CursesQ, (void *)cursesItem );
+}
+
+void cursesFormClear( void )
+{
+    LinkedListItem_t   *item;
+    CursesField_t      *fieldItem;
+    CursesItem_t       *cursesItem;
+    FIELD              *field;
+    int                 i;
+
+    LinkedListLock( formList );
+
+    while( (item = formList->head) ) {
+        fieldItem = (CursesField_t *)item;
+
+        LinkedListRemove( formList, item, UNLOCKED );
+        free( fieldItem->string );
+        free( fieldItem );
+    }
+
+    LinkedListUnlock( formList );
+
+    if( detailsForm ) {
+        unpost_form( detailsForm );
+        free_form( detailsForm );
+
+        for( i = 0; detailsFields && (field = detailsFields[i]); i++ ) {
+            free_field( detailsFields[i] );
+        }
+        free( detailsFields );
+        detailsFields = NULL;
+        detailsForm = NULL;
+    }
+
+    cursesItem = (CursesItem_t *)malloc(sizeof(CursesItem_t));
+    cursesItem->type = CURSES_FORM_ITEM_REMOVE;
+    QueueEnqueueItem( CursesQ, (void *)cursesItem );
+}
+
+void cursesFormRegenerate( void )
+{
+    LinkedListItem_t       *item;
+    CursesField_t          *fieldItem;
+    int                     count;
+    int                     i;
+    FIELD                  *field;
+    int                     x, y;
+    int                     width;
+
+    if( !inSubMenuFunc ) {
+        return;
+    }
+
+    getmaxyx( winDetails, y, x );
+
+    LinkedListLock( formList );
+
+    for( count = 0, item = formList->head; item; item = item->next ) {
+        fieldItem = (CursesField_t *)item;
+        if( fieldItem->type != FIELD_LABEL ) {
+            count++;
+        }
+    }
+
+    if( detailsForm ) {
+        unpost_form( detailsForm );
+        free_form( detailsForm );
+        for( i = 0; detailsFields && (field = detailsFields[i]); i++ ) {
+            free_field( detailsFields[i] );
+        }
+    }
+    
+    detailsFields = (FIELD **)realloc( detailsFields, 
+                                       (count + 1) * sizeof(FIELD *) );
+    
+    for( i = 0, item = formList->head; item; item = item->next ) {
+        fieldItem = (CursesField_t *)item;
+        switch( fieldItem->type ) {
+        case FIELD_LABEL:
+            break;
+        case FIELD_FIELD:
+            width = fieldItem->width;
+            if( width + fieldItem->startx > x - 1 ) {
+                width = x - fieldItem->startx - 1;
+            }
+            fieldItem->field = new_field( fieldItem->height, width,
+                                          fieldItem->starty, fieldItem->startx,
+                                          0, 0 );
+            if( fieldItem->fieldType == TYPE_ALNUM ||
+                fieldItem->fieldType == TYPE_ALPHA ) {
+                set_field_type( fieldItem->field, fieldItem->fieldType,
+                                fieldItem->fieldArgs.minLen );
+            } else if( fieldItem->fieldType == TYPE_ENUM ) {
+                set_field_type( fieldItem->field, fieldItem->fieldType,
+                                fieldItem->fieldArgs.enumArgs.stringList,
+                                fieldItem->fieldArgs.enumArgs.caseSensitive,
+                                fieldItem->fieldArgs.enumArgs.partialMatch );
+            } else if( fieldItem->fieldType == TYPE_INTEGER ) {
+                set_field_type( fieldItem->field, fieldItem->fieldType,
+                                fieldItem->fieldArgs.integerArgs.precision,
+                                fieldItem->fieldArgs.integerArgs.minValue,
+                                fieldItem->fieldArgs.integerArgs.maxValue );
+            } else if( fieldItem->fieldType == TYPE_NUMERIC ) {
+                set_field_type( fieldItem->field, fieldItem->fieldType,
+                                fieldItem->fieldArgs.numericArgs.precision,
+                                fieldItem->fieldArgs.numericArgs.minValue,
+                                fieldItem->fieldArgs.numericArgs.maxValue );
+            } else if( fieldItem->fieldType == TYPE_REGEXP ) {
+                set_field_type( fieldItem->field, fieldItem->fieldType,
+                                fieldItem->fieldArgs.regexp );
+            } else if( fieldItem->fieldType == TYPE_IPV4 ) {
+                set_field_type( fieldItem->field, fieldItem->fieldType );
+            }
+
+            if( fieldItem->maxLen == 0 ) {
+                fieldItem->maxLen = width;
+            }
+
+            if( fieldItem->maxLen > width ) {
+                field_opts_off( fieldItem->field, O_STATIC );
+                set_max_field( fieldItem->field, fieldItem->maxLen );
+            }
+
+            if( fieldItem->string ) {
+                set_field_buffer( fieldItem->field, 0, fieldItem->string );
+            }
+
+            set_field_back( fieldItem->field, A_UNDERLINE );
+            field_opts_off( fieldItem->field, O_AUTOSKIP );
+            detailsFields[i] = fieldItem->field;
+            i++;
+            break;
+        case FIELD_BUTTON:
+            break;
+        }
+    }
+    detailsFields[count] = NULL;
+
+    detailsForm = new_form( detailsFields );
+    set_form_win( detailsForm, winDetailsForm );
+    set_form_sub( detailsForm, winDetailsForm );
+    post_form( detailsForm );
+
+    curs_set(1);
+
+    wsyncup( winDetailsForm );
+
+    for( i = 0, item = formList->head; item; item = item->next ) {
+        fieldItem = (CursesField_t *)item;
+        if( fieldItem->type == FIELD_LABEL ) {
+            mvwprintw( winDetails, fieldItem->starty, fieldItem->startx,
+                       fieldItem->string );
+        }
+    }
+
+    LinkedListUnlock( formList );
+    wsyncup( winDetails );
+    wrefresh( winFull );
+}
+
+bool cursesFormKeyhandle( int ch )
+{
+    switch( ch ) {
+    case 27:    /* Escape */
+    case KEY_PPAGE:
+    case KEY_NPAGE:
+    case 18:    /* Ctrl-R */
+        return( TRUE );
+    case KEY_DOWN:
+        form_driver( detailsForm, REQ_SNEXT_FIELD );
+        form_driver( detailsForm, REQ_END_LINE );
+        break;
+    case KEY_UP:
+        form_driver( detailsForm, REQ_SPREV_FIELD );
+        form_driver( detailsForm, REQ_END_LINE );
+        break;
+    case KEY_BACKSPACE:
+        form_driver( detailsForm, REQ_DEL_PREV );
+        break;
+    case KEY_DC:
+        form_driver( detailsForm, REQ_DEL_CHAR );
+        break;
+    case KEY_LEFT:
+        form_driver( detailsForm, REQ_PREV_CHAR );
+        break;
+    case KEY_RIGHT:
+        form_driver( detailsForm, REQ_NEXT_CHAR );
+        break;
+    case KEY_HOME:
+        form_driver( detailsForm, REQ_BEG_LINE );
+        break;
+    case KEY_END:
+        form_driver( detailsForm, REQ_END_LINE );
+        break;
+    default:
+        form_driver( detailsForm, ch );
+        break;
+    }
+
+    return( FALSE );
+}
+
+void cursesServerDisplay( void *arg )
+{
+    IRCServer_t            *server;
+    static char             buf[64];
+    CursesFieldTypeArgs_t   fieldArgs;
+
+    server = (IRCServer_t *)arg;
+
+    cursesKeyhandleRegister( cursesFormKeyhandle );
+
+    snprintf( buf, 64, "Server Number:  %d", server->serverId );
+    cursesFieldAdd( FIELD_LABEL, 0, 0, 0, 0, buf, 0, NULL, NULL );
+    cursesFieldAdd( FIELD_LABEL, 0, 1, 0, 0, "Server:", 0, NULL, NULL );
+    cursesFieldAdd( FIELD_FIELD, 16, 1, 32, 1, server->server, 64, NULL, NULL );
+    cursesFieldAdd( FIELD_LABEL, 0, 2, 0, 0, "Port:", 0, NULL, NULL );
+    fieldArgs.integerArgs.precision = 5;
+    fieldArgs.integerArgs.minValue  = 1;
+    fieldArgs.integerArgs.maxValue  = 65535;
+    snprintf( buf, 64, "%d", server->port );
+    cursesFieldAdd( FIELD_FIELD, 16, 2, 6, 1, buf, 6, TYPE_INTEGER, 
+                    &fieldArgs );
+    cursesFieldAdd( FIELD_LABEL, 0, 3, 0, 0, "Password:", 0, NULL, NULL );
+    cursesFieldAdd( FIELD_FIELD, 16, 3, 32, 1, server->password, 64, NULL, 
+                    NULL );
+    cursesFieldAdd( FIELD_LABEL, 0, 4, 0, 0, "Nick:", 0, NULL, NULL );
+    cursesFieldAdd( FIELD_FIELD, 16, 4, 32, 1, server->nick, 64, NULL, NULL );
+    cursesFieldAdd( FIELD_LABEL, 0, 5, 0, 0, "User Name:", 0, NULL, NULL );
+    cursesFieldAdd( FIELD_FIELD, 16, 5, 32, 1, server->username, 64, NULL, 
+                    NULL );
+    cursesFieldAdd( FIELD_LABEL, 0, 6, 0, 0, "Real Name:", 0, NULL, NULL );
+    cursesFieldAdd( FIELD_FIELD, 16, 6, 32, 1, server->realname, 64, NULL, 
+                    NULL );
+    cursesFieldAdd( FIELD_LABEL, 0, 7, 0, 0, "Nickserv Nick:", 0, NULL, NULL );
+    cursesFieldAdd( FIELD_FIELD, 16, 7, 32, 1, server->nickserv, 64, NULL, 
+                    NULL );
+    cursesFieldAdd( FIELD_LABEL, 0, 8, 0, 0, "Nickserv Msg:", 0, NULL, NULL );
+    cursesFieldAdd( FIELD_FIELD, 16, 8, 32, 1, server->nickservmsg, 64, NULL, 
+                    NULL );
+
+    cursesFieldAdd( FIELD_LABEL, 0, 9, 0, 0, "Flood Interval:", 0, NULL, NULL );
+    snprintf( buf, 64, "%d", server->floodInterval );
+    fieldArgs.integerArgs.precision = 10;
+    fieldArgs.integerArgs.minValue  = 0;
+    fieldArgs.integerArgs.maxValue  = 0x7FFFFFFF;
+    cursesFieldAdd( FIELD_FIELD, 16, 9, 20, 1, buf, 20, TYPE_INTEGER, 
+                    &fieldArgs );
+
+    cursesFieldAdd( FIELD_LABEL, 0, 10, 0, 0, "Flood Max Time:", 0, NULL, 
+                    NULL );
+    snprintf( buf, 64, "%d", server->floodMaxTime );
+    fieldArgs.integerArgs.precision = 10;
+    fieldArgs.integerArgs.minValue  = 0;
+    fieldArgs.integerArgs.maxValue  = 0x7FFFFFFF;
+    cursesFieldAdd( FIELD_FIELD, 16, 10, 20, 1, buf, 20, TYPE_INTEGER, 
+                    &fieldArgs );
+
+    cursesFieldAdd( FIELD_LABEL, 0, 11, 0, 0, "Flood Buffer:", 0, NULL, NULL );
+    snprintf( buf, 64, "%d", server->floodBuffer );
+    fieldArgs.integerArgs.precision = 10;
+    fieldArgs.integerArgs.minValue  = 0;
+    fieldArgs.integerArgs.maxValue  = 0x7FFFFFFF;
+    cursesFieldAdd( FIELD_FIELD, 16, 11, 20, 1, buf, 20, TYPE_INTEGER, 
+                    &fieldArgs );
+
+    cursesFieldAdd( FIELD_LABEL, 0, 12, 0, 0, "Flood Max Line:", 0, NULL, 
+                    NULL );
+    snprintf( buf, 64, "%d", server->floodMaxLine );
+    fieldArgs.integerArgs.precision = 10;
+    fieldArgs.integerArgs.minValue  = 0;
+    fieldArgs.integerArgs.maxValue  = 0x7FFFFFFF;
+    cursesFieldAdd( FIELD_FIELD, 16, 12, 20, 1, buf, 20, TYPE_INTEGER, 
+                    &fieldArgs );
+}
+
+void cursesChannelDisplay( void *arg )
+{
+}
+
 
 /*
  * vim:ts=4:sw=4:ai:et:si:sts=4

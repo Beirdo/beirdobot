@@ -706,11 +706,13 @@ static char        *copyrightNotice =
 void mainAbout( void *arg )
 {
     cursesTextAdd( WINDOW_DETAILS, ALIGN_WRAP, 0, 0, aboutNotice );
+    cursesKeyhandleRegister( cursesDetailsKeyhandle );
 }
 
 void mainLicensing( void *arg )
 {
     cursesTextAdd( WINDOW_DETAILS, ALIGN_WRAP, 0, 0, copyrightNotice );
+    cursesKeyhandleRegister( cursesDetailsKeyhandle );
 }
 
 void versionAdd( char *what, char *version )
@@ -766,6 +768,7 @@ void mainVersions( void *arg )
     BalancedBTreeLock( versionTree );
     versionShowRecurse( versionTree->root, 0 );
     BalancedBTreeUnlock( versionTree );
+    cursesKeyhandleRegister( cursesDetailsKeyhandle );
 }
 
 int versionShowRecurse( BalancedBTreeItem_t *node, int line )
