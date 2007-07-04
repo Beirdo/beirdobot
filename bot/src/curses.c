@@ -1614,7 +1614,7 @@ void cursesServerDisplay( void *arg )
     cursesFieldAdd( FIELD_LABEL, 0, 1, 0, 0, "Server:", 0, NULL, NULL );
     cursesFieldAdd( FIELD_FIELD, 16, 1, 32, 1, server->server, 64, NULL, NULL );
     cursesFieldAdd( FIELD_LABEL, 0, 2, 0, 0, "Port:", 0, NULL, NULL );
-    fieldArgs.integerArgs.precision = 5;
+    fieldArgs.integerArgs.precision = 0;
     fieldArgs.integerArgs.minValue  = 1;
     fieldArgs.integerArgs.maxValue  = 65535;
     snprintf( buf, 64, "%d", server->port );
@@ -1640,7 +1640,7 @@ void cursesServerDisplay( void *arg )
 
     cursesFieldAdd( FIELD_LABEL, 0, 9, 0, 0, "Flood Interval:", 0, NULL, NULL );
     snprintf( buf, 64, "%d", server->floodInterval );
-    fieldArgs.integerArgs.precision = 10;
+    fieldArgs.integerArgs.precision = 0;
     fieldArgs.integerArgs.minValue  = 0;
     fieldArgs.integerArgs.maxValue  = 0x7FFFFFFF;
     cursesFieldAdd( FIELD_FIELD, 16, 9, 20, 1, buf, 20, TYPE_INTEGER, 
@@ -1649,7 +1649,7 @@ void cursesServerDisplay( void *arg )
     cursesFieldAdd( FIELD_LABEL, 0, 10, 0, 0, "Flood Max Time:", 0, NULL, 
                     NULL );
     snprintf( buf, 64, "%d", server->floodMaxTime );
-    fieldArgs.integerArgs.precision = 10;
+    fieldArgs.integerArgs.precision = 0;
     fieldArgs.integerArgs.minValue  = 0;
     fieldArgs.integerArgs.maxValue  = 0x7FFFFFFF;
     cursesFieldAdd( FIELD_FIELD, 16, 10, 20, 1, buf, 20, TYPE_INTEGER, 
@@ -1657,7 +1657,7 @@ void cursesServerDisplay( void *arg )
 
     cursesFieldAdd( FIELD_LABEL, 0, 11, 0, 0, "Flood Buffer:", 0, NULL, NULL );
     snprintf( buf, 64, "%d", server->floodBuffer );
-    fieldArgs.integerArgs.precision = 10;
+    fieldArgs.integerArgs.precision = 0;
     fieldArgs.integerArgs.minValue  = 0;
     fieldArgs.integerArgs.maxValue  = 0x7FFFFFFF;
     cursesFieldAdd( FIELD_FIELD, 16, 11, 20, 1, buf, 20, TYPE_INTEGER, 
@@ -1666,7 +1666,7 @@ void cursesServerDisplay( void *arg )
     cursesFieldAdd( FIELD_LABEL, 0, 12, 0, 0, "Flood Max Line:", 0, NULL, 
                     NULL );
     snprintf( buf, 64, "%d", server->floodMaxLine );
-    fieldArgs.integerArgs.precision = 10;
+    fieldArgs.integerArgs.precision = 0;
     fieldArgs.integerArgs.minValue  = 0;
     fieldArgs.integerArgs.maxValue  = 0x7FFFFFFF;
     cursesFieldAdd( FIELD_FIELD, 16, 12, 20, 1, buf, 20, TYPE_INTEGER, 
