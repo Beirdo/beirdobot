@@ -566,6 +566,7 @@ void *curses_output_thread( void *arg )
                         inSubMenuFunc = FALSE;
                         currDetailKeyhandler = NULL;
                         cursesWindowClear( WINDOW_DETAILS );
+                        cursesFormClear();
                         curs_set(0);
                     }
                     break;
@@ -1405,32 +1406,34 @@ void cursesFormClear( void )
     LinkedListItem_t   *item;
     CursesField_t      *fieldItem;
     CursesItem_t       *cursesItem;
-    FIELD              *field;
     int                 i;
-
-    LinkedListLock( formList );
-
-    while( (item = formList->head) ) {
-        fieldItem = (CursesField_t *)item;
-
-        LinkedListRemove( formList, item, UNLOCKED );
-        free( fieldItem->string );
-        free( fieldItem );
-    }
-
-    LinkedListUnlock( formList );
 
     if( detailsForm ) {
         unpost_form( detailsForm );
+        wsyncup( winDetailsForm );
+        wrefresh( winFull );
         free_form( detailsForm );
 
-        for( i = 0; detailsFields && (field = detailsFields[i]); i++ ) {
+        for( i = 0; detailsFields && detailsFields[i]; i++ ) {
             free_field( detailsFields[i] );
         }
         free( detailsFields );
         detailsFields = NULL;
         detailsForm = NULL;
     }
+
+    LinkedListLock( formList );
+
+    while( (item = formList->head) ) {
+        fieldItem = (CursesField_t *)item;
+
+        LinkedListRemove( formList, item, LOCKED );
+        free( fieldItem->string );
+        free( fieldItem );
+    }
+
+    LinkedListUnlock( formList );
+
 
     cursesItem = (CursesItem_t *)malloc(sizeof(CursesItem_t));
     cursesItem->type = CURSES_FORM_ITEM_REMOVE;
