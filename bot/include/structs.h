@@ -336,7 +336,7 @@ typedef enum {
     ALIGN_WRAP          /* left aligned, wrapped */
 } CursesTextAlign_t;
 
-typedef bool (*CursesKeyhandleFunc_t)(int);
+typedef int (*CursesKeyhandleFunc_t)(int);
 
 typedef union {
     int         minLen;

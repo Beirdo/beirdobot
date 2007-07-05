@@ -84,6 +84,7 @@ void cursesReloadScreen( void );
 void cursesWindowClear( CursesWindow_t window );
 void cursesUpdateLines( void );
 void cursesFieldChanged( FORM *form );
+void cursesServerRevert( void *arg, char *string );
 
 typedef enum {
     CURSES_TEXT_ADD,
@@ -398,6 +399,7 @@ void *curses_output_thread( void *arg )
     int                 x, y;
     int                 linewidth;
     int                 linelen;
+    int                 key;
 
     scrolledBack = FALSE;
     atexit( cursesAtExit );
@@ -487,9 +489,10 @@ void *curses_output_thread( void *arg )
             cursesFormRegenerate();
             break;
         case CURSES_KEYSTROKE:
+            key = item->data.key.keystroke;
             if( !inSubMenuFunc || !currDetailKeyhandler ||
-                currDetailKeyhandler( item->data.key.keystroke ) ) {
-                switch( item->data.key.keystroke ) {
+                (key = currDetailKeyhandler( key )) ) {
+                switch( key ) {
                 case KEY_UP:
                     menu_driver( menus[currMenuId+1]->menu, REQ_UP_ITEM );
                     break;
@@ -1353,14 +1356,14 @@ void cursesUpdateLines( void )
     }
 }
 
-bool cursesDetailsKeyhandle( int ch )
+int cursesDetailsKeyhandle( int ch )
 {
     switch( ch ) {
     case KEY_LEFT:
     case KEY_PPAGE:
     case KEY_NPAGE:
     case 18:    /* Ctrl-R */
-        return( TRUE );
+        return( ch );
     case KEY_UP:
         break;
     case KEY_DOWN:
@@ -1370,7 +1373,7 @@ bool cursesDetailsKeyhandle( int ch )
         break;
     }
 
-    return( FALSE );
+    return( 0 );
 }
 
 void cursesKeyhandleRegister( CursesKeyhandleFunc_t func )
@@ -1475,6 +1478,34 @@ void cursesFormCheckboxAdd( int startx, int starty, bool enabled,
     QueueEnqueueItem( CursesQ, (void *)cursesItem );
 
     cursesFormLabelAdd( x++, starty, "]" );
+}
+
+void cursesFormButtonAdd( int startx, int starty, char *string,
+                          CursesFieldChangeFunc_t changeFunc,
+                          void *changeFuncArg )
+{
+    CursesItem_t   *cursesItem;
+    CursesField_t  *field;
+
+    if( !inSubMenuFunc ) {
+        return;
+    }
+
+    field = (CursesField_t *)malloc(sizeof(CursesField_t));
+    memset( field, 0x00, sizeof(CursesField_t) );
+    field->type      = FIELD_BUTTON;
+    field->startx    = startx;
+    field->starty    = starty;
+    field->string    = strdup(string);
+    field->len       = strlen(string);
+    field->fieldChangeFunc      = changeFunc;
+    field->fieldChangeFuncArg   = changeFuncArg;
+
+    LinkedListAdd( formList, (LinkedListItem_t *)field, UNLOCKED, AT_TAIL );
+
+    cursesItem = (CursesItem_t *)malloc(sizeof(CursesItem_t));
+    cursesItem->type = CURSES_FORM_ITEM_ADD;
+    QueueEnqueueItem( CursesQ, (void *)cursesItem );
 }
 
 
@@ -1633,6 +1664,19 @@ void cursesFormRegenerate( void )
             i++;
             break;
         case FIELD_BUTTON:
+            fieldItem->field = new_field( 1, fieldItem->len, fieldItem->starty, 
+                                          fieldItem->startx, 0, 0 );
+
+            if( fieldItem->string ) {
+                set_field_buffer( fieldItem->field, 0, fieldItem->string );
+            }
+
+            set_field_userptr( fieldItem->field, fieldItem );
+
+            set_field_back( fieldItem->field, A_REVERSE );
+            field_opts_off( fieldItem->field, O_AUTOSKIP );
+            detailsFields[i] = fieldItem->field;
+            i++;
             break;
         }
     }
@@ -1670,7 +1714,7 @@ void cursesFormRegenerate( void )
     wrefresh( winFull );
 }
 
-bool cursesFormKeyhandle( int ch )
+int cursesFormKeyhandle( int ch )
 {
     FIELD          *field;
     CursesField_t  *fieldItem;
@@ -1683,8 +1727,9 @@ bool cursesFormKeyhandle( int ch )
     case KEY_PPAGE:
     case KEY_NPAGE:
     case 18:    /* Ctrl-R */
-        return( TRUE );
+        return( ch );
     case KEY_DOWN:
+    case 9:     /* Tab */
         form_driver( detailsForm, REQ_SNEXT_FIELD );
         form_driver( detailsForm, REQ_END_LINE );
         break;
@@ -1726,6 +1771,17 @@ bool cursesFormKeyhandle( int ch )
     case 10:    /* Enter */
         if ( fieldItem->type == FIELD_CHECKBOX ) {
             form_driver( detailsForm, REQ_NEXT_CHOICE );
+        } else if( fieldItem->type == FIELD_BUTTON ) {
+            if( fieldItem->fieldChangeFunc ) {
+                fieldItem->fieldChangeFunc( fieldItem->fieldChangeFuncArg,
+                                            NULL );
+                if( !detailsForm ) {
+                    return( KEY_LEFT );
+                } else if ( detailsForm == (void *)1 ) {
+                    detailsForm = NULL;
+                    cursesFormRegenerate();
+                }
+            }
         } else {
             form_driver( detailsForm, ch );
         }
@@ -1736,7 +1792,7 @@ bool cursesFormKeyhandle( int ch )
         break;
     }
 
-    return( FALSE );
+    return( 0 );
 }
 
 void cursesFieldChanged( FORM *form )
@@ -1747,6 +1803,10 @@ void cursesFieldChanged( FORM *form )
     field = current_field( form );
     fieldItem = (CursesField_t *)field_userptr(field);
 
+    if( fieldItem->type == FIELD_BUTTON ) {
+        return;
+    }
+
     free( fieldItem->string );
     fieldItem->string = strdup( field_buffer( field, 0 ) );
 
@@ -1754,6 +1814,20 @@ void cursesFieldChanged( FORM *form )
         fieldItem->fieldChangeFunc( fieldItem->fieldChangeFuncArg, 
                                     fieldItem->string );
     }
+}
+
+void cursesServerRevert( void *arg, char *string )
+{
+    FIELD          *field;
+    CursesField_t  *fieldItem;
+
+    field = current_field( detailsForm );
+    fieldItem = (CursesField_t *)field_userptr(field);
+
+    fieldItem->fieldChangeFunc = NULL;
+    cursesFormClear();
+    cursesServerDisplay( arg );
+    detailsForm = (void *)1;
 }
 
 void cursesServerDisplay( void *arg )
@@ -1836,6 +1910,10 @@ void cursesServerDisplay( void *arg )
 
     cursesFormLabelAdd( 0, 13, "Enabled:" );
     cursesFormCheckboxAdd( 16, 13, server->enabled, NULL, NULL );
+
+    cursesFormButtonAdd( 2, 14, "Revert", cursesServerRevert, server );
+    cursesFormButtonAdd( 10, 14, "Save", NULL, NULL );
+    cursesFormButtonAdd( 16, 14, "Cancel", NULL, NULL );
 }
 
 void cursesChannelDisplay( void *arg )
