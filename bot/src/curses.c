@@ -63,6 +63,7 @@ WINDOW         *winDetailsForm;
 
 FORM           *detailsForm = NULL;
 FIELD         **detailsFields = NULL;
+int             detailsIndex = -1;
 
 LinkedList_t   *textEntries[WINDOW_COUNT];
 
@@ -82,6 +83,7 @@ void cursesAtExit( void );
 void cursesReloadScreen( void );
 void cursesWindowClear( CursesWindow_t window );
 void cursesUpdateLines( void );
+void cursesFieldChanged( FORM *form );
 
 typedef enum {
     CURSES_TEXT_ADD,
@@ -540,6 +542,7 @@ void *curses_output_thread( void *arg )
                     if( menuItem->menuFunc ) {
                         if( menuItem->menuFunc != cursesDoSubMenu ) {
                             inSubMenuFunc = TRUE;
+                            detailsIndex = -1;
                         }
                         menuItem->menuFunc( menuItem->menuFuncArg );
                         if( detailsForm ) {
@@ -764,6 +767,7 @@ void cursesReloadScreen( void )
     }
 
     if( detailsForm ) {
+        detailsIndex = field_index( current_field( detailsForm ) );
         unpost_form( detailsForm );
         free_form( detailsForm );
 
@@ -1420,6 +1424,7 @@ void cursesFormClear( void )
         free( detailsFields );
         detailsFields = NULL;
         detailsForm = NULL;
+        detailsIndex = -1;
     }
 
     LinkedListLock( formList );
@@ -1466,6 +1471,7 @@ void cursesFormRegenerate( void )
     }
 
     if( detailsForm ) {
+        detailsIndex = field_index( current_field( detailsForm ) );
         unpost_form( detailsForm );
         free_form( detailsForm );
         for( i = 0; detailsFields && (field = detailsFields[i]); i++ ) {
@@ -1528,6 +1534,8 @@ void cursesFormRegenerate( void )
                 set_field_buffer( fieldItem->field, 0, fieldItem->string );
             }
 
+            set_field_userptr( fieldItem->field, fieldItem );
+
             set_field_back( fieldItem->field, A_UNDERLINE );
             field_opts_off( fieldItem->field, O_AUTOSKIP );
             detailsFields[i] = fieldItem->field;
@@ -1542,6 +1550,7 @@ void cursesFormRegenerate( void )
     detailsForm = new_form( detailsFields );
     set_form_win( detailsForm, winDetailsForm );
     set_form_sub( detailsForm, winDetailsForm );
+    set_field_term( detailsForm, cursesFieldChanged );
     post_form( detailsForm );
 
     curs_set(1);
@@ -1557,6 +1566,15 @@ void cursesFormRegenerate( void )
     }
 
     LinkedListUnlock( formList );
+    if( detailsIndex == -1 ) {
+        detailsIndex = 0;
+    }
+
+    if( detailsIndex >= count ) {
+        detailsIndex = count - 1;
+    }
+
+    set_current_field( detailsForm, detailsFields[detailsIndex] );
     wsyncup( winDetails );
     wrefresh( winFull );
 }
@@ -1601,6 +1619,18 @@ bool cursesFormKeyhandle( int ch )
     }
 
     return( FALSE );
+}
+
+void cursesFieldChanged( FORM *form )
+{
+    FIELD          *field;
+    CursesField_t  *fieldItem;
+
+    field = current_field( form );
+    fieldItem = (CursesField_t *)field_userptr(field);
+
+    free( fieldItem->string );
+    fieldItem->string = strdup( field_buffer( field, 0 ) );
 }
 
 void cursesServerDisplay( void *arg )
