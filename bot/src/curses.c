@@ -186,6 +186,14 @@ typedef enum {
     LINE_UP_TEE
 } CursesLineType_t;
 
+typedef enum {
+    FIELD_LABEL,
+    FIELD_FIELD,
+    FIELD_CHECKBOX,
+    FIELD_BUTTON
+} CursesFieldType_t;
+
+
 typedef struct {
     CursesLineType_t    type;
     int                 startx;
@@ -228,6 +236,8 @@ typedef struct {
     FIELDTYPE              *fieldType;
     CursesFieldTypeArgs_t   fieldArgs;
     FIELD                  *field;
+    CursesFieldChangeFunc_t fieldChangeFunc;
+    void                   *fieldChangeFuncArg;
 } CursesField_t;
 
 LinkedList_t   *formList;
@@ -1372,9 +1382,11 @@ void cursesKeyhandleRegister( CursesKeyhandleFunc_t func )
     currDetailKeyhandler = func;
 }
 
-void cursesFieldAdd( CursesFieldType_t type, int startx, int starty, int width,
-                     int height, char *string, int maxLen, void *fieldType, 
-                     CursesFieldTypeArgs_t *fieldArgs )
+void cursesFormFieldAdd( int startx, int starty, int width, int height, 
+                         char *string, int maxLen, void *fieldType, 
+                         CursesFieldTypeArgs_t *fieldArgs, 
+                         CursesFieldChangeFunc_t changeFunc, 
+                         void *changeFuncArg )
 {
     CursesItem_t   *cursesItem;
     CursesField_t  *field;
@@ -1385,7 +1397,7 @@ void cursesFieldAdd( CursesFieldType_t type, int startx, int starty, int width,
 
     field = (CursesField_t *)malloc(sizeof(CursesField_t));
     memset( field, 0x00, sizeof(CursesField_t) );
-    field->type      = type;
+    field->type      = FIELD_FIELD;
     field->startx    = startx;
     field->starty    = starty;
     field->width     = width;
@@ -1397,6 +1409,8 @@ void cursesFieldAdd( CursesFieldType_t type, int startx, int starty, int width,
     if( fieldArgs ) {
         memcpy( &field->fieldArgs, fieldArgs, sizeof(CursesFieldTypeArgs_t));
     }
+    field->fieldChangeFunc      = changeFunc;
+    field->fieldChangeFuncArg   = changeFuncArg;
 
     LinkedListAdd( formList, (LinkedListItem_t *)field, UNLOCKED, AT_TAIL );
 
@@ -1404,6 +1418,65 @@ void cursesFieldAdd( CursesFieldType_t type, int startx, int starty, int width,
     cursesItem->type = CURSES_FORM_ITEM_ADD;
     QueueEnqueueItem( CursesQ, (void *)cursesItem );
 }
+
+void cursesFormLabelAdd( int startx, int starty, char *string )
+{
+    CursesItem_t   *cursesItem;
+    CursesField_t  *field;
+
+    if( !inSubMenuFunc ) {
+        return;
+    }
+
+    field = (CursesField_t *)malloc(sizeof(CursesField_t));
+    memset( field, 0x00, sizeof(CursesField_t) );
+    field->type      = FIELD_LABEL;
+    field->startx    = startx;
+    field->starty    = starty;
+    field->string    = strdup(string);
+    field->len       = strlen(string);
+
+    LinkedListAdd( formList, (LinkedListItem_t *)field, UNLOCKED, AT_TAIL );
+
+    cursesItem = (CursesItem_t *)malloc(sizeof(CursesItem_t));
+    cursesItem->type = CURSES_FORM_ITEM_ADD;
+    QueueEnqueueItem( CursesQ, (void *)cursesItem );
+}
+
+void cursesFormCheckboxAdd( int startx, int starty, bool enabled,
+                            CursesFieldChangeFunc_t changeFunc,
+                            void *changeFuncArg )
+{
+    CursesItem_t   *cursesItem;
+    CursesField_t  *field;
+    int             x;
+
+    if( !inSubMenuFunc ) {
+        return;
+    }
+
+    x = startx;
+    cursesFormLabelAdd( x++, starty, "[" );
+
+    field = (CursesField_t *)malloc(sizeof(CursesField_t));
+    memset( field, 0x00, sizeof(CursesField_t) );
+    field->type      = FIELD_CHECKBOX;
+    field->startx    = x++;
+    field->starty    = starty;
+    field->string    = strdup(enabled ? "X" : " ");
+    field->len       = strlen(field->string);
+    field->fieldChangeFunc      = changeFunc;
+    field->fieldChangeFuncArg   = changeFuncArg;
+
+    LinkedListAdd( formList, (LinkedListItem_t *)field, UNLOCKED, AT_TAIL );
+
+    cursesItem = (CursesItem_t *)malloc(sizeof(CursesItem_t));
+    cursesItem->type = CURSES_FORM_ITEM_ADD;
+    QueueEnqueueItem( CursesQ, (void *)cursesItem );
+
+    cursesFormLabelAdd( x++, starty, "]" );
+}
+
 
 void cursesFormClear( void )
 {
@@ -1454,6 +1527,7 @@ void cursesFormRegenerate( void )
     FIELD                  *field;
     int                     x, y;
     int                     width;
+    static char            *checkBoxStrings[] = { " ", "X", NULL };
 
     if( !inSubMenuFunc ) {
         return;
@@ -1541,6 +1615,23 @@ void cursesFormRegenerate( void )
             detailsFields[i] = fieldItem->field;
             i++;
             break;
+        case FIELD_CHECKBOX:
+            fieldItem->field = new_field( 1, 1, fieldItem->starty, 
+                                          fieldItem->startx, 0, 0 );
+            set_field_type( fieldItem->field, TYPE_ENUM, checkBoxStrings, 0,
+                            0 );
+
+            if( fieldItem->string ) {
+                set_field_buffer( fieldItem->field, 0, fieldItem->string );
+            }
+
+            set_field_userptr( fieldItem->field, fieldItem );
+
+            set_field_back( fieldItem->field, A_UNDERLINE );
+            field_opts_off( fieldItem->field, O_AUTOSKIP );
+            detailsFields[i] = fieldItem->field;
+            i++;
+            break;
         case FIELD_BUTTON:
             break;
         }
@@ -1581,6 +1672,12 @@ void cursesFormRegenerate( void )
 
 bool cursesFormKeyhandle( int ch )
 {
+    FIELD          *field;
+    CursesField_t  *fieldItem;
+
+    field = current_field( detailsForm );
+    fieldItem = (CursesField_t *)field_userptr( field );
+
     switch( ch ) {
     case 27:    /* Escape */
     case KEY_PPAGE:
@@ -1596,25 +1693,46 @@ bool cursesFormKeyhandle( int ch )
         form_driver( detailsForm, REQ_END_LINE );
         break;
     case KEY_BACKSPACE:
-        form_driver( detailsForm, REQ_DEL_PREV );
+        if( fieldItem->type == FIELD_FIELD ) {
+            form_driver( detailsForm, REQ_DEL_PREV );
+        }
         break;
     case KEY_DC:
-        form_driver( detailsForm, REQ_DEL_CHAR );
+        if( fieldItem->type == FIELD_FIELD ) {
+            form_driver( detailsForm, REQ_DEL_CHAR );
+        }
         break;
     case KEY_LEFT:
-        form_driver( detailsForm, REQ_PREV_CHAR );
+        if( fieldItem->type == FIELD_FIELD ) {
+            form_driver( detailsForm, REQ_PREV_CHAR );
+        }
         break;
     case KEY_RIGHT:
-        form_driver( detailsForm, REQ_NEXT_CHAR );
+        if( fieldItem->type == FIELD_FIELD ) {
+            form_driver( detailsForm, REQ_NEXT_CHAR );
+        }
         break;
     case KEY_HOME:
-        form_driver( detailsForm, REQ_BEG_LINE );
+        if( fieldItem->type == FIELD_FIELD ) {
+            form_driver( detailsForm, REQ_BEG_LINE );
+        }
         break;
     case KEY_END:
-        form_driver( detailsForm, REQ_END_LINE );
+        if( fieldItem->type == FIELD_FIELD ) {
+            form_driver( detailsForm, REQ_END_LINE );
+        }
         break;
+    case 32:    /* Space */
+    case 10:    /* Enter */
+        if ( fieldItem->type == FIELD_CHECKBOX ) {
+            form_driver( detailsForm, REQ_NEXT_CHOICE );
+        } else {
+            form_driver( detailsForm, ch );
+        }
     default:
-        form_driver( detailsForm, ch );
+        if( fieldItem->type == FIELD_FIELD ) {
+            form_driver( detailsForm, ch );
+        }
         break;
     }
 
@@ -1631,6 +1749,11 @@ void cursesFieldChanged( FORM *form )
 
     free( fieldItem->string );
     fieldItem->string = strdup( field_buffer( field, 0 ) );
+
+    if( fieldItem->fieldChangeFunc ) {
+        fieldItem->fieldChangeFunc( fieldItem->fieldChangeFuncArg, 
+                                    fieldItem->string );
+    }
 }
 
 void cursesServerDisplay( void *arg )
@@ -1644,67 +1767,75 @@ void cursesServerDisplay( void *arg )
     cursesKeyhandleRegister( cursesFormKeyhandle );
 
     snprintf( buf, 64, "Server Number:  %d", server->serverId );
-    cursesFieldAdd( FIELD_LABEL, 0, 0, 0, 0, buf, 0, NULL, NULL );
-    cursesFieldAdd( FIELD_LABEL, 0, 1, 0, 0, "Server:", 0, NULL, NULL );
-    cursesFieldAdd( FIELD_FIELD, 16, 1, 32, 1, server->server, 64, NULL, NULL );
-    cursesFieldAdd( FIELD_LABEL, 0, 2, 0, 0, "Port:", 0, NULL, NULL );
+    cursesFormLabelAdd( 0, 0, buf );
+    cursesFormLabelAdd( 0, 1, "Server:" );
+    cursesFormFieldAdd( 16, 1, 32, 1, server->server, 64, NULL, NULL, NULL, 
+                        NULL );
+    cursesFormLabelAdd( 0, 2, "Port:" );
+
     fieldArgs.integerArgs.precision = 0;
     fieldArgs.integerArgs.minValue  = 1;
     fieldArgs.integerArgs.maxValue  = 65535;
     snprintf( buf, 64, "%d", server->port );
-    cursesFieldAdd( FIELD_FIELD, 16, 2, 6, 1, buf, 6, TYPE_INTEGER, 
-                    &fieldArgs );
-    cursesFieldAdd( FIELD_LABEL, 0, 3, 0, 0, "Password:", 0, NULL, NULL );
-    cursesFieldAdd( FIELD_FIELD, 16, 3, 32, 1, server->password, 64, NULL, 
-                    NULL );
-    cursesFieldAdd( FIELD_LABEL, 0, 4, 0, 0, "Nick:", 0, NULL, NULL );
-    cursesFieldAdd( FIELD_FIELD, 16, 4, 32, 1, server->nick, 64, NULL, NULL );
-    cursesFieldAdd( FIELD_LABEL, 0, 5, 0, 0, "User Name:", 0, NULL, NULL );
-    cursesFieldAdd( FIELD_FIELD, 16, 5, 32, 1, server->username, 64, NULL, 
-                    NULL );
-    cursesFieldAdd( FIELD_LABEL, 0, 6, 0, 0, "Real Name:", 0, NULL, NULL );
-    cursesFieldAdd( FIELD_FIELD, 16, 6, 32, 1, server->realname, 64, NULL, 
-                    NULL );
-    cursesFieldAdd( FIELD_LABEL, 0, 7, 0, 0, "Nickserv Nick:", 0, NULL, NULL );
-    cursesFieldAdd( FIELD_FIELD, 16, 7, 32, 1, server->nickserv, 64, NULL, 
-                    NULL );
-    cursesFieldAdd( FIELD_LABEL, 0, 8, 0, 0, "Nickserv Msg:", 0, NULL, NULL );
-    cursesFieldAdd( FIELD_FIELD, 16, 8, 32, 1, server->nickservmsg, 64, NULL, 
-                    NULL );
+    cursesFormFieldAdd( 16, 2, 6, 1, buf, 6, TYPE_INTEGER, &fieldArgs, NULL, 
+                        NULL );
+    cursesFormLabelAdd( 0, 3, "Password:" );
+    cursesFormFieldAdd( 16, 3, 32, 1, server->password, 64, NULL, NULL, NULL, 
+                        NULL );
+    cursesFormLabelAdd( 0, 4, "Nick:" );
+    cursesFormFieldAdd( 16, 4, 32, 1, server->nick, 64, NULL, NULL, NULL, 
+                        NULL );
+    cursesFormLabelAdd( 0, 5, "User Name:" );
+    cursesFormFieldAdd( 16, 5, 32, 1, server->username, 64, NULL, NULL, NULL, 
+                        NULL );
+    cursesFormLabelAdd( 0, 6, "Real Name:" );
+    cursesFormFieldAdd( 16, 6, 32, 1, server->realname, 64, NULL, NULL, NULL, 
+                        NULL );
+    cursesFormLabelAdd( 0, 7, "Nickserv Nick:" );
+    cursesFormFieldAdd( 16, 7, 32, 1, server->nickserv, 64, NULL, NULL, NULL, 
+                        NULL );
+    cursesFormLabelAdd( 0, 8, "Nickserv Msg:" );
+    cursesFormFieldAdd( 16, 8, 32, 1, server->nickservmsg, 64, NULL, NULL, 
+                        NULL, NULL );
 
-    cursesFieldAdd( FIELD_LABEL, 0, 9, 0, 0, "Flood Interval:", 0, NULL, NULL );
+    cursesFormLabelAdd( 0, 9, "Flood Interval:" );
+
     snprintf( buf, 64, "%d", server->floodInterval );
     fieldArgs.integerArgs.precision = 0;
     fieldArgs.integerArgs.minValue  = 0;
     fieldArgs.integerArgs.maxValue  = 0x7FFFFFFF;
-    cursesFieldAdd( FIELD_FIELD, 16, 9, 20, 1, buf, 20, TYPE_INTEGER, 
-                    &fieldArgs );
+    cursesFormFieldAdd( 16, 9, 20, 1, buf, 20, TYPE_INTEGER, &fieldArgs, NULL, 
+                        NULL );
 
-    cursesFieldAdd( FIELD_LABEL, 0, 10, 0, 0, "Flood Max Time:", 0, NULL, 
-                    NULL );
+    cursesFormLabelAdd( 0, 10, "Flood Max Time:" );
+
     snprintf( buf, 64, "%d", server->floodMaxTime );
     fieldArgs.integerArgs.precision = 0;
     fieldArgs.integerArgs.minValue  = 0;
     fieldArgs.integerArgs.maxValue  = 0x7FFFFFFF;
-    cursesFieldAdd( FIELD_FIELD, 16, 10, 20, 1, buf, 20, TYPE_INTEGER, 
-                    &fieldArgs );
+    cursesFormFieldAdd( 16, 10, 20, 1, buf, 20, TYPE_INTEGER, &fieldArgs, NULL,
+                        NULL );
 
-    cursesFieldAdd( FIELD_LABEL, 0, 11, 0, 0, "Flood Buffer:", 0, NULL, NULL );
+    cursesFormLabelAdd( 0, 11, "Flood Buffer:" );
+
     snprintf( buf, 64, "%d", server->floodBuffer );
     fieldArgs.integerArgs.precision = 0;
     fieldArgs.integerArgs.minValue  = 0;
     fieldArgs.integerArgs.maxValue  = 0x7FFFFFFF;
-    cursesFieldAdd( FIELD_FIELD, 16, 11, 20, 1, buf, 20, TYPE_INTEGER, 
-                    &fieldArgs );
+    cursesFormFieldAdd( 16, 11, 20, 1, buf, 20, TYPE_INTEGER, &fieldArgs, NULL,
+                        NULL );
 
-    cursesFieldAdd( FIELD_LABEL, 0, 12, 0, 0, "Flood Max Line:", 0, NULL, 
-                    NULL );
+    cursesFormLabelAdd( 0, 12, "Flood Max Line:" );
+
     snprintf( buf, 64, "%d", server->floodMaxLine );
     fieldArgs.integerArgs.precision = 0;
     fieldArgs.integerArgs.minValue  = 0;
     fieldArgs.integerArgs.maxValue  = 0x7FFFFFFF;
-    cursesFieldAdd( FIELD_FIELD, 16, 12, 20, 1, buf, 20, TYPE_INTEGER, 
-                    &fieldArgs );
+    cursesFormFieldAdd( 16, 12, 20, 1, buf, 20, TYPE_INTEGER, &fieldArgs, NULL,
+                        NULL );
+
+    cursesFormLabelAdd( 0, 13, "Enabled:" );
+    cursesFormCheckboxAdd( 16, 13, server->enabled, NULL, NULL );
 }
 
 void cursesChannelDisplay( void *arg )

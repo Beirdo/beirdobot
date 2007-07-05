@@ -190,9 +190,15 @@ void cursesDoSubMenu( void *arg );
 bool cursesDetailsKeyhandle( int ch );
 bool cursesFormKeyhandle( int ch );
 void cursesKeyhandleRegister( CursesKeyhandleFunc_t func );
-void cursesFieldAdd( CursesFieldType_t type, int startx, int starty, int width,
-                     int height, char *string, int maxLen, void *fieldType, 
-                     CursesFieldTypeArgs_t *fieldArgs );
+void cursesFormFieldAdd( int startx, int starty, int width, int height, 
+                         char *string, int maxLen, void *fieldType, 
+                         CursesFieldTypeArgs_t *fieldArgs, 
+                         CursesFieldChangeFunc_t changeFunc, 
+                         void *changeFuncArg );
+void cursesFormLabelAdd( int startx, int starty, char *string );
+void cursesFormCheckboxAdd( int startx, int starty, bool enabled,
+                            CursesFieldChangeFunc_t changeFunc,
+                            void *changeFuncArg );
 void cursesFormClear( void );
 
 void versionAdd( char *what, char *version );

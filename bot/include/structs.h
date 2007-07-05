@@ -358,12 +358,7 @@ typedef union {
     char       *regexp;
 } CursesFieldTypeArgs_t;
 
-typedef enum {
-    FIELD_LABEL,
-    FIELD_FIELD,
-    FIELD_BUTTON
-} CursesFieldType_t;
-
+typedef void (*CursesFieldChangeFunc_t)(void *, char *);
 
 #endif
 
