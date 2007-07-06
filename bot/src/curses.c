@@ -64,6 +64,8 @@ WINDOW         *winDetailsForm;
 FORM           *detailsForm = NULL;
 FIELD         **detailsFields = NULL;
 int             detailsIndex = -1;
+int             detailsPage = 0;
+int             detailsFieldCount = 0;
 
 LinkedList_t   *textEntries[WINDOW_COUNT];
 
@@ -85,6 +87,8 @@ void cursesWindowClear( CursesWindow_t window );
 void cursesUpdateLines( void );
 void cursesFieldChanged( FORM *form );
 void cursesServerRevert( void *arg, char *string );
+void cursesNextPage( void *arg, char *string );
+void cursesUpdateFormLabels( void );
 
 typedef enum {
     CURSES_TEXT_ADD,
@@ -242,6 +246,7 @@ typedef struct {
 } CursesField_t;
 
 LinkedList_t   *formList;
+LinkedList_t   *formPageList;
 
 void cursesWindowSet( void )
 {
@@ -365,9 +370,10 @@ void curses_start( void )
     cursesWindowSet();
     cursesMenuInitialize();
 
-    CursesQ    = QueueCreate(2048);
-    CursesLogQ = QueueCreate(2048);
-    formList   = LinkedListCreate();
+    CursesQ      = QueueCreate(2048);
+    CursesLogQ   = QueueCreate(2048);
+    formList     = LinkedListCreate();
+    formPageList = LinkedListCreate();
 
     thread_create( &cursesOutThreadId, curses_output_thread, NULL, 
                    "thread_curses_out", NULL, NULL );
@@ -786,6 +792,7 @@ void cursesReloadScreen( void )
 
         for( i = 0; detailsFields && detailsFields[i]; i++ ) {
             free_field( detailsFields[i] );
+            detailsFields[i] = NULL;
         }
         free( detailsFields );
         detailsFields = NULL;
@@ -1524,6 +1531,7 @@ void cursesFormClear( void )
 
         for( i = 0; detailsFields && detailsFields[i]; i++ ) {
             free_field( detailsFields[i] );
+            detailsFields[i] = NULL;
         }
         free( detailsFields );
         detailsFields = NULL;
@@ -1532,6 +1540,7 @@ void cursesFormClear( void )
     }
 
     LinkedListLock( formList );
+    LinkedListLock( formPageList );
 
     while( (item = formList->head) ) {
         fieldItem = (CursesField_t *)item;
@@ -1541,6 +1550,15 @@ void cursesFormClear( void )
         free( fieldItem );
     }
 
+    while( (item = formPageList->head) ) {
+        fieldItem = (CursesField_t *)item;
+
+        LinkedListRemove( formPageList, item, LOCKED );
+        free( fieldItem->string );
+        free( fieldItem );
+    }
+
+    LinkedListUnlock( formPageList );
     LinkedListUnlock( formList );
 
 
@@ -1554,11 +1572,16 @@ void cursesFormRegenerate( void )
     LinkedListItem_t       *item;
     CursesField_t          *fieldItem;
     int                     count;
-    int                     i;
-    FIELD                  *field;
+    int                     i = 0;
     int                     x, y;
     int                     width;
     static char            *checkBoxStrings[] = { " ", "X", NULL };
+    int                     pageStart;
+    int                     pageNum;
+    int                     pageCount;
+    int                     maxy;
+    bool                    newPage;
+    int                     starty;
 
     if( !inSubMenuFunc ) {
         return;
@@ -1567,104 +1590,180 @@ void cursesFormRegenerate( void )
     getmaxyx( winDetails, y, x );
 
     LinkedListLock( formList );
+    LinkedListLock( formPageList );
 
+    while( (item = formPageList->head) ) {
+        fieldItem = (CursesField_t *)item;
+
+        LinkedListRemove( formPageList, item, LOCKED );
+        free( fieldItem->string );
+        free( fieldItem );
+    }
+
+    maxy = 0;
     for( count = 0, item = formList->head; item; item = item->next ) {
         fieldItem = (CursesField_t *)item;
         if( fieldItem->type != FIELD_LABEL ) {
             count++;
         }
+
+        if( fieldItem->starty + fieldItem->height - 1 > maxy ) {
+            maxy = fieldItem->starty + fieldItem->height - 1;
+        }
     }
 
     if( detailsForm ) {
         detailsIndex = field_index( current_field( detailsForm ) );
+        detailsPage  = form_page( detailsForm );
         unpost_form( detailsForm );
         free_form( detailsForm );
-        for( i = 0; detailsFields && (field = detailsFields[i]); i++ ) {
+        for( i = 0; detailsFields && detailsFields[i]; i++ ) {
             free_field( detailsFields[i] );
+            detailsFields[i] = NULL;
         }
     }
+
+    pageCount = (maxy + y - 1) / (y - 1);
+    newPage = FALSE;
     
-    detailsFields = (FIELD **)realloc( detailsFields, 
-                                       (count + 1) * sizeof(FIELD *) );
+    detailsFieldCount = count + pageCount + 1;
+    detailsFields = (FIELD **)realloc( detailsFields, detailsFieldCount *
+                                        sizeof(FIELD *) );
+    memset( detailsFields, 0x00, detailsFieldCount * sizeof(FIELD *) );
     
-    for( i = 0, item = formList->head; item; item = item->next ) {
-        fieldItem = (CursesField_t *)item;
-        switch( fieldItem->type ) {
-        case FIELD_LABEL:
-            break;
-        case FIELD_FIELD:
-            width = fieldItem->width;
-            if( width + fieldItem->startx > x - 1 ) {
-                width = x - fieldItem->startx - 1;
+    i = 0;
+    for( pageNum = 0, pageStart = 0; pageNum < pageCount; 
+         pageNum++, pageStart += y-1 ) {
+        for( item = formList->head; item; item = item->next ) {
+            fieldItem = (CursesField_t *)item;
+
+            starty = fieldItem->starty - pageStart;
+
+            if( starty < 0 || starty >= pageStart + y - 1 )
+            {
+                continue;
             }
-            fieldItem->field = new_field( fieldItem->height, width,
-                                          fieldItem->starty, fieldItem->startx,
-                                          0, 0 );
-            if( fieldItem->fieldType == TYPE_ALNUM ||
-                fieldItem->fieldType == TYPE_ALPHA ) {
-                set_field_type( fieldItem->field, fieldItem->fieldType,
-                                fieldItem->fieldArgs.minLen );
-            } else if( fieldItem->fieldType == TYPE_ENUM ) {
-                set_field_type( fieldItem->field, fieldItem->fieldType,
-                                fieldItem->fieldArgs.enumArgs.stringList,
-                                fieldItem->fieldArgs.enumArgs.caseSensitive,
-                                fieldItem->fieldArgs.enumArgs.partialMatch );
-            } else if( fieldItem->fieldType == TYPE_INTEGER ) {
-                set_field_type( fieldItem->field, fieldItem->fieldType,
-                                fieldItem->fieldArgs.integerArgs.precision,
-                                fieldItem->fieldArgs.integerArgs.minValue,
-                                fieldItem->fieldArgs.integerArgs.maxValue );
-            } else if( fieldItem->fieldType == TYPE_NUMERIC ) {
-                set_field_type( fieldItem->field, fieldItem->fieldType,
-                                fieldItem->fieldArgs.numericArgs.precision,
-                                fieldItem->fieldArgs.numericArgs.minValue,
-                                fieldItem->fieldArgs.numericArgs.maxValue );
-            } else if( fieldItem->fieldType == TYPE_REGEXP ) {
-                set_field_type( fieldItem->field, fieldItem->fieldType,
-                                fieldItem->fieldArgs.regexp );
-            } else if( fieldItem->fieldType == TYPE_IPV4 ) {
-                set_field_type( fieldItem->field, fieldItem->fieldType );
+            switch( fieldItem->type ) {
+            case FIELD_LABEL:
+                continue;
+            case FIELD_FIELD:
+                width = fieldItem->width;
+                if( width + fieldItem->startx > x - 1 ) {
+                    width = x - fieldItem->startx - 1;
+                }
+                fieldItem->field = new_field( fieldItem->height, width,
+                                              fieldItem->starty - pageStart,  
+                                              fieldItem->startx,
+                                              0, 0 );
+                if( fieldItem->fieldType == TYPE_ALNUM ||
+                    fieldItem->fieldType == TYPE_ALPHA ) {
+                    set_field_type( fieldItem->field, fieldItem->fieldType,
+                                    fieldItem->fieldArgs.minLen );
+                } else if( fieldItem->fieldType == TYPE_ENUM ) {
+                    set_field_type( fieldItem->field, fieldItem->fieldType,
+                                   fieldItem->fieldArgs.enumArgs.stringList,
+                                   fieldItem->fieldArgs.enumArgs.caseSensitive,
+                                   fieldItem->fieldArgs.enumArgs.partialMatch );
+                } else if( fieldItem->fieldType == TYPE_INTEGER ) {
+                    set_field_type( fieldItem->field, fieldItem->fieldType,
+                                    fieldItem->fieldArgs.integerArgs.precision,
+                                    fieldItem->fieldArgs.integerArgs.minValue,
+                                    fieldItem->fieldArgs.integerArgs.maxValue );
+                } else if( fieldItem->fieldType == TYPE_NUMERIC ) {
+                    set_field_type( fieldItem->field, fieldItem->fieldType,
+                                    fieldItem->fieldArgs.numericArgs.precision,
+                                    fieldItem->fieldArgs.numericArgs.minValue,
+                                    fieldItem->fieldArgs.numericArgs.maxValue );
+                } else if( fieldItem->fieldType == TYPE_REGEXP ) {
+                    set_field_type( fieldItem->field, fieldItem->fieldType,
+                                    fieldItem->fieldArgs.regexp );
+                } else if( fieldItem->fieldType == TYPE_IPV4 ) {
+                    set_field_type( fieldItem->field, fieldItem->fieldType );
+                }
+
+                if( fieldItem->maxLen == 0 ) {
+                    fieldItem->maxLen = width;
+                }
+
+                if( fieldItem->maxLen > width ) {
+                    field_opts_off( fieldItem->field, O_STATIC );
+                    set_max_field( fieldItem->field, fieldItem->maxLen );
+                }
+
+                if( fieldItem->string ) {
+                    set_field_buffer( fieldItem->field, 0, fieldItem->string );
+                }
+
+                set_field_userptr( fieldItem->field, fieldItem );
+
+                set_field_back( fieldItem->field, A_UNDERLINE );
+                field_opts_off( fieldItem->field, O_AUTOSKIP );
+                if( newPage ) {
+                    set_new_page( fieldItem->field, TRUE );
+                }
+                detailsFields[i] = fieldItem->field;
+                i++;
+                break;
+            case FIELD_CHECKBOX:
+                fieldItem->field = new_field( 1, 1, 
+                                              fieldItem->starty - pageStart, 
+                                              fieldItem->startx, 0, 0 );
+                set_field_type( fieldItem->field, TYPE_ENUM, checkBoxStrings, 0,
+                                0 );
+
+                if( fieldItem->string ) {
+                    set_field_buffer( fieldItem->field, 0, fieldItem->string );
+                }
+
+                set_field_userptr( fieldItem->field, fieldItem );
+
+                set_field_back( fieldItem->field, A_UNDERLINE );
+                field_opts_off( fieldItem->field, O_AUTOSKIP );
+                if( newPage ) {
+                    set_new_page( fieldItem->field, TRUE );
+                }
+                detailsFields[i] = fieldItem->field;
+                i++;
+                break;
+            case FIELD_BUTTON:
+                fieldItem->field = new_field( 1, fieldItem->len, 
+                                              fieldItem->starty - pageStart, 
+                                              fieldItem->startx, 0, 0 );
+
+                if( fieldItem->string ) {
+                    set_field_buffer( fieldItem->field, 0, fieldItem->string );
+                }
+
+                set_field_userptr( fieldItem->field, fieldItem );
+
+                set_field_back( fieldItem->field, A_REVERSE );
+                field_opts_off( fieldItem->field, O_AUTOSKIP );
+                if( newPage ) {
+                    set_new_page( fieldItem->field, TRUE );
+                }
+                detailsFields[i] = fieldItem->field;
+                i++;
+                break;
             }
+            newPage = FALSE;
+        }
 
-            if( fieldItem->maxLen == 0 ) {
-                fieldItem->maxLen = width;
-            }
+        if( pageCount > 1 ) {
+            fieldItem = (CursesField_t *)malloc(sizeof(CursesField_t));
+            memset( fieldItem, 0x00, sizeof(CursesField_t) );
+            fieldItem->type      = FIELD_BUTTON;
+            fieldItem->starty    = y - 1;
+            fieldItem->string    = strdup("Next Page");
+            fieldItem->len       = strlen(fieldItem->string);
+            fieldItem->startx    = (x - fieldItem->len) / 2;
+            fieldItem->fieldChangeFunc      = cursesNextPage;
+            fieldItem->fieldChangeFuncArg   = NULL;
 
-            if( fieldItem->maxLen > width ) {
-                field_opts_off( fieldItem->field, O_STATIC );
-                set_max_field( fieldItem->field, fieldItem->maxLen );
-            }
+            LinkedListAdd( formPageList, (LinkedListItem_t *)fieldItem, LOCKED, 
+                           AT_TAIL );
 
-            if( fieldItem->string ) {
-                set_field_buffer( fieldItem->field, 0, fieldItem->string );
-            }
-
-            set_field_userptr( fieldItem->field, fieldItem );
-
-            set_field_back( fieldItem->field, A_UNDERLINE );
-            field_opts_off( fieldItem->field, O_AUTOSKIP );
-            detailsFields[i] = fieldItem->field;
-            i++;
-            break;
-        case FIELD_CHECKBOX:
-            fieldItem->field = new_field( 1, 1, fieldItem->starty, 
-                                          fieldItem->startx, 0, 0 );
-            set_field_type( fieldItem->field, TYPE_ENUM, checkBoxStrings, 0,
-                            0 );
-
-            if( fieldItem->string ) {
-                set_field_buffer( fieldItem->field, 0, fieldItem->string );
-            }
-
-            set_field_userptr( fieldItem->field, fieldItem );
-
-            set_field_back( fieldItem->field, A_UNDERLINE );
-            field_opts_off( fieldItem->field, O_AUTOSKIP );
-            detailsFields[i] = fieldItem->field;
-            i++;
-            break;
-        case FIELD_BUTTON:
-            fieldItem->field = new_field( 1, fieldItem->len, fieldItem->starty, 
+            fieldItem->field = new_field( 1, fieldItem->len, 
+                                          fieldItem->starty, 
                                           fieldItem->startx, 0, 0 );
 
             if( fieldItem->string ) {
@@ -1677,10 +1776,10 @@ void cursesFormRegenerate( void )
             field_opts_off( fieldItem->field, O_AUTOSKIP );
             detailsFields[i] = fieldItem->field;
             i++;
-            break;
+            newPage = TRUE;
         }
     }
-    detailsFields[count] = NULL;
+    detailsFields[i] = NULL;
 
     detailsForm = new_form( detailsFields );
     set_form_win( detailsForm, winDetailsForm );
@@ -1692,24 +1791,30 @@ void cursesFormRegenerate( void )
 
     wsyncup( winDetailsForm );
 
-    for( i = 0, item = formList->head; item; item = item->next ) {
-        fieldItem = (CursesField_t *)item;
-        if( fieldItem->type == FIELD_LABEL ) {
-            mvwprintw( winDetails, fieldItem->starty, fieldItem->startx,
-                       fieldItem->string );
-        }
+    cursesUpdateFormLabels();
+
+    LinkedListUnlock( formPageList );
+    LinkedListUnlock( formList );
+
+    if( detailsPage == -1 ) {
+        detailsPage = 0;
     }
 
-    LinkedListUnlock( formList );
+    if( detailsPage >= pageCount ) {
+        detailsPage = pageCount - 1;
+    }
+    set_form_page( detailsForm, detailsPage );
+
     if( detailsIndex == -1 ) {
         detailsIndex = 0;
     }
 
-    if( detailsIndex >= count ) {
-        detailsIndex = count - 1;
+    if( detailsIndex >= count + pageCount ) {
+        detailsIndex = count + pageCount - 1;
     }
 
     set_current_field( detailsForm, detailsFields[detailsIndex] );
+
     wsyncup( winDetails );
     wrefresh( winFull );
 }
@@ -1920,6 +2025,38 @@ void cursesChannelDisplay( void *arg )
 {
 }
 
+void cursesNextPage( void *arg, char *string )
+{
+    form_driver( detailsForm, REQ_NEXT_PAGE );
+    detailsPage = form_page( detailsForm );
+
+    LinkedListLock( formList );
+    cursesUpdateFormLabels();
+    LinkedListUnlock( formList );
+}
+
+void cursesUpdateFormLabels( void )
+{
+    int                     i;
+    LinkedListItem_t       *item;
+    CursesField_t          *fieldItem;
+    int                     x, y;
+    int                     starty;
+
+    getmaxyx( winDetails, y, x );
+
+    /* Assumes formList is locked */
+    for( i = 0, item = formList->head; item; item = item->next ) {
+        fieldItem = (CursesField_t *)item;
+        if( fieldItem->type == FIELD_LABEL ) {
+            starty = fieldItem->starty - (detailsPage * (y-1));
+            if( starty >= 0 && starty < y - 1 ) {
+                mvwprintw( winDetails, starty, fieldItem->startx,
+                           fieldItem->string );
+            }
+        }
+    }
+}
 
 /*
  * vim:ts=4:sw=4:ai:et:si:sts=4
