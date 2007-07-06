@@ -261,6 +261,8 @@ void cursesWindowSet( void )
     keypad(stdscr, TRUE);
 
     winFull    = newwin( 0, 0, 0, 0 );
+    wrefresh( winFull );
+
     getmaxyx( winFull, y, x );
     LogPrint( LOG_INFO, "Window size: %d x %d", x, y );
 
