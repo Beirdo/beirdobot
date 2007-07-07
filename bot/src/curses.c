@@ -35,6 +35,7 @@
 #include <ncurses.h>
 #include <menu.h>
 #include <form.h>
+#include <math.h>
 #include "botnet.h"
 #include "protos.h"
 #include "queue.h"
@@ -58,6 +59,7 @@ WINDOW         *winMenu1;
 WINDOW         *winMenu2;
 WINDOW         *winDetails;
 WINDOW         *winLog;
+WINDOW         *winLogScrollbar;
 WINDOW         *winTailer;
 WINDOW         *winDetailsForm;
 
@@ -122,6 +124,7 @@ CursesWindowDef_t   windows[] = {
     { &winDetails,      0, 0, 0, 0 },
     { &winDetailsForm,  0, 0, 0, 0 },
     { &winLog,          0, 0, 0, 0 },
+    { &winLogScrollbar, 0, 0, 0, 0 },
     { &winTailer,       0, 0, 0, 0 }
 };
 
@@ -338,8 +341,13 @@ void cursesWindowSet( void )
 
     windows[WINDOW_LOG].startx = 0;
     windows[WINDOW_LOG].starty = lines + 3;
-    windows[WINDOW_LOG].width  = x;
+    windows[WINDOW_LOG].width  = x - 1;
     windows[WINDOW_LOG].height = lines + ((y-5) & 1);
+
+    windows[WINDOW_LOG_SCROLLBAR].startx = x - 1;
+    windows[WINDOW_LOG_SCROLLBAR].starty = lines + 3;
+    windows[WINDOW_LOG_SCROLLBAR].width  = 1;
+    windows[WINDOW_LOG_SCROLLBAR].height = lines + ((y-5) & 1);
 
     windows[WINDOW_TAILER].startx = 0;
     windows[WINDOW_TAILER].starty = y - 1;
@@ -398,6 +406,8 @@ void *curses_output_thread( void *arg )
     bool                scrolledBack;
     int                 count;
     int                 logTop = 0;
+    int                 logCurr;
+    int                 logCount;
     int                 lines;
     int                 logEntry;
     int                 i;
@@ -414,6 +424,7 @@ void *curses_output_thread( void *arg )
     int                 key;
     int                 starty;
     int                 maxx, maxy;
+    double              logPerLine;
 
     scrolledBack = FALSE;
     atexit( cursesAtExit );
@@ -619,7 +630,6 @@ void *curses_output_thread( void *arg )
     UpdateScreen:
         cursesUpdateLines();
 
-
         for( i = 0; i < WINDOW_COUNT; i++ ) {
             LinkedListLock( textEntries[i] );
 
@@ -806,13 +816,12 @@ void *curses_output_thread( void *arg )
             wsyncup( *windows[i].window );
         }
 
-#if 0
-    UpdateLogs:
-#endif
+        /* UpdateLogs */
         QueueLock( CursesLogQ );
         getmaxyx( winLog, lines, x );
 
         count = QueueUsed( CursesLogQ );
+        logCount = count;
         if( count > lines ) {
             if( !scrolledBack ) {
                 logTop = (CursesLogQ->head + CursesLogQ->numElements - 
@@ -823,10 +832,25 @@ void *curses_output_thread( void *arg )
             logTop = CursesLogQ->tail;
         }
 
+        logCurr = (logTop + CursesLogQ->numElements + count - 
+                   CursesLogQ->tail) & CursesLogQ->numMask;
+
         for( i = 0; i < count; i++ ) {
             logEntry = (logTop + i) & CursesLogQ->numMask;
             logItem = (CursesLog_t *)CursesLogQ->itemTable[logEntry];
             mvwprintw( winLog, i, 0, "%s", logItem->message );
+        }
+
+        getmaxyx( winLogScrollbar, y, x );
+        logPerLine = (1.0/(double)(y - 1))/2.0;
+        for( i = 0; i < y; i++ ) {
+            if( fabs( ((double)logCurr/(double)logCount) - 
+                      (((double)i/(double)(y - 1)) + logPerLine) )  <=
+                  logPerLine ) {
+                mvwaddch( winLogScrollbar, i, 0, ACS_BLOCK );
+            } else {
+                mvwaddch( winLogScrollbar, i, 0, ACS_CKBOARD );
+            }
         }
 
         QueueUnlock( CursesLogQ );

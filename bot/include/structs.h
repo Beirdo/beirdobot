@@ -316,6 +316,7 @@ typedef enum {
     WINDOW_DETAILS,
     WINDOW_DETAILS_FORM,
     WINDOW_LOG,
+    WINDOW_LOG_SCROLLBAR,
     WINDOW_TAILER,
     WINDOW_COUNT
 } CursesWindow_t;
