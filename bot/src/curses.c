@@ -92,6 +92,7 @@ void cursesFieldChanged( FORM *form );
 void cursesServerRevert( void *arg, char *string );
 void cursesNextPage( void *arg, char *string );
 void cursesUpdateFormLabels( void );
+void cursesCancel( void *arg, char *string );
 
 typedef enum {
     CURSES_TEXT_ADD,
@@ -1700,8 +1701,10 @@ void cursesFormRegenerate( void )
             count++;
         }
 
-        if( fieldItem->starty + fieldItem->height - 1 > maxy ) {
-            maxy = fieldItem->starty + fieldItem->height - 1;
+        if( fieldItem->height ) {
+            maxy = MAX( fieldItem->starty + fieldItem->height - 1, maxy );
+        } else {
+            maxy = MAX( fieldItem->starty, maxy );
         }
     }
 
@@ -1732,7 +1735,7 @@ void cursesFormRegenerate( void )
 
             starty = fieldItem->starty - pageStart;
 
-            if( starty < 0 || starty >= pageStart + y - 1 )
+            if( starty < 0 || starty > pageStart + y - 2 )
             {
                 continue;
             }
@@ -2028,6 +2031,11 @@ void cursesServerRevert( void *arg, char *string )
     detailsForm = (void *)1;
 }
 
+void cursesCancel( void *arg, char *string )
+{
+    cursesFormClear();
+}
+
 void cursesServerDisplay( void *arg )
 {
     IRCServer_t            *server;
@@ -2111,7 +2119,7 @@ void cursesServerDisplay( void *arg )
 
     cursesFormButtonAdd( 2, 14, "Revert", cursesServerRevert, server );
     cursesFormButtonAdd( 10, 14, "Save", NULL, NULL );
-    cursesFormButtonAdd( 16, 14, "Cancel", NULL, NULL );
+    cursesFormButtonAdd( 16, 14, "Cancel", cursesCancel, NULL );
 }
 
 void cursesChannelDisplay( void *arg )
