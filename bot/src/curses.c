@@ -66,6 +66,9 @@ FIELD         **detailsFields = NULL;
 int             detailsIndex = -1;
 int             detailsPage = 0;
 int             detailsFieldCount = 0;
+int             detailsTopLine = 0;
+int             detailsBottomLine = 0;
+int             detailsItemCount = 0;
 
 LinkedList_t   *textEntries[WINDOW_COUNT];
 
@@ -408,6 +411,8 @@ void *curses_output_thread( void *arg )
     int                 linewidth;
     int                 linelen;
     int                 key;
+    int                 starty;
+    int                 maxx, maxy;
 
     scrolledBack = FALSE;
     atexit( cursesAtExit );
@@ -592,6 +597,8 @@ void *curses_output_thread( void *arg )
                         cursesWindowClear( WINDOW_DETAILS );
                         cursesFormClear();
                         curs_set(0);
+                        detailsTopLine = 0;
+                        detailsBottomLine = 0;
                     }
                     break;
                 default:
@@ -611,46 +618,81 @@ void *curses_output_thread( void *arg )
     UpdateScreen:
         cursesUpdateLines();
 
+
         for( i = 0; i < WINDOW_COUNT; i++ ) {
             LinkedListLock( textEntries[i] );
+
+            getmaxyx( *windows[i].window, maxy, maxx );
+            if( i == WINDOW_DETAILS ) {
+                detailsBottomLine = 0;
+            }
 
             for( listItem = textEntries[i]->head; listItem; 
                  listItem = listItem->next ) {
                 textItem = (CursesText_t *)listItem;
 
+                if( i == WINDOW_DETAILS ) {
+                    starty = textItem->y - detailsTopLine;
+                    if( (starty < 0 || starty >= maxy) && 
+                        textItem->align != ALIGN_WRAP ) {
+                        if( starty >= maxy ) {
+                            detailsBottomLine = maxy;
+                        }
+                        continue;
+                    }
+                } else {
+                    starty = textItem->y;
+                }
+
                 switch( textItem->align ) {
                 case ALIGN_LEFT:
-                    mvwaddnstr( *windows[i].window, textItem->y, textItem->x, 
+                    mvwaddnstr( *windows[i].window, starty, textItem->x, 
                                 textItem->string, textItem->len );
+                    if( i == WINDOW_DETAILS ) {
+                        detailsBottomLine = MAX( detailsBottomLine, starty );
+                    }
                     break;
                 case ALIGN_RIGHT:
-                    mvwaddnstr( *windows[i].window, textItem->y, 
+                    mvwaddnstr( *windows[i].window, starty, 
                                 windows[i].width - textItem->x - textItem->len, 
                                 textItem->string, textItem->len );
+                    if( i == WINDOW_DETAILS ) {
+                        detailsBottomLine = MAX( detailsBottomLine, starty );
+                    }
                     break;
                 case ALIGN_CENTER:
-                    mvwaddnstr( *windows[i].window, textItem->y, 
+                    mvwaddnstr( *windows[i].window, starty, 
                                 ((windows[i].width - textItem->len) / 2) + 
                                 textItem->x, textItem->string, textItem->len );
+                    if( i == WINDOW_DETAILS ) {
+                        detailsBottomLine = MAX( detailsBottomLine, starty );
+                    }
                     break;
                 case ALIGN_FROM_CENTER:
-                    mvwaddnstr( *windows[i].window, textItem->y, 
+                    mvwaddnstr( *windows[i].window, starty, 
                                 (windows[i].width / 2) + textItem->x, 
                                 textItem->string, textItem->len );
+                    if( i == WINDOW_DETAILS ) {
+                        detailsBottomLine = MAX( detailsBottomLine, starty );
+                    }
                     break;
                 case ALIGN_WRAP:
                     string    = textItem->string;
                     len       = textItem->len;
-                    y         = textItem->y;
+                    y         = textItem->y - detailsTopLine;
                     linewidth = windows[i].width - textItem->x;
 
 
                     linelen = 0;
                     word = string;
                     while( len && *string ) {
-                        if( len <= linewidth ) {
+                        if( len <= linewidth && y >= 0 && y < maxy ) {
                             mvwaddnstr( *windows[i].window, y, textItem->x,
                                         string, len );
+                            if( i == WINDOW_DETAILS ) {
+                                detailsBottomLine = MAX( detailsBottomLine,
+                                                         y );
+                            }
                             len = 0;
                             continue;
                         }
@@ -661,8 +703,14 @@ void *curses_output_thread( void *arg )
                                 /*
                                  * We accumulated words
                                  */
-                                mvwaddnstr( *windows[i].window, y, textItem->x,
-                                            string, linelen );
+                                if( y >= 0 && y < maxy ) {
+                                    mvwaddnstr( *windows[i].window, y, 
+                                                textItem->x, string, linelen );
+                                    if( i == WINDOW_DETAILS ) {
+                                        detailsBottomLine = 
+                                            MAX( detailsBottomLine, y );
+                                    }
+                                }
                                 string += linelen + 1;
                                 word    = string;
                                 len    -= linelen + 1;
@@ -671,10 +719,17 @@ void *curses_output_thread( void *arg )
                                  * no whitespace left... chop a word in the
                                  * middle and nastily hyphenate it
                                  */
-                                mvwaddnstr( *windows[i].window, y, textItem->x,
-                                            string, linewidth-2 );
-                                mvwaddnstr( *windows[i].window, y, 
-                                            linewidth-2, "-", 1 );
+                                if( y >= 0 && y < maxy ) {
+                                    mvwaddnstr( *windows[i].window, y, 
+                                                textItem->x, string, 
+                                                linewidth-2 );
+                                    mvwaddnstr( *windows[i].window, y, 
+                                                linewidth-2, "-", 1 );
+                                    if( i == WINDOW_DETAILS ) {
+                                        detailsBottomLine = 
+                                            MAX( detailsBottomLine, y );
+                                    }
+                                }
                                 string += linewidth - 2;
                                 word    = string;
                                 len    -= linewidth - 2;
@@ -689,16 +744,29 @@ void *curses_output_thread( void *arg )
                                  * no whitespace left... chop a word in the
                                  * middle and nastily hyphenate it
                                  */
-                                mvwaddnstr( *windows[i].window, y, textItem->x,
-                                            string, linewidth-2 );
-                                mvwaddnstr( *windows[i].window, y, 
-                                            linewidth-2, "-", 1 );
+                                if( y >= 0 && y < maxy ) {
+                                    mvwaddnstr( *windows[i].window, y, 
+                                                textItem->x, string, 
+                                                linewidth-2 );
+                                    mvwaddnstr( *windows[i].window, y, 
+                                                linewidth-2, "-", 1 );
+                                    if( i == WINDOW_DETAILS ) {
+                                        detailsBottomLine = 
+                                            MAX( detailsBottomLine, y );
+                                    }
+                                }
                                 string += linewidth - 2;
                                 word    = string;
                                 len    -= linewidth - 2;
                             } else {
-                                mvwaddnstr( *windows[i].window, y, textItem->x,
-                                            string, linelen );
+                                if( y >= 0 && y < maxy ) {
+                                    mvwaddnstr( *windows[i].window, y, 
+                                                textItem->x, string, linelen );
+                                    if( i == WINDOW_DETAILS ) {
+                                        detailsBottomLine = 
+                                            MAX( detailsBottomLine, y );
+                                    }
+                                }
                                 string += linelen + 1;
                                 len    -= linelen + 1;
                                 linelen = 0;
@@ -708,8 +776,14 @@ void *curses_output_thread( void *arg )
                         } else if( *ch == '\n' || *ch == '\r' ) {
                             /* OK, we have whitespace */
                             linelen = ch - string;
-                            mvwaddnstr( *windows[i].window, y, textItem->x,
-                                        string, linelen );
+                            if( y >= 0 && y < maxy ) {
+                                mvwaddnstr( *windows[i].window, y, textItem->x,
+                                            string, linelen );
+                                if( i == WINDOW_DETAILS ) {
+                                    detailsBottomLine = MAX( detailsBottomLine,
+                                                             y );
+                                }
+                            }
 
                             string  = ch + 1;
                             len    -= linelen + 1;
@@ -1367,6 +1441,8 @@ void cursesUpdateLines( void )
 
 int cursesDetailsKeyhandle( int ch )
 {
+    int         x, y;
+
     switch( ch ) {
     case KEY_LEFT:
     case KEY_PPAGE:
@@ -1374,8 +1450,18 @@ int cursesDetailsKeyhandle( int ch )
     case 18:    /* Ctrl-R */
         return( ch );
     case KEY_UP:
+        detailsTopLine--;
+        if( detailsTopLine < 0 ) {
+            detailsTopLine = 0;
+        }
+        wclear( winDetails );
         break;
     case KEY_DOWN:
+        getmaxyx( winDetails, y, x );
+        if( detailsBottomLine > y - 2 ) {
+            detailsTopLine++;
+            wclear( winDetails );
+        }
         break;
     case KEY_RIGHT:
     default:
@@ -1425,6 +1511,7 @@ void cursesFormFieldAdd( int startx, int starty, int width, int height,
     field->fieldChangeFuncArg   = changeFuncArg;
 
     LinkedListAdd( formList, (LinkedListItem_t *)field, UNLOCKED, AT_TAIL );
+    detailsItemCount++;
 
     cursesItem = (CursesItem_t *)malloc(sizeof(CursesItem_t));
     cursesItem->type = CURSES_FORM_ITEM_ADD;
@@ -1449,6 +1536,7 @@ void cursesFormLabelAdd( int startx, int starty, char *string )
     field->len       = strlen(string);
 
     LinkedListAdd( formList, (LinkedListItem_t *)field, UNLOCKED, AT_TAIL );
+    detailsItemCount++;
 
     cursesItem = (CursesItem_t *)malloc(sizeof(CursesItem_t));
     cursesItem->type = CURSES_FORM_ITEM_ADD;
@@ -1481,6 +1569,7 @@ void cursesFormCheckboxAdd( int startx, int starty, bool enabled,
     field->fieldChangeFuncArg   = changeFuncArg;
 
     LinkedListAdd( formList, (LinkedListItem_t *)field, UNLOCKED, AT_TAIL );
+    detailsItemCount++;
 
     cursesItem = (CursesItem_t *)malloc(sizeof(CursesItem_t));
     cursesItem->type = CURSES_FORM_ITEM_ADD;
@@ -1511,6 +1600,7 @@ void cursesFormButtonAdd( int startx, int starty, char *string,
     field->fieldChangeFuncArg   = changeFuncArg;
 
     LinkedListAdd( formList, (LinkedListItem_t *)field, UNLOCKED, AT_TAIL );
+    detailsItemCount++;
 
     cursesItem = (CursesItem_t *)malloc(sizeof(CursesItem_t));
     cursesItem->type = CURSES_FORM_ITEM_ADD;
@@ -1563,6 +1653,7 @@ void cursesFormClear( void )
     LinkedListUnlock( formPageList );
     LinkedListUnlock( formList );
 
+    detailsItemCount = 0;
 
     cursesItem = (CursesItem_t *)malloc(sizeof(CursesItem_t));
     cursesItem->type = CURSES_FORM_ITEM_REMOVE;
@@ -1585,7 +1676,7 @@ void cursesFormRegenerate( void )
     bool                    newPage;
     int                     starty;
 
-    if( !inSubMenuFunc ) {
+    if( !inSubMenuFunc || detailsItemCount == 0 ) {
         return;
     }
 

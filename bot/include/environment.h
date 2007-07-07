@@ -92,6 +92,13 @@ typedef unsigned long long int uint64;
 
 
 #define BOOL(x)  ((x) ? TRUE : FALSE)
+#ifndef MAX
+#define MAX(x,y)    ((x) > (y) ? (x) : (y))
+#endif
+
+#ifndef MIN
+#define MIN(x,y)    ((x) < (y) ? (x) : (y))
+#endif
 
 #define NELEMENTS(x)                (sizeof((x)) / sizeof((x)[0]))
 #define OFFSETOF(elem,StructType)   ((char *)&(((StructType *)NULL)->elem) - \
