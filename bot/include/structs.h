@@ -46,7 +46,7 @@ typedef struct {
     BalancedBTree_t    *channelNum;
     int                 serverId;
     char               *server;
-    uint16              port;
+    int                 port;
     char               *password;
     char               *nick;
     char               *username;
@@ -339,6 +339,17 @@ typedef enum {
 
 typedef int (*CursesKeyhandleFunc_t)(int);
 
+typedef enum {
+    FT_NONE,
+    FT_ALNUM,
+    FT_ALPHA,
+    FT_ENUM,
+    FT_INTEGER,
+    FT_NUMERIC,
+    FT_REGEXP,
+    FT_IPV4
+} CursesFieldTypeType_t;
+
 typedef union {
     int         minLen;
     struct {
@@ -358,6 +369,13 @@ typedef union {
     } numericArgs;
     char       *regexp;
 } CursesFieldTypeArgs_t;
+
+typedef enum {
+    FA_NONE,
+    FA_STRING,
+    FA_INTEGER,
+    FA_BOOL
+} CursesFormatArg_t;
 
 typedef void (*CursesFieldChangeFunc_t)(void *, char *);
 

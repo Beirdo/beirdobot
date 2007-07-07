@@ -2060,96 +2060,6 @@ void cursesCancel( void *arg, char *string )
     cursesFormClear();
 }
 
-void cursesServerDisplay( void *arg )
-{
-    IRCServer_t            *server;
-    static char             buf[64];
-    CursesFieldTypeArgs_t   fieldArgs;
-
-    server = (IRCServer_t *)arg;
-
-    cursesKeyhandleRegister( cursesFormKeyhandle );
-
-    snprintf( buf, 64, "Server Number:  %d", server->serverId );
-    cursesFormLabelAdd( 0, 0, buf );
-    cursesFormLabelAdd( 0, 1, "Server:" );
-    cursesFormFieldAdd( 16, 1, 32, 1, server->server, 64, NULL, NULL, NULL, 
-                        NULL );
-    cursesFormLabelAdd( 0, 2, "Port:" );
-
-    fieldArgs.integerArgs.precision = 0;
-    fieldArgs.integerArgs.minValue  = 1;
-    fieldArgs.integerArgs.maxValue  = 65535;
-    snprintf( buf, 64, "%d", server->port );
-    cursesFormFieldAdd( 16, 2, 6, 1, buf, 6, TYPE_INTEGER, &fieldArgs, NULL, 
-                        NULL );
-    cursesFormLabelAdd( 0, 3, "Password:" );
-    cursesFormFieldAdd( 16, 3, 32, 1, server->password, 64, NULL, NULL, NULL, 
-                        NULL );
-    cursesFormLabelAdd( 0, 4, "Nick:" );
-    cursesFormFieldAdd( 16, 4, 32, 1, server->nick, 64, NULL, NULL, NULL, 
-                        NULL );
-    cursesFormLabelAdd( 0, 5, "User Name:" );
-    cursesFormFieldAdd( 16, 5, 32, 1, server->username, 64, NULL, NULL, NULL, 
-                        NULL );
-    cursesFormLabelAdd( 0, 6, "Real Name:" );
-    cursesFormFieldAdd( 16, 6, 32, 1, server->realname, 64, NULL, NULL, NULL, 
-                        NULL );
-    cursesFormLabelAdd( 0, 7, "Nickserv Nick:" );
-    cursesFormFieldAdd( 16, 7, 32, 1, server->nickserv, 64, NULL, NULL, NULL, 
-                        NULL );
-    cursesFormLabelAdd( 0, 8, "Nickserv Msg:" );
-    cursesFormFieldAdd( 16, 8, 32, 1, server->nickservmsg, 64, NULL, NULL, 
-                        NULL, NULL );
-
-    cursesFormLabelAdd( 0, 9, "Flood Interval:" );
-
-    snprintf( buf, 64, "%d", server->floodInterval );
-    fieldArgs.integerArgs.precision = 0;
-    fieldArgs.integerArgs.minValue  = 0;
-    fieldArgs.integerArgs.maxValue  = 0x7FFFFFFF;
-    cursesFormFieldAdd( 16, 9, 20, 1, buf, 20, TYPE_INTEGER, &fieldArgs, NULL, 
-                        NULL );
-
-    cursesFormLabelAdd( 0, 10, "Flood Max Time:" );
-
-    snprintf( buf, 64, "%d", server->floodMaxTime );
-    fieldArgs.integerArgs.precision = 0;
-    fieldArgs.integerArgs.minValue  = 0;
-    fieldArgs.integerArgs.maxValue  = 0x7FFFFFFF;
-    cursesFormFieldAdd( 16, 10, 20, 1, buf, 20, TYPE_INTEGER, &fieldArgs, NULL,
-                        NULL );
-
-    cursesFormLabelAdd( 0, 11, "Flood Buffer:" );
-
-    snprintf( buf, 64, "%d", server->floodBuffer );
-    fieldArgs.integerArgs.precision = 0;
-    fieldArgs.integerArgs.minValue  = 0;
-    fieldArgs.integerArgs.maxValue  = 0x7FFFFFFF;
-    cursesFormFieldAdd( 16, 11, 20, 1, buf, 20, TYPE_INTEGER, &fieldArgs, NULL,
-                        NULL );
-
-    cursesFormLabelAdd( 0, 12, "Flood Max Line:" );
-
-    snprintf( buf, 64, "%d", server->floodMaxLine );
-    fieldArgs.integerArgs.precision = 0;
-    fieldArgs.integerArgs.minValue  = 0;
-    fieldArgs.integerArgs.maxValue  = 0x7FFFFFFF;
-    cursesFormFieldAdd( 16, 12, 20, 1, buf, 20, TYPE_INTEGER, &fieldArgs, NULL,
-                        NULL );
-
-    cursesFormLabelAdd( 0, 13, "Enabled:" );
-    cursesFormCheckboxAdd( 16, 13, server->enabled, NULL, NULL );
-
-    cursesFormButtonAdd( 2, 14, "Revert", cursesServerRevert, server );
-    cursesFormButtonAdd( 10, 14, "Save", NULL, NULL );
-    cursesFormButtonAdd( 16, 14, "Cancel", cursesCancel, NULL );
-}
-
-void cursesChannelDisplay( void *arg )
-{
-}
-
 void cursesNextPage( void *arg, char *string )
 {
     form_driver( detailsForm, REQ_NEXT_PAGE );
@@ -2181,6 +2091,206 @@ void cursesUpdateFormLabels( void )
             }
         }
     }
+}
+
+typedef struct {
+    CursesFieldType_t       type;
+    int                     startx;
+    int                     starty;
+    int                     width;
+    int                     height;
+    char                   *format;
+    int                     offset;
+    CursesFormatArg_t       offsetType;
+    int                     maxLen;
+    CursesFieldTypeType_t   fieldType;
+    CursesFieldTypeArgs_t   fieldArgs;
+    CursesFieldChangeFunc_t changeFunc;
+    void                   *changeFuncArg;
+} CursesFormItem_t;
+
+
+static CursesFormItem_t     serverFormItem[] = {
+    { FIELD_LABEL, 0, 0, 0, 0, "Server Number: %d", 
+      OFFSETOF(serverId,IRCServer_t), FA_INTEGER, 0, FT_NONE, { 0 }, NULL, 
+      NULL },
+    { FIELD_LABEL, 0, 1, 0, 0, "Server:", -1, FA_NONE, 0, FT_NONE, { 0 }, NULL,
+      NULL },
+    { FIELD_FIELD, 16, 1, 32, 1, "%s", OFFSETOF(server,IRCServer_t), FA_STRING,
+      64, FT_NONE, { 0 }, NULL, NULL },
+    { FIELD_LABEL, 0, 2, 0, 0, "Port:", -1, FA_NONE, 0, FT_NONE, { 0 }, NULL, 
+      NULL },
+    { FIELD_FIELD, 16, 2, 6, 1, "%d", OFFSETOF(port,IRCServer_t), FA_INTEGER, 6,
+      FT_INTEGER, { .integerArgs = { 0, 1, 65535 } }, NULL, NULL },
+    { FIELD_LABEL, 0, 3, 0, 0, "Password:", -1, FA_NONE, 0, FT_NONE, { 0 }, 
+      NULL, NULL },
+    { FIELD_FIELD, 16, 3, 32, 1, "%s", OFFSETOF(password,IRCServer_t), 
+      FA_STRING, 64, FT_NONE, { 0 }, NULL, NULL },
+    { FIELD_LABEL, 0, 4, 0, 0, "Nick:", -1, FA_NONE, 0, FT_NONE, { 0 }, NULL, 
+      NULL },
+    { FIELD_FIELD, 16, 4, 32, 1, "%s", OFFSETOF(nick,IRCServer_t), FA_STRING, 
+      64, FT_NONE, { 0 }, NULL, NULL },
+    { FIELD_LABEL, 0, 5, 0, 0, "User Name:", -1, FA_NONE, 0, FT_NONE, { 0 }, 
+      NULL, NULL },
+    { FIELD_FIELD, 16, 5, 32, 1, "%s", OFFSETOF(username,IRCServer_t), 
+      FA_STRING, 64, FT_NONE, { 0 }, NULL, NULL },
+    { FIELD_LABEL, 0, 6, 0, 0, "Real Name:", -1, FA_NONE, 0, FT_NONE, { 0 }, 
+      NULL, NULL },
+    { FIELD_FIELD, 16, 6, 32, 1, "%s", OFFSETOF(realname,IRCServer_t), 
+      FA_STRING, 64, FT_NONE, { 0 }, NULL, NULL },
+    { FIELD_LABEL, 0, 7, 0, 0, "Nickserv Nick:", -1, FA_NONE, 0, FT_NONE, { 0 },
+      NULL, NULL },
+    { FIELD_FIELD, 16, 7, 32, 1, "%s", OFFSETOF(nickserv,IRCServer_t), 
+      FA_STRING, 64, FT_NONE, { 0 }, NULL, NULL },
+    { FIELD_LABEL, 0, 8, 0, 0, "Nickserv Msg:", -1, FA_NONE, 0, FT_NONE, { 0 },
+      NULL, NULL },
+    { FIELD_FIELD, 16, 8, 32, 1, "%s", OFFSETOF(nickservmsg,IRCServer_t), 
+      FA_STRING, 64, FT_NONE, { 0 }, NULL, NULL },
+    { FIELD_LABEL, 0, 9, 0, 0, "Flood Interval:", -1, FA_NONE, 0, FT_NONE, 
+      { 0 }, NULL, NULL },
+    { FIELD_FIELD, 16, 9, 20, 1, "%d", OFFSETOF(floodInterval,IRCServer_t), 
+      FA_INTEGER, 20, FT_INTEGER, { .integerArgs = { 0, 0, 0x7FFFFFFF } }, 
+      NULL, NULL },
+    { FIELD_LABEL, 0, 10, 0, 0, "Flood Max Time:", -1, FA_NONE, 0, FT_NONE, 
+      { 0 }, NULL, NULL },
+    { FIELD_FIELD, 16, 10, 20, 1, "%d", OFFSETOF(floodMaxTime,IRCServer_t), 
+      FA_INTEGER, 20, FT_INTEGER, { .integerArgs = { 0, 0, 0x7FFFFFFF } }, 
+      NULL, NULL },
+    { FIELD_LABEL, 0, 11, 0, 0, "Flood Buffer:", -1, FA_NONE, 0, FT_NONE, { 0 },
+      NULL, NULL },
+    { FIELD_FIELD, 16, 11, 20, 1, "%d", OFFSETOF(floodBuffer,IRCServer_t), 
+      FA_INTEGER, 20, FT_INTEGER, { .integerArgs = { 0, 0, 0x7FFFFFFF } }, 
+      NULL, NULL },
+    { FIELD_LABEL, 0, 12, 0, 0, "Flood Max Line:", -1, FA_NONE, 0, FT_NONE, 
+      { 0 }, NULL, NULL },
+    { FIELD_FIELD, 16, 12, 20, 1, "%d", OFFSETOF(floodMaxLine,IRCServer_t), 
+      FA_INTEGER, 20, FT_INTEGER, { .integerArgs = { 0, 0, 0x7FFFFFFF } }, 
+      NULL, NULL },
+    { FIELD_LABEL, 0, 13, 0, 0, "Enabled:", -1, FA_NONE, 0, FT_NONE, { 0 }, 
+      NULL, NULL },
+    { FIELD_CHECKBOX, 16, 13, 0, 0, "[%c]", OFFSETOF(enabled,IRCServer_t), 
+      FA_BOOL, 3, FT_NONE, { 0 }, NULL, NULL },
+    { FIELD_BUTTON, 2, 14, 0, 0, "Revert", -1, FA_NONE, 0, FT_NONE, { 0 }, 
+      cursesServerRevert, NULL },
+    { FIELD_BUTTON, 10, 14, 0, 0, "Save", -1, FA_NONE, 0, FT_NONE, { 0 }, NULL,
+      NULL },
+    { FIELD_BUTTON, 16, 14, 0, 0, "Cancel", -1, FA_NONE, 0, FT_NONE, { 0 }, 
+      cursesCancel, NULL }
+};
+static int serverFormItemCount = NELEMENTS(serverFormItem);
+
+void cursesServerDisplay( void *arg )
+{
+    IRCServer_t            *server;
+    static char             buf[1024];
+    CursesFormItem_t       *item;
+    int                     i;
+    FIELDTYPE              *fieldtype;
+    int                     len;
+
+    server = (IRCServer_t *)arg;
+
+    cursesKeyhandleRegister( cursesFormKeyhandle );
+
+    for( i = 0; i < serverFormItemCount; i++ ) {
+        item = &serverFormItem[i];
+
+        switch( item->type ) {
+        case FIELD_LABEL:
+            if( item->offset != -1 && item->offsetType != FA_NONE ) {
+                switch( item->offsetType ) {
+                case FA_STRING:
+                    snprintf( buf, 1024, item->format,
+                              *(char **)ATOFFSET(server,item->offset) );
+                    break;
+                case FA_INTEGER:
+                    snprintf( buf, 1024, item->format,
+                              *(int *)ATOFFSET(server,item->offset) );
+                    break;
+                case FA_BOOL:
+                    snprintf( buf, 1024, item->format,
+                              *(bool *)ATOFFSET(server,item->offset) );
+                    break;
+                default:
+                    buf[0] = '\0';
+                }
+            } else {
+                snprintf( buf, 1024, item->format );
+            }
+            cursesFormLabelAdd( item->startx, item->starty, buf );
+            break;
+        case FIELD_FIELD:
+            if( item->maxLen == 0 ) {
+                len = 1024;
+            } else {
+                len = MIN(1024, item->maxLen);
+            }
+
+            switch( item->offsetType ) {
+            case FA_STRING:
+                snprintf( buf, 1024, item->format,
+                          *(char **)ATOFFSET(server,item->offset) );
+                break;
+            case FA_INTEGER:
+                snprintf( buf, 1024, item->format,
+                          *(int *)ATOFFSET(server,item->offset) );
+                break;
+            case FA_BOOL:
+                snprintf( buf, 1024, item->format,
+                          *(bool *)ATOFFSET(server,item->offset) );
+                break;
+            default:
+                buf[0] = '\0';
+            }
+
+            switch( item->fieldType ) {
+            case FT_NONE:
+            default:
+                fieldtype = NULL;
+                break;
+            case FT_ALNUM:
+                fieldtype = TYPE_ALNUM;
+                break;
+            case FT_ALPHA:
+                fieldtype = TYPE_ALPHA;
+                break;
+            case FT_ENUM:
+                fieldtype = TYPE_ENUM;
+                break;
+            case FT_INTEGER:
+                fieldtype = TYPE_INTEGER;
+                break;
+            case FT_NUMERIC:
+                fieldtype = TYPE_NUMERIC;
+                break;
+            case FT_REGEXP:
+                fieldtype = TYPE_REGEXP;
+                break;
+            case FT_IPV4:
+                fieldtype = TYPE_IPV4;
+                break;
+            }
+
+            cursesFormFieldAdd( item->startx, item->starty, item->width,
+                                item->height, buf, item->maxLen, fieldtype,
+                                &item->fieldArgs, item->changeFunc,
+                                item->changeFuncArg );
+            break;
+        case FIELD_CHECKBOX:
+            cursesFormCheckboxAdd( item->startx, item->starty,
+                                   *(bool *)ATOFFSET(server,item->offset),
+                                   item->changeFunc, item->changeFuncArg );
+            break;
+        case FIELD_BUTTON:
+            cursesFormButtonAdd( item->startx, item->starty, item->format,
+                                 item->changeFunc, item->changeFuncArg );
+            break;
+        }
+    }
+}
+
+void cursesChannelDisplay( void *arg )
+{
 }
 
 /*
