@@ -1550,15 +1550,15 @@ void result_load_channels( MYSQL_RES *res, MYSQL_BIND *input, void *arg )
                 cursesMenuItemRemove( 2, MENU_CHANNELS, channel->menuText );
                 free( channel->menuText );
                 channel->menuText = fullSpec;
-                cursesMenuItemAdd( 2, MENU_CHANNELS, channel->menuText, NULL,
-                                   NULL );
+                cursesMenuItemAdd( 2, MENU_CHANNELS, channel->menuText, 
+                                   cursesChannelDisplay, channel );
             } else {
                 free( fullSpec );
             }
         } else {
             channel->menuText = fullSpec;
-            cursesMenuItemAdd( 2, MENU_CHANNELS, channel->menuText, NULL,
-                               NULL );
+            cursesMenuItemAdd( 2, MENU_CHANNELS, channel->menuText,
+                               cursesChannelDisplay, channel );
         }
 
         if( found && strcmp( oldChannel, channel->channel ) ) {

@@ -2139,6 +2139,10 @@ void cursesFormDisplay( void *arg, CursesFormItem_t *items, int count,
                     snprintf( buf, 1024, item->format,
                               *(bool *)ATOFFSET(arg,item->offset) );
                     break;
+                case FA_CHAR:
+                    snprintf( buf, 1024, item->format,
+                              *(char *)ATOFFSET(arg,item->offset) );
+                    break;
                 default:
                     buf[0] = '\0';
                 }
@@ -2166,6 +2170,10 @@ void cursesFormDisplay( void *arg, CursesFormItem_t *items, int count,
             case FA_BOOL:
                 snprintf( buf, 1024, item->format,
                           *(bool *)ATOFFSET(arg,item->offset) );
+                break;
+            case FA_CHAR:
+                snprintf( buf, 1024, item->format,
+                          *(char *)ATOFFSET(arg,item->offset) );
                 break;
             default:
                 buf[0] = '\0';

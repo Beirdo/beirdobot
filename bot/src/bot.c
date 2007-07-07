@@ -62,6 +62,9 @@ void botSighup( int signum, void *arg );
 void serverStartTree( BalancedBTreeItem_t *node );
 bool serverKillTree( BalancedBTreeItem_t *node, bool ifVisited );
 void cursesServerRevert( void *arg, char *string );
+void cursesChannelRevert( void *arg, char *string );
+void serverSaveFunc( void *arg, int index, char *string );
+void channelSaveFunc( void *arg, int index, char *string );
 
 
 void ProcOnConnected(BN_PInfo I, const char HostName[])
@@ -1118,6 +1121,9 @@ void serverSaveFunc( void *arg, int index, char *string )
     case FA_BOOL:
         *(bool *)ATOFFSET(arg,item->offset) = ( *string == 'X' ? TRUE : FALSE );
         break;
+    case FA_CHAR:
+        *(char *)ATOFFSET(arg,item->offset) = *string;
+        break;
     default:
         return;
     }
@@ -1135,9 +1141,91 @@ void cursesServerRevert( void *arg, char *string )
                       serverSaveFunc );
 }
 
+static CursesFormItem_t     channelFormItems[] = {
+    { FIELD_LABEL, 0, 0, 0, 0, "Channel Number: %d", 
+      OFFSETOF(channelId,IRCChannel_t), FA_INTEGER, 0, FT_NONE, { 0 }, NULL, 
+      NULL },
+    { FIELD_LABEL, 0, 1, 0, 0, "Channel:", -1, FA_NONE, 0, FT_NONE, { 0 }, NULL,
+      NULL },
+    { FIELD_FIELD, 16, 1, 32, 1, "%s", OFFSETOF(channel,IRCChannel_t), 
+      FA_STRING, 64, FT_NONE, { 0 }, NULL, NULL },
+    { FIELD_LABEL, 0, 2, 0, 0, "Notify URL:", -1, FA_NONE, 0, FT_NONE, { 0 },
+      NULL, NULL },
+    { FIELD_FIELD, 16, 2, 32, 1, "%s", OFFSETOF(url,IRCChannel_t), FA_STRING,
+      255, FT_NONE, { 0 }, NULL, NULL },
+    { FIELD_LABEL, 0, 3, 0, 0, "Notify Window:", -1, FA_NONE, 0, FT_NONE, { 0 },
+      NULL, NULL },
+    { FIELD_FIELD, 16, 3, 20, 1, "%d", OFFSETOF(notifywindow,IRCChannel_t),
+      FA_INTEGER, 20, FT_INTEGER, { .integerArgs = { 0, 0, 168 } }, NULL, 
+      NULL },
+    { FIELD_LABEL, 0, 4, 0, 0, "Command Char:", -1, FA_NONE, 0, FT_NONE, { 0 },
+      NULL, NULL },
+    { FIELD_FIELD, 16, 4, 1, 1, "%c", OFFSETOF(cmdChar,IRCChannel_t), FA_CHAR,
+      1, FT_NONE, { 0 }, NULL, NULL },
+    { FIELD_LABEL, 0, 5, 0, 0, "Enabled:", -1, FA_NONE, 0, FT_NONE, { 0 }, 
+      NULL, NULL },
+    { FIELD_CHECKBOX, 16, 5, 0, 0, "[%c]", OFFSETOF(enabled,IRCChannel_t), 
+      FA_BOOL, 3, FT_NONE, { 0 }, NULL, NULL },
+    { FIELD_BUTTON, 2, 6, 0, 0, "Revert", -1, FA_NONE, 0, FT_NONE, { 0 }, 
+      cursesChannelRevert, (void *)(-1) },
+    { FIELD_BUTTON, 10, 6, 0, 0, "Save", -1, FA_NONE, 0, FT_NONE, { 0 }, 
+      cursesSave, (void *)(-1) },
+    { FIELD_BUTTON, 16, 6, 0, 0, "Cancel", -1, FA_NONE, 0, FT_NONE, { 0 }, 
+      cursesCancel, NULL }
+};
+static int channelFormItemCount = NELEMENTS(channelFormItems);
+
+void channelSaveFunc( void *arg, int index, char *string )
+{
+    CursesFormItem_t       *item;
+
+    if( index == -1 ) {
+        LogPrint( LOG_DEBUG, "channel: %p - complete", arg );
+        return;
+    }
+
+    if( index < 0 || index >= channelFormItemCount ) {
+        return;
+    }
+    item = &channelFormItems[index];
+
+    if( item->offset == -1 ) {
+        return;
+    }
+
+    LogPrint( LOG_DEBUG, "channel: %p, index %d, offset %d, string: \"%s\"", 
+              arg, index, item->offset, string );
+
+    switch( item->offsetType ) {
+    case FA_STRING:
+        free( *(char **)ATOFFSET(arg,item->offset) );
+        *(char **)ATOFFSET(arg,item->offset) = strdup( string );
+        break;
+    case FA_INTEGER:
+        *(int *)ATOFFSET(arg,item->offset) = atoi( string );
+        break;
+    case FA_BOOL:
+        *(bool *)ATOFFSET(arg,item->offset) = ( *string == 'X' ? TRUE : FALSE );
+        break;
+    case FA_CHAR:
+        *(char *)ATOFFSET(arg,item->offset) = *string;
+        break;
+    default:
+        return;
+    }
+}
+
+void cursesChannelRevert( void *arg, char *string )
+{
+    cursesFormRevert( arg, channelFormItems, channelFormItemCount, 
+                      channelSaveFunc );
+}
+
 
 void cursesChannelDisplay( void *arg )
 {
+    cursesFormDisplay( arg, channelFormItems, channelFormItemCount, 
+                       channelSaveFunc );
 }
 
 
