@@ -229,8 +229,6 @@ bool pluginUnload( char *name )
     return( true );
 }
 
-typedef void __attribute__((__may_alias__)) void_a;
-
 void pluginLoadItem( Plugin_t *plugin )
 {
     char                   *libfile;
@@ -251,7 +249,7 @@ void pluginLoadItem( Plugin_t *plugin )
 
     /* Clear any errors */
     dlerror();
-    *(void_a **)(&plugin->init) = dlsym( plugin->handle, "plugin_initialize" );
+    *(void **)(&plugin->init) = dlsym( plugin->handle, "plugin_initialize" );
     if( (error = dlerror()) != NULL ) {
         LogPrint( LOG_CRIT, "%s", error );
         return;

@@ -15,7 +15,7 @@ CFLAGS  += $(shell ${BOTNETCFG} --cflags)
 CFLAGS  += $(shell ${MYSQLCFG} --cflags)
 
 CFLAGS_regexp = $(shell ${PCRECFG} --cflags)
-CFLAGS_plugin_api = -DPLUGIN_PATH=\"${pkglibdir}\"
+CFLAGS_plugin_api = -DPLUGIN_PATH=\"${pkglibdir}\" -Wno-strict-aliasing
 CFLAGS_main = $(shell ${CURLCFG} --cflags)
 
 LDFLAGS = -g -rdynamic
