@@ -379,6 +379,30 @@ typedef enum {
 
 typedef void (*CursesFieldChangeFunc_t)(void *, char *);
 
+typedef enum {
+    FIELD_LABEL,
+    FIELD_FIELD,
+    FIELD_CHECKBOX,
+    FIELD_BUTTON
+} CursesFieldType_t;
+
+
+typedef struct {
+    CursesFieldType_t       type;
+    int                     startx;
+    int                     starty;
+    int                     width;
+    int                     height;
+    char                   *format;
+    int                     offset;
+    CursesFormatArg_t       offsetType;
+    int                     maxLen;
+    CursesFieldTypeType_t   fieldType;
+    CursesFieldTypeArgs_t   fieldArgs;
+    CursesFieldChangeFunc_t changeFunc;
+    void                   *changeFuncArg;
+} CursesFormItem_t;
+
 #endif
 
 /*

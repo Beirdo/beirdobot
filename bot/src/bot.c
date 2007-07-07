@@ -61,6 +61,7 @@ void *bot_server_thread(void *arg);
 void botSighup( int signum, void *arg );
 void serverStartTree( BalancedBTreeItem_t *node );
 bool serverKillTree( BalancedBTreeItem_t *node, bool ifVisited );
+void cursesServerRevert( void *arg, char *string );
 
 
 void ProcOnConnected(BN_PInfo I, const char HostName[])
@@ -1011,6 +1012,94 @@ void botSighup( int signum, void *arg )
         BalancedBTreeUnlock( server->channelName );
         LinkedListUnlock( server->channels );
     }
+}
+
+
+
+static CursesFormItem_t     serverFormItems[] = {
+    { FIELD_LABEL, 0, 0, 0, 0, "Server Number:  %d", 
+      OFFSETOF(serverId,IRCServer_t), FA_INTEGER, 0, FT_NONE, { 0 }, NULL, 
+      NULL },
+    { FIELD_LABEL, 0, 1, 0, 0, "Server:", -1, FA_NONE, 0, FT_NONE, { 0 }, NULL,
+      NULL },
+    { FIELD_FIELD, 16, 1, 32, 1, "%s", OFFSETOF(server,IRCServer_t), FA_STRING,
+      64, FT_NONE, { 0 }, NULL, NULL },
+    { FIELD_LABEL, 0, 2, 0, 0, "Port:", -1, FA_NONE, 0, FT_NONE, { 0 }, NULL, 
+      NULL },
+    { FIELD_FIELD, 16, 2, 6, 1, "%d", OFFSETOF(port,IRCServer_t), FA_INTEGER, 6,
+      FT_INTEGER, { .integerArgs = { 0, 1, 65535 } }, NULL, NULL },
+    { FIELD_LABEL, 0, 3, 0, 0, "Password:", -1, FA_NONE, 0, FT_NONE, { 0 }, 
+      NULL, NULL },
+    { FIELD_FIELD, 16, 3, 32, 1, "%s", OFFSETOF(password,IRCServer_t), 
+      FA_STRING, 64, FT_NONE, { 0 }, NULL, NULL },
+    { FIELD_LABEL, 0, 4, 0, 0, "Nick:", -1, FA_NONE, 0, FT_NONE, { 0 }, NULL, 
+      NULL },
+    { FIELD_FIELD, 16, 4, 32, 1, "%s", OFFSETOF(nick,IRCServer_t), FA_STRING, 
+      64, FT_NONE, { 0 }, NULL, NULL },
+    { FIELD_LABEL, 0, 5, 0, 0, "User Name:", -1, FA_NONE, 0, FT_NONE, { 0 }, 
+      NULL, NULL },
+    { FIELD_FIELD, 16, 5, 32, 1, "%s", OFFSETOF(username,IRCServer_t), 
+      FA_STRING, 64, FT_NONE, { 0 }, NULL, NULL },
+    { FIELD_LABEL, 0, 6, 0, 0, "Real Name:", -1, FA_NONE, 0, FT_NONE, { 0 }, 
+      NULL, NULL },
+    { FIELD_FIELD, 16, 6, 32, 1, "%s", OFFSETOF(realname,IRCServer_t), 
+      FA_STRING, 64, FT_NONE, { 0 }, NULL, NULL },
+    { FIELD_LABEL, 0, 7, 0, 0, "Nickserv Nick:", -1, FA_NONE, 0, FT_NONE, { 0 },
+      NULL, NULL },
+    { FIELD_FIELD, 16, 7, 32, 1, "%s", OFFSETOF(nickserv,IRCServer_t), 
+      FA_STRING, 64, FT_NONE, { 0 }, NULL, NULL },
+    { FIELD_LABEL, 0, 8, 0, 0, "Nickserv Msg:", -1, FA_NONE, 0, FT_NONE, { 0 },
+      NULL, NULL },
+    { FIELD_FIELD, 16, 8, 32, 1, "%s", OFFSETOF(nickservmsg,IRCServer_t), 
+      FA_STRING, 64, FT_NONE, { 0 }, NULL, NULL },
+    { FIELD_LABEL, 0, 9, 0, 0, "Flood Interval:", -1, FA_NONE, 0, FT_NONE, 
+      { 0 }, NULL, NULL },
+    { FIELD_FIELD, 16, 9, 20, 1, "%d", OFFSETOF(floodInterval,IRCServer_t), 
+      FA_INTEGER, 20, FT_INTEGER, { .integerArgs = { 0, 0, 0x7FFFFFFF } }, 
+      NULL, NULL },
+    { FIELD_LABEL, 0, 10, 0, 0, "Flood Max Time:", -1, FA_NONE, 0, FT_NONE, 
+      { 0 }, NULL, NULL },
+    { FIELD_FIELD, 16, 10, 20, 1, "%d", OFFSETOF(floodMaxTime,IRCServer_t), 
+      FA_INTEGER, 20, FT_INTEGER, { .integerArgs = { 0, 0, 0x7FFFFFFF } }, 
+      NULL, NULL },
+    { FIELD_LABEL, 0, 11, 0, 0, "Flood Buffer:", -1, FA_NONE, 0, FT_NONE, { 0 },
+      NULL, NULL },
+    { FIELD_FIELD, 16, 11, 20, 1, "%d", OFFSETOF(floodBuffer,IRCServer_t), 
+      FA_INTEGER, 20, FT_INTEGER, { .integerArgs = { 0, 0, 0x7FFFFFFF } }, 
+      NULL, NULL },
+    { FIELD_LABEL, 0, 12, 0, 0, "Flood Max Line:", -1, FA_NONE, 0, FT_NONE, 
+      { 0 }, NULL, NULL },
+    { FIELD_FIELD, 16, 12, 20, 1, "%d", OFFSETOF(floodMaxLine,IRCServer_t), 
+      FA_INTEGER, 20, FT_INTEGER, { .integerArgs = { 0, 0, 0x7FFFFFFF } }, 
+      NULL, NULL },
+    { FIELD_LABEL, 0, 13, 0, 0, "Enabled:", -1, FA_NONE, 0, FT_NONE, { 0 }, 
+      NULL, NULL },
+    { FIELD_CHECKBOX, 16, 13, 0, 0, "[%c]", OFFSETOF(enabled,IRCServer_t), 
+      FA_BOOL, 3, FT_NONE, { 0 }, NULL, NULL },
+    { FIELD_BUTTON, 2, 14, 0, 0, "Revert", -1, FA_NONE, 0, FT_NONE, { 0 }, 
+      cursesServerRevert, (void *)(-1) },
+    { FIELD_BUTTON, 10, 14, 0, 0, "Save", -1, FA_NONE, 0, FT_NONE, { 0 }, NULL,
+      NULL },
+    { FIELD_BUTTON, 16, 14, 0, 0, "Cancel", -1, FA_NONE, 0, FT_NONE, { 0 }, 
+      cursesCancel, NULL }
+};
+static int serverFormItemCount = NELEMENTS(serverFormItems);
+
+
+
+void cursesServerDisplay( void *arg )
+{
+    cursesFormDisplay( arg, serverFormItems, serverFormItemCount );
+}
+
+void cursesServerRevert( void *arg, char *string )
+{
+    cursesFormRevert( arg, serverFormItems, serverFormItemCount );
+}
+
+
+void cursesChannelDisplay( void *arg )
+{
 }
 
 

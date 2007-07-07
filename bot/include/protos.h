@@ -207,8 +207,11 @@ void cursesFormClear( void );
 void versionAdd( char *what, char *version );
 void versionRemove( char *what );
 
+void cursesFormDisplay( void *arg, CursesFormItem_t *items, int count );
+void cursesFormRevert( void *arg, CursesFormItem_t *items, int count );
 void cursesServerDisplay( void *arg );
 void cursesChannelDisplay( void *arg );
+void cursesCancel( void *arg, char *string );
 
 #endif
 
