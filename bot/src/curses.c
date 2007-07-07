@@ -241,6 +241,8 @@ typedef struct {
     FIELD                  *field;
     CursesFieldChangeFunc_t fieldChangeFunc;
     void                   *fieldChangeFuncArg;
+    CursesSaveFunc_t        saveFunc;
+    int                     index;
 } CursesField_t;
 
 LinkedList_t   *formList;
@@ -1500,7 +1502,8 @@ void cursesFormFieldAdd( int startx, int starty, int width, int height,
                          char *string, int maxLen, void *fieldType, 
                          CursesFieldTypeArgs_t *fieldArgs, 
                          CursesFieldChangeFunc_t changeFunc, 
-                         void *changeFuncArg )
+                         void *changeFuncArg, CursesSaveFunc_t saveFunc,
+                         int index )
 {
     CursesItem_t   *cursesItem;
     CursesField_t  *field;
@@ -1525,6 +1528,8 @@ void cursesFormFieldAdd( int startx, int starty, int width, int height,
     }
     field->fieldChangeFunc      = changeFunc;
     field->fieldChangeFuncArg   = changeFuncArg;
+    field->saveFunc             = saveFunc;
+    field->index                = index;
 
     LinkedListAdd( formList, (LinkedListItem_t *)field, UNLOCKED, AT_TAIL );
     detailsItemCount++;
@@ -1561,7 +1566,8 @@ void cursesFormLabelAdd( int startx, int starty, char *string )
 
 void cursesFormCheckboxAdd( int startx, int starty, bool enabled,
                             CursesFieldChangeFunc_t changeFunc,
-                            void *changeFuncArg )
+                            void *changeFuncArg, CursesSaveFunc_t saveFunc,
+                            int index )
 {
     CursesItem_t   *cursesItem;
     CursesField_t  *field;
@@ -1583,6 +1589,8 @@ void cursesFormCheckboxAdd( int startx, int starty, bool enabled,
     field->len       = strlen(field->string);
     field->fieldChangeFunc      = changeFunc;
     field->fieldChangeFuncArg   = changeFuncArg;
+    field->saveFunc             = saveFunc;
+    field->index                = index;
 
     LinkedListAdd( formList, (LinkedListItem_t *)field, UNLOCKED, AT_TAIL );
     detailsItemCount++;
@@ -1806,6 +1814,7 @@ void cursesFormRegenerate( void )
                 }
 
                 set_field_userptr( fieldItem->field, fieldItem );
+                set_field_status( fieldItem->field, FALSE );
 
                 set_field_back( fieldItem->field, A_UNDERLINE );
                 field_opts_off( fieldItem->field, O_AUTOSKIP );
@@ -1827,6 +1836,7 @@ void cursesFormRegenerate( void )
                 }
 
                 set_field_userptr( fieldItem->field, fieldItem );
+                set_field_status( fieldItem->field, FALSE );
 
                 set_field_back( fieldItem->field, A_UNDERLINE );
                 field_opts_off( fieldItem->field, O_AUTOSKIP );
@@ -2037,6 +2047,34 @@ void cursesCancel( void *arg, char *string )
     cursesFormClear();
 }
 
+void cursesSave( void *arg, char *string )
+{
+    LinkedListItem_t       *item;
+    CursesField_t          *fieldItem;
+    CursesSaveFunc_t        saveFunc = NULL;
+
+    LinkedListLock( formList );
+
+    for( item = formList->head; item; item = item->next ) {
+        fieldItem = (CursesField_t *)item;
+        if( (fieldItem->type == FIELD_FIELD || 
+             fieldItem->type == FIELD_CHECKBOX) && fieldItem->saveFunc ) {
+            if( field_status( fieldItem->field ) ) {
+                set_field_status( fieldItem->field, FALSE );
+                string = field_buffer( fieldItem->field, 0 );
+                fieldItem->saveFunc( arg, fieldItem->index, string );
+                saveFunc = fieldItem->saveFunc;
+            }
+        }
+    }
+
+    LinkedListUnlock( formList );
+
+    if( saveFunc ) {
+        saveFunc( arg, -1, "" );
+    }
+}
+
 void cursesNextPage( void *arg, char *string )
 {
     form_driver( detailsForm, REQ_NEXT_PAGE );
@@ -2070,7 +2108,8 @@ void cursesUpdateFormLabels( void )
     }
 }
 
-void cursesFormDisplay( void *arg, CursesFormItem_t *items, int count )
+void cursesFormDisplay( void *arg, CursesFormItem_t *items, int count,
+                        CursesSaveFunc_t saveFunc )
 {
     static char             buf[1024];
     CursesFormItem_t       *item;
@@ -2163,12 +2202,13 @@ void cursesFormDisplay( void *arg, CursesFormItem_t *items, int count )
             cursesFormFieldAdd( item->startx, item->starty, item->width,
                                 item->height, buf, item->maxLen, fieldtype,
                                 &item->fieldArgs, item->changeFunc,
-                                item->changeFuncArg );
+                                item->changeFuncArg, saveFunc, i );
             break;
         case FIELD_CHECKBOX:
             cursesFormCheckboxAdd( item->startx, item->starty,
                                    *(bool *)ATOFFSET(arg,item->offset),
-                                   item->changeFunc, item->changeFuncArg );
+                                   item->changeFunc, item->changeFuncArg,
+                                   saveFunc, i );
             break;
         case FIELD_BUTTON:
             buttonArg = (item->changeFuncArg == (void *)(-1) ?  arg : 
@@ -2180,7 +2220,8 @@ void cursesFormDisplay( void *arg, CursesFormItem_t *items, int count )
     }
 }
 
-void cursesFormRevert( void *arg, CursesFormItem_t *items, int count )
+void cursesFormRevert( void *arg, CursesFormItem_t *items, int count,
+                       CursesSaveFunc_t saveFunc )
 {
     FIELD          *field;
     CursesField_t  *fieldItem;
@@ -2190,7 +2231,7 @@ void cursesFormRevert( void *arg, CursesFormItem_t *items, int count )
 
     fieldItem->fieldChangeFunc = NULL;
     cursesFormClear();
-    cursesFormDisplay( arg, items, count );
+    cursesFormDisplay( arg, items, count, saveFunc );
     detailsForm = (void *)1;
 }
 

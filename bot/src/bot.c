@@ -1078,23 +1078,61 @@ static CursesFormItem_t     serverFormItems[] = {
       FA_BOOL, 3, FT_NONE, { 0 }, NULL, NULL },
     { FIELD_BUTTON, 2, 14, 0, 0, "Revert", -1, FA_NONE, 0, FT_NONE, { 0 }, 
       cursesServerRevert, (void *)(-1) },
-    { FIELD_BUTTON, 10, 14, 0, 0, "Save", -1, FA_NONE, 0, FT_NONE, { 0 }, NULL,
-      NULL },
+    { FIELD_BUTTON, 10, 14, 0, 0, "Save", -1, FA_NONE, 0, FT_NONE, { 0 }, 
+      cursesSave, (void *)(-1) },
     { FIELD_BUTTON, 16, 14, 0, 0, "Cancel", -1, FA_NONE, 0, FT_NONE, { 0 }, 
       cursesCancel, NULL }
 };
 static int serverFormItemCount = NELEMENTS(serverFormItems);
 
 
+void serverSaveFunc( void *arg, int index, char *string )
+{
+    CursesFormItem_t       *item;
+
+    if( index == -1 ) {
+        LogPrint( LOG_DEBUG, "server: %p - complete", arg );
+        return;
+    }
+
+    if( index < 0 || index >= serverFormItemCount ) {
+        return;
+    }
+    item = &serverFormItems[index];
+
+    if( item->offset == -1 ) {
+        return;
+    }
+
+    LogPrint( LOG_DEBUG, "server: %p, index %d, offset %d, string: \"%s\"", 
+              arg, index, item->offset, string );
+
+    switch( item->offsetType ) {
+    case FA_STRING:
+        free( *(char **)ATOFFSET(arg,item->offset) );
+        *(char **)ATOFFSET(arg,item->offset) = strdup( string );
+        break;
+    case FA_INTEGER:
+        *(int *)ATOFFSET(arg,item->offset) = atoi( string );
+        break;
+    case FA_BOOL:
+        *(bool *)ATOFFSET(arg,item->offset) = ( *string == 'X' ? TRUE : FALSE );
+        break;
+    default:
+        return;
+    }
+}
 
 void cursesServerDisplay( void *arg )
 {
-    cursesFormDisplay( arg, serverFormItems, serverFormItemCount );
+    cursesFormDisplay( arg, serverFormItems, serverFormItemCount, 
+                       serverSaveFunc );
 }
 
 void cursesServerRevert( void *arg, char *string )
 {
-    cursesFormRevert( arg, serverFormItems, serverFormItemCount );
+    cursesFormRevert( arg, serverFormItems, serverFormItemCount, 
+                      serverSaveFunc );
 }
 
 

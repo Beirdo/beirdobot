@@ -403,6 +403,8 @@ typedef struct {
     void                   *changeFuncArg;
 } CursesFormItem_t;
 
+typedef void (*CursesSaveFunc_t)(void *, int, char *);
+
 #endif
 
 /*

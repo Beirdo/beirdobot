@@ -190,15 +190,17 @@ void cursesDoSubMenu( void *arg );
 int cursesDetailsKeyhandle( int ch );
 int cursesFormKeyhandle( int ch );
 void cursesKeyhandleRegister( CursesKeyhandleFunc_t func );
+void cursesFormLabelAdd( int startx, int starty, char *string );
 void cursesFormFieldAdd( int startx, int starty, int width, int height, 
                          char *string, int maxLen, void *fieldType, 
                          CursesFieldTypeArgs_t *fieldArgs, 
                          CursesFieldChangeFunc_t changeFunc, 
-                         void *changeFuncArg );
-void cursesFormLabelAdd( int startx, int starty, char *string );
+                         void *changeFuncArg, CursesSaveFunc_t saveFunc,
+                         int index );
 void cursesFormCheckboxAdd( int startx, int starty, bool enabled,
                             CursesFieldChangeFunc_t changeFunc,
-                            void *changeFuncArg );
+                            void *changeFuncArg, CursesSaveFunc_t saveFunc,
+                            int index );
 void cursesFormButtonAdd( int startx, int starty, char *string,
                           CursesFieldChangeFunc_t changeFunc,
                           void *changeFuncArg );
@@ -207,11 +209,14 @@ void cursesFormClear( void );
 void versionAdd( char *what, char *version );
 void versionRemove( char *what );
 
-void cursesFormDisplay( void *arg, CursesFormItem_t *items, int count );
-void cursesFormRevert( void *arg, CursesFormItem_t *items, int count );
+void cursesFormDisplay( void *arg, CursesFormItem_t *items, int count,
+                        CursesSaveFunc_t saveFunc );
+void cursesFormRevert( void *arg, CursesFormItem_t *items, int count,
+                       CursesSaveFunc_t saveFunc );
 void cursesServerDisplay( void *arg );
 void cursesChannelDisplay( void *arg );
 void cursesCancel( void *arg, char *string );
+void cursesSave( void *arg, char *string );
 
 #endif
 
