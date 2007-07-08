@@ -503,6 +503,8 @@ void signal_death( int signum, siginfo_t *info, void *secret )
     /* Spew all remaining messages */
     LogFlushOutput();
 
+    cursesAtExit();
+
     /* Kill this thing HARD! */
     abort();
 }
@@ -593,6 +595,8 @@ void MainDelayExit( void )
 
     LogPrintNoArg(LOG_DEBUG, "Shutdown complete!" );
     LogFlushOutput();
+
+    cursesAtExit();
 
     /* And finally... die */
     _exit( 0 );

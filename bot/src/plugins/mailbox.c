@@ -90,6 +90,7 @@ typedef struct {
     char               *format;
     bool                enabled;
     bool                visited;
+    char               *menuText;
 } MailboxReport_t;
 
 typedef struct {
@@ -191,9 +192,14 @@ char *botMailboxDepthFirst( BalancedBTreeItem_t *item, IRCServer_t *server,
 char *mailboxShowDetails( Mailbox_t *mailbox );
 void mailboxUnvisitTree( BalancedBTreeItem_t *node );
 bool mailboxFlushUnvisited( BalancedBTreeItem_t *node );
+
 void mailboxSaveFunc( void *arg, int index, char *string );
 void cursesMailboxRevert( void *arg, char *string );
 void cursesMailboxDisplay( void *arg );
+
+void mailboxReportSaveFunc( void *arg, int index, char *string );
+void cursesMailboxReportRevert( void *arg, char *string );
+void cursesMailboxReportDisplay( void *arg );
 
 
 /* INTERNAL VARIABLES  */
@@ -291,6 +297,8 @@ void plugin_shutdown( void )
                 report = (MailboxReport_t *)mailbox->reports->head;
                 free( report->nick );
                 free( report->format );
+                cursesMenuItemRemove( 2, mailboxMenuId, report->menuText );
+                free( report->menuText );
                 LinkedListRemove( mailbox->reports, (LinkedListItem_t *)report,
                                   LOCKED );
                 free( report );
@@ -638,6 +646,8 @@ bool mailboxFlushUnvisited( BalancedBTreeItem_t *node )
                 report = (MailboxReport_t *)mailbox->reports->head;
                 free( report->nick );
                 free( report->format );
+                cursesMenuItemRemove( 2, mailboxMenuId, report->menuText );
+                free( report->menuText );
                 LinkedListRemove( mailbox->reports, (LinkedListItem_t *)report,
                                   LOCKED );
                 free( report );
@@ -673,6 +683,8 @@ bool mailboxFlushUnvisited( BalancedBTreeItem_t *node )
             if( !report->visited ) {
                 free( report->nick );
                 free( report->format );
+                cursesMenuItemRemove( 2, mailboxMenuId, report->menuText );
+                free( report->menuText );
                 LinkedListRemove( mailbox->reports, (LinkedListItem_t *)report,
                                   LOCKED );
                 free( report );
@@ -1166,6 +1178,7 @@ static void result_load_reports( MYSQL_RES *res, MYSQL_BIND *input,
     MailboxReport_t        *report;
     LinkedListItem_t       *rptItem;
     bool                    found;
+    char                   *menuText;
 
     mailbox = (Mailbox_t *)args;
     if( !mailbox ) {
@@ -1210,6 +1223,25 @@ static void result_load_reports( MYSQL_RES *res, MYSQL_BIND *input,
         report->format    = strdup(row[3]);
         report->enabled   = ( atoi(row[4]) == 0 ? FALSE : TRUE );
         report->visited   = TRUE;
+
+        menuText = (char *)malloc(64);
+        snprintf( menuText, 64, "Report S: %d, C: %d", 
+                  report->serverId, report->channelId );
+        if( found ) {
+            if( strcmp( menuText, report->menuText ) ) {
+                cursesMenuItemRemove( 2, mailboxMenuId, report->menuText );
+                free( report->menuText );
+                report->menuText = menuText;
+                cursesMenuItemAdd( 2, mailboxMenuId, report->menuText,
+                                   cursesMailboxReportDisplay, report );
+            } else {
+                free( menuText );
+            }
+        } else {
+            report->menuText = menuText;
+            cursesMenuItemAdd( 2, mailboxMenuId, report->menuText, 
+                               cursesMailboxReportDisplay, report );
+        }
 
         if( ChannelsLoaded ) {
             report->server  = FindServerNum( report->serverId );
@@ -1689,6 +1721,64 @@ void cursesMailboxDisplay( void *arg )
 {
     cursesFormDisplay( arg, mailboxFormItems, mailboxFormItemCount, 
                        mailboxSaveFunc );
+}
+
+
+static CursesFormItem_t mailboxReportFormItems[] = {
+    { FIELD_LABEL, 0, 0, 0, 0, "Server Number:", -1, FA_NONE, 0, FT_NONE, { 0 },
+      NULL, NULL },
+    { FIELD_FIELD, 16, 0, 20, 1, "%d", OFFSETOF(serverId,MailboxReport_t), 
+      FA_INTEGER, 20, FT_INTEGER, { .integerArgs = { 0, 1, 4000 } }, NULL, 
+      NULL },
+    { FIELD_LABEL, 0, 1, 0, 0, "Channel Number:", -1, FA_NONE, 0, FT_NONE, 
+      { 0 }, NULL, NULL },
+    { FIELD_FIELD, 16, 1, 20, 1, "%d", OFFSETOF(channelId,MailboxReport_t), 
+      FA_INTEGER, 20, FT_INTEGER, { .integerArgs = { 0, 1, 4000 } }, NULL, 
+      NULL },
+    { FIELD_LABEL, 0, 2, 0, 0, "Nick:", -1, FA_NONE, 0, FT_NONE, { 0 }, NULL,
+      NULL },
+    { FIELD_FIELD, 16, 2, 32, 1, "%s", OFFSETOF(nick,MailboxReport_t), 
+      FA_STRING, 64, FT_NONE, { 0 }, NULL, NULL },
+    { FIELD_LABEL, 0, 3, 0, 0, "Format:", -1, FA_NONE, 0, FT_NONE, { 0 }, NULL,
+      NULL },
+    { FIELD_FIELD, 16, 3, 32, 1, "%s", OFFSETOF(format,MailboxReport_t), 
+      FA_STRING, 64, FT_NONE, { 0 }, NULL, NULL },
+    { FIELD_LABEL, 0, 4, 0, 0, "Enabled:", -1, FA_NONE, 0, FT_NONE, { 0 },
+      NULL, NULL },
+    { FIELD_CHECKBOX, 16, 4, 0, 0, "[%c]", OFFSETOF(enabled,MailboxReport_t), 
+      FA_BOOL, 0, FT_NONE, { 0 }, NULL, NULL },
+    { FIELD_BUTTON, 2, 5, 0, 0, "Revert", -1, FA_NONE, 0, FT_NONE, { 0 },
+      cursesMailboxReportRevert, (void *)(-1) },
+    { FIELD_BUTTON, 10, 5, 0, 0, "Save", -1, FA_NONE, 0, FT_NONE, { 0 },
+      cursesSave, (void *)(-1) },
+    { FIELD_BUTTON, 16, 5, 0, 0, "Cancel", -1, FA_NONE, 0, FT_NONE, { 0 },
+      cursesCancel, NULL }
+};
+static int mailboxReportFormItemCount = NELEMENTS(mailboxReportFormItems);
+
+
+void mailboxReportSaveFunc( void *arg, int index, char *string )
+{
+    if( index == -1 ) {
+        LogPrint( LOG_DEBUG, "mailbox: %p - complete", arg );
+        return;
+    }
+
+    cursesSaveOffset( arg, index, mailboxReportFormItems, 
+                      mailboxReportFormItemCount, string );
+}
+
+void cursesMailboxReportRevert( void *arg, char *string )
+{
+    cursesFormRevert( arg, mailboxReportFormItems, mailboxReportFormItemCount, 
+                      mailboxReportSaveFunc );
+}
+
+
+void cursesMailboxReportDisplay( void *arg )
+{
+    cursesFormDisplay( arg, mailboxReportFormItems, mailboxReportFormItemCount, 
+                       mailboxReportSaveFunc );
 }
 
 

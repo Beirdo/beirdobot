@@ -53,6 +53,7 @@ QueueObject_t  *CursesQ;
 QueueObject_t  *CursesLogQ;
 pthread_t       cursesInThreadId;
 pthread_t       cursesOutThreadId;
+bool            cursesExited = FALSE;
 
 WINDOW         *winFull;
 WINDOW         *winHeader;
@@ -87,7 +88,6 @@ void cursesSubmenuRegenerate( int menuId, BalancedBTree_t *tree );
 void cursesItemAdd( ITEM **items, BalancedBTree_t *tree, int start );
 int cursesItemAddRecurse( ITEM **items, BalancedBTreeItem_t *node, int start );
 void cursesSubmenuAddAll( BalancedBTreeItem_t *node );
-void cursesAtExit( void );
 void cursesReloadScreen( void );
 void cursesWindowClear( CursesWindow_t window );
 void cursesUpdateLines( void );
@@ -909,6 +909,12 @@ void cursesReloadScreen( void )
 void cursesAtExit( void )
 {
     int         x, y;
+
+    if( cursesExited ) {
+        return;
+    }
+
+    cursesExited = TRUE;
     curs_set(1);
     echo();
     nl();

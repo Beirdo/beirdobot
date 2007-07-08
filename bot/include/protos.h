@@ -221,6 +221,7 @@ void cursesSaveOffset( void *arg, int index, CursesFormItem_t *items,
                        int itemCount, char *string );
 
 void cursesPluginDisplay( void *arg );
+void cursesAtExit( void );
 
 #endif
 
