@@ -2250,6 +2250,45 @@ void cursesFormRevert( void *arg, CursesFormItem_t *items, int count,
     detailsForm = (void *)1;
 }
 
+void cursesSaveOffset( void *arg, int index, CursesFormItem_t *items,
+                       int itemCount, char *string )
+{
+    CursesFormItem_t       *item;
+
+    if( index < 0 || index >= itemCount ) {
+        return;
+    }
+    item = &items[index];
+
+    if( item->offset == -1 ) {
+        return;
+    }
+
+    LogPrint( LOG_DEBUG, "arg: %p, index %d, offset %d, string: \"%s\"", 
+              arg, index, item->offset, string );
+
+    switch( item->offsetType ) {
+    case FA_STRING:
+        free( ATOFFSET(arg, item->offset, char *) );
+        ATOFFSET(arg, item->offset, char *) = strdup( string );
+        break;
+    case FA_INTEGER:
+        ATOFFSET(arg, item->offset, int) = atoi( string );
+        break;
+    case FA_BOOL:
+        ATOFFSET(arg, item->offset, bool) = ( *string == 'X' ? TRUE : FALSE );
+        break;
+    case FA_CHAR:
+        ATOFFSET(arg, item->offset, char) = *string;
+        break;
+    case FA_SERVER:
+        ATOFFSET(arg, item->offset, IRCServer_t *) = 
+                                                 FindServerNum( atoi(string) );
+        break;
+    default:
+        return;
+    }
+}
 
 /*
  * vim:ts=4:sw=4:ai:et:si:sts=4

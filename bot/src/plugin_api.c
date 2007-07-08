@@ -54,6 +54,7 @@ void botCmdPlugin( IRCServer_t *server, IRCChannel_t *channel, char *who,
 void pluginUnloadTree( BalancedBTreeItem_t *node );
 void pluginUnvisitTree( BalancedBTreeItem_t *node );
 bool pluginFlushUnvisited( BalancedBTreeItem_t *node );
+void pluginSaveFunc( void *arg, int index, char *string );
 
 BalancedBTree_t *pluginTree;
 
@@ -368,6 +369,10 @@ void botCmdPlugin( IRCServer_t *server, IRCChannel_t *channel, char *who,
 
 void pluginUnloadAll( void )
 {
+    if( !pluginTree ) {
+        return;
+    }
+
     BalancedBTreeLock( pluginTree );
     pluginUnloadTree( pluginTree->root );
     BalancedBTreeUnlock( pluginTree );
@@ -391,6 +396,45 @@ void pluginUnloadTree( BalancedBTreeItem_t *node )
 
     pluginUnloadTree( node->right );
 }
+
+static CursesFormItem_t pluginFormItems[] = {
+    { FIELD_LABEL, 1, 1, 0, 0, "Enabled:", -1, FA_NONE, 0, FT_NONE, { 0 },
+      NULL, NULL },
+    { FIELD_CHECKBOX, 12, 1, 0, 0, "[%c]", OFFSETOF(preload,Plugin_t), FA_BOOL,
+      3, FT_NONE, { 0 }, NULL, NULL },
+    { FIELD_BUTTON, 4, 3, 0, 0, "Save", -1, FA_NONE, 0, FT_NONE, { 0 }, 
+      cursesSave, (void *)(-1) },
+    { FIELD_BUTTON, 9, 3, 0, 0, "Cancel", -1, FA_NONE, 0, FT_NONE, { 0 },
+      cursesCancel, NULL }
+};
+static int pluginFormItemCount = NELEMENTS(pluginFormItems);
+
+void cursesPluginDisplay( void *arg )
+{
+    cursesFormDisplay( arg, pluginFormItems, pluginFormItemCount,
+                       pluginSaveFunc );
+}
+
+void pluginSaveFunc( void *arg, int index, char *string )
+{
+    Plugin_t               *plugin;
+
+    plugin = (Plugin_t *)arg;
+
+    if( index == -1 ) {
+        LogPrint( LOG_DEBUG, "plugin: %p - complete", arg );
+        if( plugin->preload && !plugin->loaded ) {
+            pluginLoadItem( plugin );
+        } else if( !plugin->preload && plugin->loaded ) {
+            pluginUnloadItem( plugin );
+        }
+        return;
+    }
+
+    cursesSaveOffset( arg, index, pluginFormItems, pluginFormItemCount, 
+                      string );
+}
+
 
 /*
  * vim:ts=4:sw=4:ai:et:si:sts=4

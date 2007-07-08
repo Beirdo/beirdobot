@@ -1091,46 +1091,13 @@ static int serverFormItemCount = NELEMENTS(serverFormItems);
 
 void serverSaveFunc( void *arg, int index, char *string )
 {
-    CursesFormItem_t       *item;
-
     if( index == -1 ) {
         LogPrint( LOG_DEBUG, "server: %p - complete", arg );
         return;
     }
 
-    if( index < 0 || index >= serverFormItemCount ) {
-        return;
-    }
-    item = &serverFormItems[index];
-
-    if( item->offset == -1 ) {
-        return;
-    }
-
-    LogPrint( LOG_DEBUG, "server: %p, index %d, offset %d, string: \"%s\"", 
-              arg, index, item->offset, string );
-
-    switch( item->offsetType ) {
-    case FA_STRING:
-        free( ATOFFSET(arg, item->offset, char *) );
-        ATOFFSET(arg, item->offset, char *) = strdup( string );
-        break;
-    case FA_INTEGER:
-        ATOFFSET(arg, item->offset, int) = atoi( string );
-        break;
-    case FA_BOOL:
-        ATOFFSET(arg, item->offset, bool) = ( *string == 'X' ? TRUE : FALSE );
-        break;
-    case FA_CHAR:
-        ATOFFSET(arg, item->offset, char) = *string;
-        break;
-    case FA_SERVER:
-        ATOFFSET(arg, item->offset, IRCServer_t *) = 
-                                                 FindServerNum( atoi(string) );
-        break;
-    default:
-        return;
-    }
+    cursesSaveOffset( arg, index, serverFormItems, serverFormItemCount,
+                      string );
 }
 
 void cursesServerDisplay( void *arg )
@@ -1185,46 +1152,13 @@ static int channelFormItemCount = NELEMENTS(channelFormItems);
 
 void channelSaveFunc( void *arg, int index, char *string )
 {
-    CursesFormItem_t       *item;
-
     if( index == -1 ) {
         LogPrint( LOG_DEBUG, "channel: %p - complete", arg );
         return;
     }
 
-    if( index < 0 || index >= channelFormItemCount ) {
-        return;
-    }
-    item = &channelFormItems[index];
-
-    if( item->offset == -1 ) {
-        return;
-    }
-
-    LogPrint( LOG_DEBUG, "channel: %p, index %d, offset %d, string: \"%s\"", 
-              arg, index, item->offset, string );
-
-    switch( item->offsetType ) {
-    case FA_STRING:
-        free( ATOFFSET(arg, item->offset, char *) );
-        ATOFFSET(arg, item->offset, char *) = strdup( string );
-        break;
-    case FA_INTEGER:
-        ATOFFSET(arg, item->offset, int) = atoi( string );
-        break;
-    case FA_BOOL:
-        ATOFFSET(arg, item->offset, bool) = ( *string == 'X' ? TRUE : FALSE );
-        break;
-    case FA_CHAR:
-        ATOFFSET(arg, item->offset, char) = *string;
-        break;
-    case FA_SERVER:
-        ATOFFSET(arg, item->offset, IRCServer_t *) = 
-                                                 FindServerNum( atoi(string) );
-        break;
-    default:
-        return;
-    }
+    cursesSaveOffset( arg, index, channelFormItems, channelFormItemCount,
+                      string );
 }
 
 void cursesChannelRevert( void *arg, char *string )

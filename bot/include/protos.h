@@ -217,6 +217,10 @@ void cursesServerDisplay( void *arg );
 void cursesChannelDisplay( void *arg );
 void cursesCancel( void *arg, char *string );
 void cursesSave( void *arg, char *string );
+void cursesSaveOffset( void *arg, int index, CursesFormItem_t *items,
+                       int itemCount, char *string );
+
+void cursesPluginDisplay( void *arg );
 
 #endif
 
