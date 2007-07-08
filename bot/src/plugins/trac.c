@@ -82,6 +82,9 @@ static size_t tracMemorizeFile(void *ptr, size_t size, size_t nmemb,
 void tracTicketCsv( BalancedBTree_t *tree, char *page );
 bool tracFlushUnvisited( BalancedBTreeItem_t *node );
 void tracUnvisitTree( BalancedBTreeItem_t *node );
+void tracSaveFunc( void *arg, int index, char *string );
+void cursesTracDisplay( void *arg );
+void cursesTracRevert( void *arg, char *string );
 
 /* CVS generated ID string */
 static char ident[] _UNUSED_ = 
@@ -574,14 +577,15 @@ static void result_load_channel_regexp( MYSQL_RES *res, MYSQL_BIND *input,
                 cursesMenuItemRemove( 2, tracMenuId, tracItem->menuText );
                 free( tracItem->menuText );
                 tracItem->menuText = menuText;
-                cursesMenuItemAdd( 2, tracMenuId, tracItem->menuText, NULL, 
-                                   NULL );
+                cursesMenuItemAdd( 2, tracMenuId, tracItem->menuText, 
+                                   cursesTracDisplay, tracItem );
             } else {
                 free( menuText );
             }
         } else {
             tracItem->menuText = menuText;
-            cursesMenuItemAdd( 2, tracMenuId, tracItem->menuText, NULL, NULL );
+            cursesMenuItemAdd( 2, tracMenuId, tracItem->menuText, 
+                               cursesTracDisplay, tracItem );
         }
 
         if( found && oldEnabled && !tracItem->enabled ) {
@@ -1154,6 +1158,70 @@ void tracTicketCsv( BalancedBTree_t *tree, char *page )
 
     BalancedBTreeAdd( tree, NULL, LOCKED, TRUE );
 }
+
+static CursesFormItem_t tracFormItems[] = {
+    { FIELD_LABEL, 0, 0, 0, 0, "Server Number:", -1, FA_NONE, 0, FT_NONE, 
+      { 0 }, NULL, NULL },
+    { FIELD_FIELD, 16, 0, 20, 1, "%d", OFFSETOF(serverId,TracURL_t), FA_INTEGER,
+      20, FT_INTEGER, { .integerArgs = { 0, 1,  4000 } }, NULL, NULL },
+    { FIELD_LABEL, 0, 1, 0, 0, "Channel Number:", -1, FA_NONE, 0, FT_NONE, 
+      { 0 }, NULL, NULL },
+    { FIELD_FIELD, 16, 1, 20, 1, "%d", OFFSETOF(chanId,TracURL_t), FA_INTEGER,
+      20, FT_INTEGER, { .integerArgs = { 0, 1,  4000 } }, NULL, NULL },
+    { FIELD_LABEL, 0, 2, 0, 0, "Trac URL:", -1, FA_NONE, 0, FT_NONE, { 0 }, 
+      NULL, NULL },
+    { FIELD_FIELD, 16, 2, 32, 1, "%s", OFFSETOF(url,TracURL_t), FA_STRING, 255,
+      FT_NONE, { 0 }, NULL, NULL },
+    { FIELD_LABEL, 0, 3, 0, 0, "SVN URL:", -1, FA_NONE, 0, FT_NONE, { 0 }, 
+      NULL, NULL },
+    { FIELD_FIELD, 16, 3, 32, 1, "%s", OFFSETOF(svnUrl,TracURL_t), FA_STRING, 
+      255, FT_NONE, { 0 }, NULL, NULL },
+    { FIELD_LABEL, 0, 4, 0, 0, "SVN User:", -1, FA_NONE, 0, FT_NONE, { 0 },
+      NULL, NULL },
+    { FIELD_FIELD, 16, 4, 32, 1, "%s", OFFSETOF(svnUser,TracURL_t), FA_STRING,
+      64, FT_NONE, { 0 }, NULL, NULL },
+    { FIELD_LABEL, 0, 5, 0, 0, "SVN Password:", -1, FA_NONE, 0, FT_NONE, { 0 },
+      NULL, NULL },
+    { FIELD_FIELD, 16, 5, 32, 1, "%s", OFFSETOF(svnPasswd,TracURL_t), FA_STRING,
+      64, FT_NONE, { 0 }, NULL, NULL },
+    { FIELD_LABEL, 0, 6, 0, 0, "Enabled:", -1, FA_NONE, 0, FT_NONE, { 0 },
+      NULL, NULL },
+    { FIELD_CHECKBOX, 16, 6, 0, 0, "[%c]", OFFSETOF(enabled,TracURL_t), 
+      FA_BOOL, 0, FT_NONE, { 0 }, NULL, NULL },
+    { FIELD_BUTTON, 2, 7, 0, 0, "Revert", -1, FA_NONE, 0, FT_NONE, { 0 },
+      cursesTracRevert, (void *)(-1) },
+    { FIELD_BUTTON, 10, 7, 0, 0, "Save", -1, FA_NONE, 0, FT_NONE, { 0 },
+      cursesSave, (void *)(-1) },
+    { FIELD_BUTTON, 16, 7, 0, 0, "Cancel", -1, FA_NONE, 0, FT_NONE, { 0 },
+      cursesCancel, NULL }
+};
+static int tracFormItemCount = NELEMENTS(tracFormItems);
+
+
+void tracSaveFunc( void *arg, int index, char *string )
+{
+    if( index == -1 ) {
+        LogPrint( LOG_DEBUG, "trac: %p - complete", arg );
+        return;
+    }
+
+    cursesSaveOffset( arg, index, tracFormItems, tracFormItemCount,
+                      string );
+}
+
+void cursesTracRevert( void *arg, char *string )
+{
+    cursesFormRevert( arg, tracFormItems, tracFormItemCount, 
+                      tracSaveFunc );
+}
+
+
+void cursesTracDisplay( void *arg )
+{
+    cursesFormDisplay( arg, tracFormItems, tracFormItemCount, 
+                       tracSaveFunc );
+}
+
 
 /*
  * vim:ts=4:sw=4:ai:et:si:sts=4
