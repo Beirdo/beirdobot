@@ -420,7 +420,6 @@ void *curses_output_thread( void *arg )
     double              logPerLine;
 
     scrolledBack = FALSE;
-    atexit( cursesAtExit );
 
     LogPrintNoArg( LOG_NOTICE, "Starting curses output thread" );
 
@@ -859,7 +858,6 @@ void *curses_output_thread( void *arg )
     }
 
     LogPrintNoArg( LOG_NOTICE, "Ending curses output thread" );
-    cursesAtExit();
     return(NULL);
 }
 
@@ -918,6 +916,7 @@ void cursesAtExit( void )
     curs_set(1);
     echo();
     nl();
+    wrefresh( winFull );
     getmaxyx( winFull, y, x );
     wmove( winFull, y, 0 );
     wdeleteln( winFull );
