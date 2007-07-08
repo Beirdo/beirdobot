@@ -104,7 +104,7 @@ typedef unsigned long long int uint64;
 #define OFFSETOF(elem,StructType)   ((char *)&(((StructType *)NULL)->elem) - \
                                        (char *)((StructType *)NULL))
 #define ELEMSIZE(elem,StructType)   (sizeof(((StructType *)NULL)->elem))
-#define ATOFFSET(x,offset)          ((void *)&(((char *)(x))[(offset)]) )
+#define ATOFFSET(x,offset,type)     (*((type *)&(((char *)(x))[(offset)])))
 #define FORCE_UINT32(x)             (*(uint32 *)&(x))
 
 #define MAX_STRING_LENGTH           1024

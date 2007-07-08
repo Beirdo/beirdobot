@@ -2129,19 +2129,23 @@ void cursesFormDisplay( void *arg, CursesFormItem_t *items, int count,
                 switch( item->offsetType ) {
                 case FA_STRING:
                     snprintf( buf, 1024, item->format,
-                              *(char **)ATOFFSET(arg,item->offset) );
+                              ATOFFSET(arg, item->offset, char *) );
                     break;
                 case FA_INTEGER:
                     snprintf( buf, 1024, item->format,
-                              *(int *)ATOFFSET(arg,item->offset) );
+                              ATOFFSET(arg, item->offset, int) );
                     break;
                 case FA_BOOL:
                     snprintf( buf, 1024, item->format,
-                              *(bool *)ATOFFSET(arg,item->offset) );
+                              ATOFFSET(arg, item->offset, bool) );
                     break;
                 case FA_CHAR:
                     snprintf( buf, 1024, item->format,
-                              *(char *)ATOFFSET(arg,item->offset) );
+                              ATOFFSET(arg, item->offset, char) );
+                    break;
+                case FA_SERVER:
+                    snprintf( buf, 1024, item->format,
+                        ATOFFSET(arg, item->offset, IRCServer_t *)->serverId );
                     break;
                 default:
                     buf[0] = '\0';
@@ -2155,25 +2159,29 @@ void cursesFormDisplay( void *arg, CursesFormItem_t *items, int count,
             if( item->maxLen == 0 ) {
                 len = 1024;
             } else {
-                len = MIN(1024, item->maxLen);
+                len = MIN(1024, item->maxLen + 1);
             }
 
             switch( item->offsetType ) {
             case FA_STRING:
-                snprintf( buf, 1024, item->format,
-                          *(char **)ATOFFSET(arg,item->offset) );
+                snprintf( buf, len, item->format,
+                          ATOFFSET(arg, item->offset, char *) );
                 break;
             case FA_INTEGER:
-                snprintf( buf, 1024, item->format,
-                          *(int *)ATOFFSET(arg,item->offset) );
+                snprintf( buf, len, item->format,
+                          ATOFFSET(arg, item->offset, int) );
                 break;
             case FA_BOOL:
-                snprintf( buf, 1024, item->format,
-                          *(bool *)ATOFFSET(arg,item->offset) );
+                snprintf( buf, len, item->format,
+                          ATOFFSET(arg, item->offset, bool) );
                 break;
             case FA_CHAR:
-                snprintf( buf, 1024, item->format,
-                          *(char *)ATOFFSET(arg,item->offset) );
+                snprintf( buf, len, item->format,
+                          ATOFFSET(arg, item->offset, char) );
+                break;
+            case FA_SERVER:
+                snprintf( buf, len, item->format,
+                        ATOFFSET(arg, item->offset, IRCServer_t *)->serverId );
                 break;
             default:
                 buf[0] = '\0';
@@ -2214,7 +2222,7 @@ void cursesFormDisplay( void *arg, CursesFormItem_t *items, int count,
             break;
         case FIELD_CHECKBOX:
             cursesFormCheckboxAdd( item->startx, item->starty,
-                                   *(bool *)ATOFFSET(arg,item->offset),
+                                   ATOFFSET(arg, item->offset, bool),
                                    item->changeFunc, item->changeFuncArg,
                                    saveFunc, i );
             break;
