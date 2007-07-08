@@ -159,6 +159,9 @@ char *botRssfeedDump( BalancedBTreeItem_t *item );
 char *rssfeedShowDetails( RssFeed_t *feed );
 void rssfeedUnvisitTree( BalancedBTreeItem_t *node );
 bool rssfeedFlushUnvisited( BalancedBTreeItem_t *node );
+void rssfeedSaveFunc( void *arg, int index, char *string );
+void cursesRssfeedRevert( void *arg, char *string );
+void cursesRssfeedDisplay( void *arg );
 
 
 /* INTERNAL VARIABLES  */
@@ -874,14 +877,15 @@ static void result_load_rssfeeds( MYSQL_RES *res, MYSQL_BIND *input,
                 cursesMenuItemRemove( 2, rssfeedMenuId, data->menuText );
                 free( data->menuText );
                 data->menuText = menuText;
-                cursesMenuItemAdd( 2, rssfeedMenuId, data->menuText, NULL, 
-                                   NULL );
+                cursesMenuItemAdd( 2, rssfeedMenuId, data->menuText, 
+                                   cursesRssfeedDisplay, data );
             } else {
                 free( menuText );
             }
         } else {
             data->menuText = menuText;
-            cursesMenuItemAdd( 2, rssfeedMenuId, data->menuText, NULL, NULL );
+            cursesMenuItemAdd( 2, rssfeedMenuId, data->menuText, 
+                               cursesRssfeedDisplay, data );
         }
         
         if( ChannelsLoaded ) {
@@ -1102,6 +1106,93 @@ char *rssfeedShowDetails( RssFeed_t *feed )
     message = strdup(buf);
     return( message );
 }
+
+static CursesFormItem_t rssfeedFormItems[] = {
+    { FIELD_LABEL, 0, 0, 0, 0, "RSSFeed Number: %d", 
+      OFFSETOF(feedId,RssFeed_t), FA_INTEGER, 0, FT_NONE, { 0 }, NULL, NULL },
+    { FIELD_LABEL, 0, 1, 0, 0, "Server Number:", -1, FA_NONE, 0, FT_NONE, 
+      { 0 }, NULL, NULL },
+    { FIELD_FIELD, 16, 1, 20, 1, "%d", OFFSETOF(serverId,RssFeed_t), FA_INTEGER,
+      20, FT_INTEGER, { .integerArgs = { 0, 1,  4000 } }, NULL, NULL },
+    { FIELD_LABEL, 0, 2, 0, 0, "Channel Number:", -1, FA_NONE, 0, FT_NONE, 
+      { 0 }, NULL, NULL },
+    { FIELD_FIELD, 16, 2, 20, 1, "%d", OFFSETOF(chanId,RssFeed_t), FA_INTEGER,
+      20, FT_INTEGER, { .integerArgs = { 0, 1,  4000 } }, NULL, NULL },
+    { FIELD_LABEL, 0, 3, 0, 0, "Feed URL:", -1, FA_NONE, 0, FT_NONE, { 0 }, 
+      NULL, NULL },
+    { FIELD_FIELD, 16, 3, 32, 1, "%s", OFFSETOF(url,RssFeed_t), FA_STRING, 255,
+      FT_NONE, { 0 }, NULL, NULL },
+    { FIELD_LABEL, 0, 4, 0, 0, "User:Password:", -1, FA_NONE, 0, FT_NONE, { 0 },
+      NULL, NULL },
+    { FIELD_FIELD, 16, 4, 32, 1, "%s", OFFSETOF(userpass,RssFeed_t), FA_STRING,
+      64, FT_NONE, { 0 }, NULL, NULL },
+    { FIELD_LABEL, 0, 5, 0, 0, "Authent. Type:", -1, FA_NONE, 0, FT_NONE, { 0 },
+      NULL, NULL },
+    { FIELD_FIELD, 16, 5, 20, 1, "0x%lX", OFFSETOF(authtype,RssFeed_t), 
+      FA_LONG_INTEGER_HEX, 20, FT_NONE, { 0 }, NULL, NULL },
+    { FIELD_LABEL, 0, 6, 0, 0, "Prefix:", -1, FA_NONE, 0, FT_NONE, { 0 },
+      NULL, NULL },
+    { FIELD_FIELD, 16, 6, 32, 1, "%s", OFFSETOF(prefix,RssFeed_t), FA_STRING,
+      32, FT_NONE, { 0 }, NULL, NULL },
+    { FIELD_LABEL, 0, 7, 0, 0, "Poll Interval:", -1, FA_NONE, 0, FT_NONE, 
+      { 0 }, NULL, NULL },
+    { FIELD_FIELD, 16, 7, 20, 1, "%ld", OFFSETOF(timeout,RssFeed_t), FA_TIME_T,
+      20, FT_INTEGER, { .integerArgs = { 0, 60, 86400 } }, NULL, NULL },
+    { FIELD_LABEL, 0, 8, 0, 0, "Time Spec.:", -1, FA_NONE, 0, FT_NONE, { 0 },
+      NULL, NULL },
+    { FIELD_FIELD, 16, 8, 32, 1, "%s", OFFSETOF(timeSpec,RssFeed_t), FA_STRING,
+      64, FT_NONE, { 0 }, NULL, NULL },
+    { FIELD_LABEL, 0, 9, 0, 0, "Time Offset:", -1, FA_NONE, 0, FT_NONE, { 0 },
+      NULL, NULL },
+    { FIELD_FIELD, 16, 9, 20, 1, "%d", OFFSETOF(offset,RssFeed_t), 
+      FA_LONG_INTEGER, 20, FT_INTEGER, { .integerArgs = { 0, -43200, 43200 } }, 
+      NULL, NULL },
+    { FIELD_LABEL, 0, 10, 0, 0, "Enabled:", -1, FA_NONE, 0, FT_NONE, { 0 },
+      NULL, NULL },
+    { FIELD_CHECKBOX, 16, 10, 0, 0, "[%c]", OFFSETOF(enabled,RssFeed_t), 
+      FA_BOOL, 0, FT_NONE, { 0 }, NULL, NULL },
+    { FIELD_LABEL, 0, 11, 0, 0, "Last Post:", -1, FA_NONE, 0, FT_NONE, { 0 },
+      NULL, NULL },
+    { FIELD_LABEL, 16, 11, 0, 0, "%s", OFFSETOF(lastPost,RssFeed_t), 
+      FA_TIMESTAMP, 0, FT_NONE, { 0 }, NULL, NULL },
+    { FIELD_LABEL, 0, 12, 0, 0, "Next Poll:", -1, FA_NONE, 0, FT_NONE, { 0 }, 
+      NULL, NULL },
+    { FIELD_LABEL, 16, 12, 0, 0, "%s", OFFSETOF(nextpoll,RssFeed_t), 
+      FA_TIMESTAMP, 0, FT_NONE, { 0 }, NULL, NULL },
+    { FIELD_BUTTON, 2, 13, 0, 0, "Revert", -1, FA_NONE, 0, FT_NONE, { 0 },
+      cursesRssfeedRevert, (void *)(-1) },
+    { FIELD_BUTTON, 10, 13, 0, 0, "Save", -1, FA_NONE, 0, FT_NONE, { 0 },
+      cursesSave, (void *)(-1) },
+    { FIELD_BUTTON, 16, 13, 0, 0, "Cancel", -1, FA_NONE, 0, FT_NONE, { 0 },
+      cursesCancel, NULL }
+};
+static int rssfeedFormItemCount = NELEMENTS(rssfeedFormItems);
+
+
+void rssfeedSaveFunc( void *arg, int index, char *string )
+{
+    if( index == -1 ) {
+        LogPrint( LOG_DEBUG, "rssfeed: %p - complete", arg );
+        return;
+    }
+
+    cursesSaveOffset( arg, index, rssfeedFormItems, rssfeedFormItemCount,
+                      string );
+}
+
+void cursesRssfeedRevert( void *arg, char *string )
+{
+    cursesFormRevert( arg, rssfeedFormItems, rssfeedFormItemCount, 
+                      rssfeedSaveFunc );
+}
+
+
+void cursesRssfeedDisplay( void *arg )
+{
+    cursesFormDisplay( arg, rssfeedFormItems, rssfeedFormItemCount, 
+                       rssfeedSaveFunc );
+}
+
 
 /*
  * vim:ts=4:sw=4:ai:et:si:sts=4

@@ -2143,6 +2143,15 @@ void cursesFormDisplay( void *arg, CursesFormItem_t *items, int count,
                     snprintf( buf, 1024, item->format,
                               ATOFFSET(arg, item->offset, int) );
                     break;
+                case FA_LONG_INTEGER:
+                case FA_LONG_INTEGER_HEX:
+                    snprintf( buf, 1024, item->format,
+                              ATOFFSET(arg, item->offset, long int) );
+                    break;
+                case FA_TIME_T:
+                    snprintf( buf, 1024, item->format,
+                              ATOFFSET(arg, item->offset, time_t) );
+                    break;
                 case FA_BOOL:
                     snprintf( buf, 1024, item->format,
                               ATOFFSET(arg, item->offset, bool) );
@@ -2183,6 +2192,15 @@ void cursesFormDisplay( void *arg, CursesFormItem_t *items, int count,
             case FA_INTEGER:
                 snprintf( buf, len, item->format,
                           ATOFFSET(arg, item->offset, int) );
+                break;
+            case FA_LONG_INTEGER:
+            case FA_LONG_INTEGER_HEX:
+                snprintf( buf, len, item->format,
+                          ATOFFSET(arg, item->offset, long int) );
+                break;
+            case FA_TIME_T:
+                snprintf( buf, len, item->format,
+                          ATOFFSET(arg, item->offset, time_t) );
                 break;
             case FA_BOOL:
                 snprintf( buf, len, item->format,
@@ -2291,10 +2309,23 @@ void cursesSaveOffset( void *arg, int index, CursesFormItem_t *items,
     switch( item->offsetType ) {
     case FA_STRING:
         free( ATOFFSET(arg, item->offset, char *) );
-        ATOFFSET(arg, item->offset, char *) = strdup( string );
+        if( !strcasecmp(string, "(NULL)") ) {
+            ATOFFSET(arg, item->offset, char *) = NULL;
+        } else {
+            ATOFFSET(arg, item->offset, char *) = strdup( string );
+        }
         break;
     case FA_INTEGER:
         ATOFFSET(arg, item->offset, int) = atoi( string );
+        break;
+    case FA_LONG_INTEGER:
+        ATOFFSET(arg, item->offset, long int) = atol( string );
+        break;
+    case FA_LONG_INTEGER_HEX:
+        ATOFFSET(arg, item->offset, long int) = strtol( string, NULL, 16 );
+        break;
+    case FA_TIME_T:
+        ATOFFSET(arg, item->offset, time_t) = atol( string );
         break;
     case FA_BOOL:
         ATOFFSET(arg, item->offset, bool) = ( *string == 'X' ? TRUE : FALSE );
