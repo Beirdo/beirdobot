@@ -191,6 +191,9 @@ char *botMailboxDepthFirst( BalancedBTreeItem_t *item, IRCServer_t *server,
 char *mailboxShowDetails( Mailbox_t *mailbox );
 void mailboxUnvisitTree( BalancedBTreeItem_t *node );
 bool mailboxFlushUnvisited( BalancedBTreeItem_t *node );
+void mailboxSaveFunc( void *arg, int index, char *string );
+void cursesMailboxRevert( void *arg, char *string );
+void cursesMailboxDisplay( void *arg );
 
 
 /* INTERNAL VARIABLES  */
@@ -1057,15 +1060,15 @@ static void result_load_mailboxes( MYSQL_RES *res, MYSQL_BIND *input,
                 cursesMenuItemRemove( 2, mailboxMenuId, mailbox->menuText );
                 free( mailbox->menuText );
                 mailbox->menuText = menuText;
-                cursesMenuItemAdd( 2, mailboxMenuId, mailbox->menuText, NULL,
-                                   NULL );
+                cursesMenuItemAdd( 2, mailboxMenuId, mailbox->menuText,
+                                   cursesMailboxDisplay, mailbox );
             } else {
                 free( menuText );
             }
         } else {
             mailbox->menuText = menuText;
-            cursesMenuItemAdd( 2, mailboxMenuId, mailbox->menuText, NULL,
-                               NULL );
+            cursesMenuItemAdd( 2, mailboxMenuId, mailbox->menuText, 
+                               cursesMailboxDisplay, mailbox );
         }
 
         /* Store by ID */
@@ -1601,6 +1604,94 @@ char *mailboxReportExpand( char *format, ENVELOPE *envelope, char *body,
     *message = '\0';
     return( origmessage );
 }
+
+static CursesFormItem_t mailboxFormItems[] = {
+    { FIELD_LABEL, 0, 0, 0, 0, "Mailbox Number: %d", 
+      OFFSETOF(mailboxId,Mailbox_t), FA_INTEGER, 0, FT_NONE, { 0 }, NULL, 
+      NULL },
+    { FIELD_LABEL, 0, 1, 0, 0, "Server:", -1, FA_NONE, 0, FT_NONE, { 0 }, NULL,
+      NULL },
+    { FIELD_FIELD, 16, 1, 32, 1, "%s", OFFSETOF(server,Mailbox_t), FA_STRING,
+      64, FT_NONE, { 0 }, NULL, NULL },
+    { FIELD_LABEL, 0, 2, 0, 0, "Port:", -1, FA_NONE, 0, FT_NONE, { 0 }, NULL,
+      NULL },
+    { FIELD_FIELD, 16, 2, 6, 1, "%d", OFFSETOF(port,Mailbox_t), FA_INTEGER, 6,
+      FT_INTEGER, { .integerArgs = { 0, 1, 65535 } }, NULL, NULL },
+    { FIELD_LABEL, 0, 3, 0, 0, "User:", -1, FA_NONE, 0, FT_NONE, { 0 }, NULL,
+      NULL },
+    { FIELD_FIELD, 16, 3, 32, 1, "%s", OFFSETOF(user,Mailbox_t), FA_STRING, 64,
+      FT_NONE, { 0 }, NULL, NULL },
+    { FIELD_LABEL, 0, 4, 0, 0, "Password:", -1, FA_NONE, 0, FT_NONE, { 0 },
+      NULL, NULL },
+    { FIELD_FIELD, 16, 4, 32, 1, "%s", OFFSETOF(password,Mailbox_t), FA_STRING,
+      64, FT_NONE, { 0 }, NULL, NULL },
+    { FIELD_LABEL, 0, 5, 0, 0, "Protocol:", -1, FA_NONE, 0, FT_NONE, { 0 },
+      NULL, NULL },
+    { FIELD_FIELD, 16, 5, 32, 1, "%s", OFFSETOF(protocol,Mailbox_t), FA_STRING,
+      32, FT_NONE, { 0 }, NULL, NULL },
+    { FIELD_LABEL, 0, 6, 0, 0, "Options:", -1, FA_NONE, 0, FT_NONE, { 0 }, 
+      NULL, NULL },
+    { FIELD_FIELD, 16, 6, 32, 1, "%s", OFFSETOF(options,Mailbox_t), FA_STRING,
+      64, FT_NONE, { 0 }, NULL, NULL },
+    { FIELD_LABEL, 0, 7, 0, 0, "Mailbox:", -1, FA_NONE, 0, FT_NONE, { 0 },
+      NULL, NULL },
+    { FIELD_FIELD, 16, 7, 32, 1, "%s", OFFSETOF(mailbox,Mailbox_t), FA_STRING,
+      64, FT_NONE, { 0 }, NULL, NULL },
+    { FIELD_LABEL, 0, 8, 0, 0, "Poll Interval:", -1, FA_NONE, 0, FT_NONE, { 0 },
+      NULL, NULL },
+    { FIELD_FIELD, 16, 8, 20, 1, "%d", OFFSETOF(interval,Mailbox_t), FA_INTEGER,
+      20, FT_INTEGER, { .integerArgs = { 0, 60, 86400 } }, NULL, NULL },
+    { FIELD_LABEL, 0, 9, 0, 0, "Enabled:", -1, FA_NONE, 0, FT_NONE, { 0 },
+      NULL, NULL },
+    { FIELD_CHECKBOX, 16, 9, 0, 0, "[%c]", OFFSETOF(enabled,Mailbox_t), FA_BOOL,
+      0, FT_NONE, { 0 }, NULL, NULL },
+    { FIELD_LABEL, 0, 10, 0, 0, "Last Checked:", -1, FA_NONE, 0, FT_NONE, { 0 },
+      NULL, NULL },
+    { FIELD_LABEL, 16, 10, 0, 0, "%s", OFFSETOF(lastCheck,Mailbox_t), 
+      FA_TIMESTAMP, 0, FT_NONE, { 0 }, NULL, NULL },
+    { FIELD_LABEL, 0, 11, 0, 0, "Last Read:", -1, FA_NONE, 0, FT_NONE, { 0 }, 
+      NULL, NULL },
+    { FIELD_LABEL, 16, 11, 0, 0, "%s", OFFSETOF(lastRead,Mailbox_t), 
+      FA_TIMESTAMP, 0, FT_NONE, { 0 }, NULL, NULL },
+    { FIELD_LABEL, 0, 12, 0, 0, "Next Poll:", -1, FA_NONE, 0, FT_NONE, { 0 }, 
+      NULL, NULL },
+    { FIELD_LABEL, 16, 12, 0, 0, "%s", OFFSETOF(nextPoll,Mailbox_t), 
+      FA_TIMESTAMP, 0, FT_NONE, { 0 }, NULL, NULL },
+    { FIELD_BUTTON, 2, 13, 0, 0, "Revert", -1, FA_NONE, 0, FT_NONE, { 0 },
+      cursesMailboxRevert, (void *)(-1) },
+    { FIELD_BUTTON, 10, 13, 0, 0, "Save", -1, FA_NONE, 0, FT_NONE, { 0 },
+      cursesSave, (void *)(-1) },
+    { FIELD_BUTTON, 16, 13, 0, 0, "Cancel", -1, FA_NONE, 0, FT_NONE, { 0 },
+      cursesCancel, NULL }
+};
+static int mailboxFormItemCount = NELEMENTS(mailboxFormItems);
+
+
+void mailboxSaveFunc( void *arg, int index, char *string )
+{
+    if( index == -1 ) {
+        LogPrint( LOG_DEBUG, "mailbox: %p - complete", arg );
+        return;
+    }
+
+    cursesSaveOffset( arg, index, mailboxFormItems, mailboxFormItemCount,
+                      string );
+}
+
+void cursesMailboxRevert( void *arg, char *string )
+{
+    cursesFormRevert( arg, mailboxFormItems, mailboxFormItemCount, 
+                      mailboxSaveFunc );
+}
+
+
+void cursesMailboxDisplay( void *arg )
+{
+    cursesFormDisplay( arg, mailboxFormItems, mailboxFormItemCount, 
+                       mailboxSaveFunc );
+}
+
+
 
 /*
  * Callbacks for the UW c-client library

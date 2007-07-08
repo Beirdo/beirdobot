@@ -422,7 +422,6 @@ void pluginSaveFunc( void *arg, int index, char *string )
     plugin = (Plugin_t *)arg;
 
     if( index == -1 ) {
-        LogPrint( LOG_DEBUG, "plugin: %p - complete", arg );
         if( plugin->preload && !plugin->loaded ) {
             pluginLoadItem( plugin );
         } else if( !plugin->preload && plugin->loaded ) {

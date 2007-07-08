@@ -32,6 +32,7 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <sys/time.h>
+#include <time.h>
 #include <ncurses.h>
 #include <menu.h>
 #include <form.h>
@@ -2091,6 +2092,7 @@ void cursesUpdateFormLabels( void )
     CursesField_t          *fieldItem;
     int                     x, y;
     int                     starty;
+    int                     width;
 
     getmaxyx( winDetails, y, x );
 
@@ -2100,8 +2102,9 @@ void cursesUpdateFormLabels( void )
         if( fieldItem->type == FIELD_LABEL ) {
             starty = fieldItem->starty - (detailsPage * (y-1));
             if( starty >= 0 && starty < y - 1 ) {
-                mvwprintw( winDetails, starty, fieldItem->startx,
-                           fieldItem->string );
+                width = MIN( x - fieldItem->startx, strlen(fieldItem->string));
+                mvwaddnstr( winDetails, starty, fieldItem->startx,
+                            fieldItem->string, width );
             }
         }
     }
@@ -2116,6 +2119,7 @@ void cursesFormDisplay( void *arg, CursesFormItem_t *items, int count,
     FIELDTYPE              *fieldtype;
     int                     len;
     void                   *buttonArg;
+    struct tm               tm;
 
     cursesKeyhandleRegister( cursesFormKeyhandle );
 
@@ -2145,6 +2149,11 @@ void cursesFormDisplay( void *arg, CursesFormItem_t *items, int count,
                 case FA_SERVER:
                     snprintf( buf, 1024, item->format,
                         ATOFFSET(arg, item->offset, IRCServer_t *)->serverId );
+                    break;
+                case FA_TIMESTAMP:
+                    localtime_r((const time_t *)
+                                  &ATOFFSET(arg,item->offset,time_t), &tm);
+                    strftime( buf, 1024, "%a, %e, %b %Y %H:%M:%S %Z", &tm );
                     break;
                 default:
                     buf[0] = '\0';
@@ -2181,6 +2190,11 @@ void cursesFormDisplay( void *arg, CursesFormItem_t *items, int count,
             case FA_SERVER:
                 snprintf( buf, len, item->format,
                         ATOFFSET(arg, item->offset, IRCServer_t *)->serverId );
+                break;
+            case FA_TIMESTAMP:
+                localtime_r((const time_t *)&ATOFFSET(arg,item->offset,time_t),
+                            &tm);
+                strftime( buf, len, "%a, %e, %b %Y %H:%M:%S %Z", &tm );
                 break;
             default:
                 buf[0] = '\0';
@@ -2264,8 +2278,10 @@ void cursesSaveOffset( void *arg, int index, CursesFormItem_t *items,
         return;
     }
 
+#if 0
     LogPrint( LOG_DEBUG, "arg: %p, index %d, offset %d, string: \"%s\"", 
               arg, index, item->offset, string );
+#endif
 
     switch( item->offsetType ) {
     case FA_STRING:

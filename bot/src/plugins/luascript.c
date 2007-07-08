@@ -54,6 +54,8 @@ char *botHelpLuascript( void *tag );
 
 BalancedBTree_t *db_get_luascripts( void );
 void result_get_luascripts( MYSQL_RES *res, MYSQL_BIND *input, void *arg );
+void cursesLuascriptDisplay( void *arg );
+void luascriptSaveFunc( void *arg, int index, char *string );
 
 typedef struct {
     char           *name;
@@ -294,7 +296,8 @@ void result_get_luascripts( MYSQL_RES *res, MYSQL_BIND *input, void *arg )
 
         BalancedBTreeAdd( tree, item, LOCKED, FALSE );
 
-        cursesMenuItemAdd( 2, luascriptMenuId, luascript->name, NULL, NULL );
+        cursesMenuItemAdd( 2, luascriptMenuId, luascript->name, 
+                           cursesLuascriptDisplay, luascript );
     }
 
     /* Rebalance the tree */
@@ -905,6 +908,46 @@ char *luaHelpFunc( void *tag )
 
     return( msg );
 }
+
+
+static CursesFormItem_t luascriptFormItems[] = {
+    { FIELD_LABEL, 1, 1, 0, 0, "Enabled:", -1, FA_NONE, 0, FT_NONE, { 0 },
+      NULL, NULL },
+    { FIELD_CHECKBOX, 12, 1, 0, 0, "[%c]", OFFSETOF(preload,Luascript_t), 
+      FA_BOOL, 3, FT_NONE, { 0 }, NULL, NULL },
+    { FIELD_BUTTON, 4, 3, 0, 0, "Save", -1, FA_NONE, 0, FT_NONE, { 0 }, 
+      cursesSave, (void *)(-1) },
+    { FIELD_BUTTON, 9, 3, 0, 0, "Cancel", -1, FA_NONE, 0, FT_NONE, { 0 },
+      cursesCancel, NULL }
+};
+static int luascriptFormItemCount = NELEMENTS(luascriptFormItems);
+
+void cursesLuascriptDisplay( void *arg )
+{
+    cursesFormDisplay( arg, luascriptFormItems, luascriptFormItemCount,
+                       luascriptSaveFunc );
+}
+
+void luascriptSaveFunc( void *arg, int index, char *string )
+{
+    Luascript_t    *luascript;
+
+    luascript = (Luascript_t *)arg;
+
+    if( index == -1 ) {
+        if( luascript->preload && !luascript->loaded ) {
+            luascriptLoadItem( luascript );
+        } else if( !luascript->preload && luascript->loaded ) {
+            luascriptUnloadItem( luascript );
+        }
+        return;
+    }
+
+    cursesSaveOffset( arg, index, luascriptFormItems, luascriptFormItemCount, 
+                      string );
+}
+
+
 
 /*
  * vim:ts=4:sw=4:ai:et:si:sts=4

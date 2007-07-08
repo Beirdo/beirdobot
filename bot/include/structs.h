@@ -375,7 +375,8 @@ typedef enum {
     FA_INTEGER,
     FA_BOOL,
     FA_CHAR,
-    FA_SERVER
+    FA_SERVER,
+    FA_TIMESTAMP
 } CursesFormatArg_t;
 
 typedef void (*CursesFieldChangeFunc_t)(void *, char *);
