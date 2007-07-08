@@ -173,8 +173,7 @@ static CursesMenuItem_t menu1Static[] = {
     { 0, -1, "System",   NULL, cursesDoSubMenu, NULL, NULL },
     { 1, -1, "Servers",  NULL, cursesDoSubMenu, NULL, NULL },
     { 2, -1, "Channels", NULL, cursesDoSubMenu, NULL, NULL },
-    { 3, -1, "Database", NULL, cursesDoSubMenu, NULL, NULL },
-    { 4, -1, "Plugins",  NULL, cursesDoSubMenu, NULL, NULL }
+    { 3, -1, "Plugins",  NULL, cursesDoSubMenu, NULL, NULL }
 };
 static int menu1StaticCount = NELEMENTS(menu1Static);
 static BalancedBTree_t *menu1Tree;

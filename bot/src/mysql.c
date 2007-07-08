@@ -84,7 +84,9 @@ void result_get_seen( MYSQL_RES *res, MYSQL_BIND *input, void *arg );
 void result_get_setting( MYSQL_RES *res, MYSQL_BIND *input, void *arg );
 void result_get_auth( MYSQL_RES *res, MYSQL_BIND *input, void *arg );
 void result_check_plugins( MYSQL_RES *res, MYSQL_BIND *input, void *arg );
+void result_MySQL_Schema( MYSQL_RES *res, MYSQL_BIND *input, void *arg );
 
+void cursesMySQLSchema( void *arg );
 
 QueryTable_t    QueryTable[] = {
     /* 0 */
@@ -159,7 +161,10 @@ QueryTable_t    QueryTable[] = {
       FALSE },
     /* 22 */
     { "INSERT INTO `plugins` ( `pluginName`, `libName`, `preload`, "
-      "`arguments`) VALUES ( ?, ?, ?, ? )", NULL, NULL, FALSE }
+      "`arguments`) VALUES ( ?, ?, ?, ? )", NULL, NULL, FALSE },
+    /* 23 */
+    { "SELECT `name`, `value` FROM `settings` ORDER BY `name` ASC", NULL, NULL,
+      FALSE }
 };
 
 QueueObject_t   *QueryQ;
@@ -177,6 +182,9 @@ void *mysql_thread( void *arg ) {
 
     LogPrintNoArg( LOG_NOTICE, "Starting MySQL thread" );
     mysql_thread_init();
+
+    cursesMenuItemAdd( 2, MENU_SYSTEM, "Database Schema", cursesMySQLSchema,
+                       NULL );
 
     gettimeofday( &now, NULL );
     lastAccess = now.tv_sec;
@@ -1263,6 +1271,11 @@ void chain_set_auth( MYSQL_RES *res, QueryItem_t *item )
     }
 }
 
+void cursesMySQLSchema( void *arg )
+{
+    db_queue_query( 23, QueryTable, NULL, 0, result_MySQL_Schema, NULL, NULL );
+}
+
 /*
  * Query result callbacks
  */
@@ -1867,6 +1880,26 @@ void result_check_plugins( MYSQL_RES *res, MYSQL_BIND *input, void *arg )
         *found = TRUE;
     }
 }
+
+void result_MySQL_Schema( MYSQL_RES *res, MYSQL_BIND *input, void *arg )
+{
+    int             i;
+    int             count;
+    MYSQL_ROW       row;
+
+    if( !res || !(count = mysql_num_rows(res)) ) {
+        return;
+    }
+
+    for( i = 0; i < count; i++ ) {
+        row = mysql_fetch_row(res);
+
+        cursesTextAdd( WINDOW_DETAILS, ALIGN_LEFT, 1, i, row[0] );
+        cursesTextAdd( WINDOW_DETAILS, ALIGN_RIGHT, 1, i, row[1] );
+    }
+    cursesKeyhandleRegister( cursesDetailsKeyhandle );
+}
+
 
 /*
  * Helper functions to duplicate what's in newer versions of libmysqlclient

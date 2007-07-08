@@ -325,7 +325,6 @@ typedef enum {
     MENU_SYSTEM,
     MENU_SERVERS,
     MENU_CHANNELS,
-    MENU_DATABASE,
     MENU_PLUGINS
 } CursesMenuNum_t;
 
