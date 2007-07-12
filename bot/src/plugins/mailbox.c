@@ -84,11 +84,15 @@ typedef struct {
 typedef struct {
     LinkedListItem_t    linkage;
     int                 mailboxId;
+    int                 oldMailboxId;
     int                 serverId;
-    int                 channelId;
+    int                 oldServerId;
     IRCServer_t        *server;
+    int                 channelId;
+    int                 oldChannelId;
     IRCChannel_t       *channel;
     char               *nick;
+    char               *oldNick;
     char               *format;
     bool                enabled;
     bool                visited;
@@ -166,7 +170,12 @@ static QueryTable_t mailboxQueryTable[] = {
     { "UPDATE `plugin_mailbox` SET `server` = ?, `port` = ?, `user` = ?, "
       "`password` = ?, `protocol` = ?, `options` = ?, `mailbox` = ?, "
       "`pollInterval` = ?, `enabled` = ? WHERE `mailboxId` = ?", NULL, NULL,
-      FALSE }
+      FALSE },
+    /* 5 */
+    { "UPDATE `plugin_mailbox_report` SET `mailboxId` = ?, `channelId` = ?, "
+      "`serverId` = ?, `nick` = ?, `format` = ?, `enabled` = ? "
+      "WHERE `mailboxId` = ? AND `channelId` = ? AND `serverId` = ? AND "
+      "`nick` = ?", NULL, NULL, FALSE }
 };
 
 
@@ -180,6 +189,7 @@ static void db_load_mailboxes( void );
 void db_update_lastpoll( int mailboxId, int lastPoll );
 void db_update_lastread( int mailboxId, int lastRead );
 void db_update_mailbox( Mailbox_t *mailbox );
+void db_update_report( MailboxReport_t *report );
 static void db_load_reports( void );
 static void result_load_mailboxes( MYSQL_RES *res, MYSQL_BIND *input, 
                                    void *args );
@@ -281,6 +291,7 @@ void plugin_shutdown( void )
         item = mailboxActiveTree->root;
         mailbox = (Mailbox_t *)item->item;
         mail_close( mailbox->stream );
+        mailbox->stream = NULL;
         BalancedBTreeRemove( mailboxActiveTree, item, LOCKED, FALSE );
         free( item );
     }
@@ -305,6 +316,9 @@ void plugin_shutdown( void )
             while( mailbox->reports->head ) {
                 report = (MailboxReport_t *)mailbox->reports->head;
                 free( report->nick );
+                if( report->oldNick ) {
+                    free( report->oldNick );
+                }
                 free( report->format );
                 cursesMenuItemRemove( 2, mailboxMenuId, report->menuText );
                 free( report->menuText );
@@ -440,11 +454,12 @@ void *mailbox_thread(void *arg)
                 continue;
             }
 
-            if( !mail_ping( mailbox->stream ) ) {
-                mail_open( mailbox->stream, mailbox->serverSpec, 0 );
+            if( !mailbox->stream || !mail_ping( mailbox->stream ) ) {
+                mailbox->stream = mail_open( mailbox->stream, 
+                                             mailbox->serverSpec, 0 );
             }
 
-            if( GlobalAbort || threadAbort ) {
+            if( GlobalAbort || threadAbort || !mailbox->stream ) {
                 continue;
             }
 
@@ -622,6 +637,7 @@ bool mailboxFlushUnvisited( BalancedBTreeItem_t *node )
     if( !mailbox->visited ) {
         if( mailbox->enabled ) {
             mail_close( mailbox->stream );
+            mailbox->stream = NULL;
         }
 
         BalancedBTreeRemove( node->btree, node, LOCKED, FALSE );
@@ -654,6 +670,9 @@ bool mailboxFlushUnvisited( BalancedBTreeItem_t *node )
             while( mailbox->reports->head ) {
                 report = (MailboxReport_t *)mailbox->reports->head;
                 free( report->nick );
+                if( report->oldNick ) {
+                    free( report->oldNick );
+                }
                 free( report->format );
                 cursesMenuItemRemove( 2, mailboxMenuId, report->menuText );
                 free( report->menuText );
@@ -691,6 +710,9 @@ bool mailboxFlushUnvisited( BalancedBTreeItem_t *node )
 
             if( !report->visited ) {
                 free( report->nick );
+                if( report->oldNick ) {
+                    free( report->oldNick );
+                }
                 free( report->format );
                 cursesMenuItemRemove( 2, mailboxMenuId, report->menuText );
                 free( report->menuText );
@@ -985,8 +1007,28 @@ void db_update_mailbox( Mailbox_t *mailbox )
     LogPrint( LOG_NOTICE, "Mailbox: mailbox %d: updating database", 
                           mailbox->mailboxId );
     db_queue_query( 4, mailboxQueryTable, data, 10, NULL, NULL, NULL );
+}
 
-    mailbox->modified = FALSE;
+void db_update_report( MailboxReport_t *report )
+{
+    MYSQL_BIND         *data;
+
+    data = (MYSQL_BIND *)malloc(10 * sizeof(MYSQL_BIND));
+    memset( data, 0, 10 * sizeof(MYSQL_BIND) );
+
+    bind_numeric( &data[0], report->mailboxId, MYSQL_TYPE_LONG );
+    bind_numeric( &data[1], report->channelId, MYSQL_TYPE_LONG );
+    bind_numeric( &data[2], report->serverId, MYSQL_TYPE_LONG );
+    bind_string( &data[3], report->nick, MYSQL_TYPE_VAR_STRING );
+    bind_string( &data[4], report->format, MYSQL_TYPE_VAR_STRING );
+    bind_numeric( &data[5], report->enabled, MYSQL_TYPE_LONG );
+    bind_numeric( &data[6], report->oldMailboxId, MYSQL_TYPE_LONG );
+    bind_numeric( &data[7], report->oldChannelId, MYSQL_TYPE_LONG );
+    bind_numeric( &data[8], report->oldServerId, MYSQL_TYPE_LONG );
+    bind_string( &data[9], report->oldNick, MYSQL_TYPE_VAR_STRING );
+
+    LogPrintNoArg( LOG_NOTICE, "Mailbox: updating report in database" );
+    db_queue_query( 5, mailboxQueryTable, data, 10, NULL, NULL, NULL );
 }
 
 /* Assumes the mailboxTree is already locked */
@@ -1127,7 +1169,8 @@ static void result_load_mailboxes( MYSQL_RES *res, MYSQL_BIND *input,
             newMailbox = TRUE;
         }
 
-        if( !found || ((!oldEnabled && mailbox->enabled) || newMailbox) ) {
+        if( !found || ((!oldEnabled && mailbox->enabled) || newMailbox) ||
+            mailbox->modified ) {
             if( mailbox->lastCheck + mailbox->interval <= nextpoll + 1 ) {
                 mailbox->nextPoll  = nextpoll++;
             } else {
@@ -1135,7 +1178,8 @@ static void result_load_mailboxes( MYSQL_RES *res, MYSQL_BIND *input,
             }
         }
 
-        if( found && ((oldEnabled && !mailbox->enabled) || newMailbox) ) {
+        if( found && (((oldEnabled && !mailbox->enabled) || newMailbox) ||
+                      mailbox->modified) ) {
             item = BalancedBTreeFind( mailboxActiveTree, &mailbox->nextPoll,
                                       UNLOCKED );
             if( item ) {
@@ -1148,6 +1192,8 @@ static void result_load_mailboxes( MYSQL_RES *res, MYSQL_BIND *input,
                                           &mailbox->stream->mailbox, UNLOCKED );
 
                 mail_close( mailbox->stream );
+                mailbox->stream = NULL;
+
                 if( item ) {
                     BalancedBTreeRemove( mailboxStreamTree, item, UNLOCKED, 
                                          FALSE );
@@ -1156,9 +1202,14 @@ static void result_load_mailboxes( MYSQL_RES *res, MYSQL_BIND *input,
             }
         }
 
-        if( !mailbox->enabled || (oldEnabled && !newMailbox) ) {
+
+        if( !mailbox->enabled || 
+            (oldEnabled && !newMailbox && !mailbox->modified) ) {
+            mailbox->modified = FALSE;
             continue;
         }
+
+        mailbox->modified = FALSE;
 
         /* Setup the next poll */
         item = (BalancedBTreeItem_t *)malloc(sizeof(BalancedBTreeItem_t));
@@ -1189,7 +1240,10 @@ static void result_load_mailboxes( MYSQL_RES *res, MYSQL_BIND *input,
         } else {
             LogPrint( LOG_CRIT, "Mailbox: Mailbox %d failed", 
                                 mailbox->mailboxId );
+#if 0
             mailbox->enabled = FALSE;
+            BalancedBTreeRemove( mailboxActiveTree, item, LOCKED, FALSE );
+#endif
         }
     }
 
@@ -1463,10 +1517,10 @@ BalancedBTreeItem_t *mailboxRecurseFindNetmbx( BalancedBTreeItem_t *node,
 
     mailbox = (Mailbox_t *)node->item;
     mbx = &mailbox->netmbx;
-    if( !strcasecmp( mbx->host,    netmbx->host) &&
-        !strcasecmp( mbx->user,    netmbx->user) &&
-        !strcasecmp( mbx->mailbox, netmbx->mailbox) &&
-        !strcasecmp( mbx->service, netmbx->service) &&
+    if( !strcasecmp( mbx->orighost, netmbx->orighost) &&
+        !strcasecmp( mbx->user,     netmbx->user) &&
+        !strcasecmp( mbx->mailbox,  netmbx->mailbox) &&
+        !strcasecmp( mbx->service,  netmbx->service) &&
         mbx->port == netmbx->port ) {
         /* Found it! */
         return( node );
@@ -1685,7 +1739,7 @@ static CursesFormItem_t mailboxFormItems[] = {
     { FIELD_LABEL, 0, 2, 0, 0, "Port:", -1, FA_NONE, 0, FT_NONE, { 0 }, NULL,
       NULL },
     { FIELD_FIELD, 16, 2, 6, 1, "%d", OFFSETOF(port,Mailbox_t), FA_INTEGER, 6,
-      FT_INTEGER, { .integerArgs = { 0, 1, 65535 } }, NULL, NULL },
+      FT_INTEGER, { .integerArgs = { 0, 0, 65535 } }, NULL, NULL },
     { FIELD_LABEL, 0, 3, 0, 0, "User:", -1, FA_NONE, 0, FT_NONE, { 0 }, NULL,
       NULL },
     { FIELD_FIELD, 16, 3, 32, 1, "%s", OFFSETOF(user,Mailbox_t), FA_STRING, 64,
@@ -1810,14 +1864,26 @@ void mailboxReportSaveFunc( void *arg, int index, char *string )
 {
     MailboxReport_t        *report;
 
+    report = (MailboxReport_t *)arg;
+
     if( index == -1 ) {
-        LogPrint( LOG_DEBUG, "mailbox: %p - complete", arg );
+        LogPrint( LOG_DEBUG, "mailbox report: %p - complete", arg );
+        if( report->mailboxId != report->oldMailboxId ||
+            report->serverId  != report->oldServerId ||
+            report->channelId != report->oldChannelId ) {
+            /* 
+             * As the report is about to be blown away and reloaded to a new
+             * report item, leave the form 
+             */
+            cursesCancel( arg, string );
+        }
+        db_update_report( report );
+        mailboxSighup( 0, NULL );
         return;
     }
 
     cursesSaveOffset( arg, index, mailboxReportFormItems, 
                       mailboxReportFormItemCount, string );
-    report = (MailboxReport_t *)arg;
     report->modified = TRUE;
 }
 
@@ -1830,6 +1896,17 @@ void cursesMailboxReportRevert( void *arg, char *string )
 
 void cursesMailboxReportDisplay( void *arg )
 {
+    MailboxReport_t        *report;
+
+    report = (MailboxReport_t *)arg;
+    report->oldMailboxId = report->mailboxId;
+    report->oldServerId  = report->serverId;
+    report->oldChannelId = report->channelId;
+    if( report->oldNick ) {
+        free( report->oldNick );
+    }
+    report->oldNick = strdup( report->nick );
+
     cursesFormDisplay( arg, mailboxReportFormItems, mailboxReportFormItemCount, 
                        mailboxReportSaveFunc );
 }
