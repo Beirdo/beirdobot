@@ -77,11 +77,13 @@ typedef struct {
     MAILSTREAM         *stream;
     LinkedList_t       *reports;
     bool                visited;
+    bool                modified;
     char               *menuText;
 } Mailbox_t;
 
 typedef struct {
     LinkedListItem_t    linkage;
+    int                 mailboxId;
     int                 serverId;
     int                 channelId;
     IRCServer_t        *server;
@@ -90,6 +92,7 @@ typedef struct {
     char               *format;
     bool                enabled;
     bool                visited;
+    bool                modified;
     char               *menuText;
 } MailboxReport_t;
 
@@ -158,7 +161,12 @@ static QueryTable_t mailboxQueryTable[] = {
       "FROM `plugin_mailbox_report` WHERE mailboxId = ?", NULL, NULL, FALSE },
     /* 3 */
     { "UPDATE `plugin_mailbox` SET `lastRead` = ? WHERE `mailboxId` = ?", 
-      NULL, NULL, FALSE }
+      NULL, NULL, FALSE },
+    /* 4 */
+    { "UPDATE `plugin_mailbox` SET `server` = ?, `port` = ?, `user` = ?, "
+      "`password` = ?, `protocol` = ?, `options` = ?, `mailbox` = ?, "
+      "`pollInterval` = ?, `enabled` = ? WHERE `mailboxId` = ?", NULL, NULL,
+      FALSE }
 };
 
 
@@ -171,6 +179,7 @@ void *mailbox_thread(void *arg);
 static void db_load_mailboxes( void );
 void db_update_lastpoll( int mailboxId, int lastPoll );
 void db_update_lastread( int mailboxId, int lastRead );
+void db_update_mailbox( Mailbox_t *mailbox );
 static void db_load_reports( void );
 static void result_load_mailboxes( MYSQL_RES *res, MYSQL_BIND *input, 
                                    void *args );
@@ -955,6 +964,30 @@ void db_update_lastread( int mailboxId, int lastRead )
     db_queue_query( 3, mailboxQueryTable, data, 2, NULL, NULL, NULL );
 }
 
+void db_update_mailbox( Mailbox_t *mailbox )
+{
+    MYSQL_BIND         *data;
+
+    data = (MYSQL_BIND *)malloc(10 * sizeof(MYSQL_BIND));
+    memset( data, 0, 10 * sizeof(MYSQL_BIND) );
+
+    bind_string( &data[0], mailbox->server, MYSQL_TYPE_VAR_STRING );
+    bind_numeric( &data[1], mailbox->port, MYSQL_TYPE_LONG );
+    bind_string( &data[2], mailbox->user, MYSQL_TYPE_VAR_STRING );
+    bind_string( &data[3], mailbox->password, MYSQL_TYPE_VAR_STRING );
+    bind_string( &data[4], mailbox->protocol, MYSQL_TYPE_VAR_STRING );
+    bind_string( &data[5], mailbox->options, MYSQL_TYPE_VAR_STRING );
+    bind_string( &data[6], mailbox->mailbox, MYSQL_TYPE_VAR_STRING );
+    bind_numeric( &data[7], mailbox->interval, MYSQL_TYPE_LONG );
+    bind_numeric( &data[8], mailbox->enabled, MYSQL_TYPE_LONG );
+    bind_numeric( &data[9], mailbox->mailboxId, MYSQL_TYPE_LONG );
+
+    LogPrint( LOG_NOTICE, "Mailbox: mailbox %d: updating database", 
+                          mailbox->mailboxId );
+    db_queue_query( 4, mailboxQueryTable, data, 10, NULL, NULL, NULL );
+
+    mailbox->modified = FALSE;
+}
 
 /* Assumes the mailboxTree is already locked */
 static void result_load_mailboxes( MYSQL_RES *res, MYSQL_BIND *input, 
@@ -1110,13 +1143,16 @@ static void result_load_mailboxes( MYSQL_RES *res, MYSQL_BIND *input,
                 free( item );
             }
 
-            item = BalancedBTreeFind( mailboxStreamTree, 
-                                      &mailbox->stream->mailbox, UNLOCKED );
+            if( mailbox->stream ) {
+                item = BalancedBTreeFind( mailboxStreamTree, 
+                                          &mailbox->stream->mailbox, UNLOCKED );
 
-            mail_close( mailbox->stream );
-            if( item ) {
-                BalancedBTreeRemove( mailboxStreamTree, item, UNLOCKED, FALSE );
-                free( item );
+                mail_close( mailbox->stream );
+                if( item ) {
+                    BalancedBTreeRemove( mailboxStreamTree, item, UNLOCKED, 
+                                         FALSE );
+                    free( item );
+                }
             }
         }
 
@@ -1209,6 +1245,7 @@ static void result_load_reports( MYSQL_RES *res, MYSQL_BIND *input,
             memset( report, 0x00, sizeof(MailboxReport_t) );
         }
 
+        report->mailboxId = mailbox->mailboxId;
         report->channelId = atoi(row[0]);
         report->serverId  = atoi(row[1]);
 
@@ -1225,8 +1262,8 @@ static void result_load_reports( MYSQL_RES *res, MYSQL_BIND *input,
         report->visited   = TRUE;
 
         menuText = (char *)malloc(64);
-        snprintf( menuText, 64, "Report S: %d, C: %d", 
-                  report->serverId, report->channelId );
+        snprintf( menuText, 64, "Report M: %d, S: %d, C: %d", 
+                  report->mailboxId, report->serverId, report->channelId );
         if( found ) {
             if( strcmp( menuText, report->menuText ) ) {
                 cursesMenuItemRemove( 2, mailboxMenuId, report->menuText );
@@ -1701,13 +1738,20 @@ static int mailboxFormItemCount = NELEMENTS(mailboxFormItems);
 
 void mailboxSaveFunc( void *arg, int index, char *string )
 {
+    Mailbox_t          *mailbox;
+
+    mailbox = (Mailbox_t *)arg;
+
     if( index == -1 ) {
         LogPrint( LOG_DEBUG, "mailbox: %p - complete", arg );
+        db_update_mailbox( mailbox );
+        mailboxSighup( 0, NULL );
         return;
     }
 
     cursesSaveOffset( arg, index, mailboxFormItems, mailboxFormItemCount,
                       string );
+    mailbox->modified = TRUE;
 }
 
 void cursesMailboxRevert( void *arg, char *string )
@@ -1725,33 +1769,38 @@ void cursesMailboxDisplay( void *arg )
 
 
 static CursesFormItem_t mailboxReportFormItems[] = {
-    { FIELD_LABEL, 0, 0, 0, 0, "Server Number:", -1, FA_NONE, 0, FT_NONE, { 0 },
-      NULL, NULL },
-    { FIELD_FIELD, 16, 0, 20, 1, "%d", OFFSETOF(serverId,MailboxReport_t), 
-      FA_INTEGER, 20, FT_INTEGER, { .integerArgs = { 0, 1, 4000 } }, NULL, 
-      NULL },
-    { FIELD_LABEL, 0, 1, 0, 0, "Channel Number:", -1, FA_NONE, 0, FT_NONE, 
+    { FIELD_LABEL, 0, 0, 0, 0, "Mailbox Number:", -1, FA_NONE, 0, FT_NONE, 
       { 0 }, NULL, NULL },
-    { FIELD_FIELD, 16, 1, 20, 1, "%d", OFFSETOF(channelId,MailboxReport_t), 
+    { FIELD_FIELD, 16, 0, 20, 1, "%d", OFFSETOF(mailboxId,MailboxReport_t), 
       FA_INTEGER, 20, FT_INTEGER, { .integerArgs = { 0, 1, 4000 } }, NULL, 
       NULL },
-    { FIELD_LABEL, 0, 2, 0, 0, "Nick:", -1, FA_NONE, 0, FT_NONE, { 0 }, NULL,
-      NULL },
-    { FIELD_FIELD, 16, 2, 32, 1, "%s", OFFSETOF(nick,MailboxReport_t), 
-      FA_STRING, 64, FT_NONE, { 0 }, NULL, NULL },
-    { FIELD_LABEL, 0, 3, 0, 0, "Format:", -1, FA_NONE, 0, FT_NONE, { 0 }, NULL,
-      NULL },
-    { FIELD_FIELD, 16, 3, 32, 1, "%s", OFFSETOF(format,MailboxReport_t), 
-      FA_STRING, 64, FT_NONE, { 0 }, NULL, NULL },
-    { FIELD_LABEL, 0, 4, 0, 0, "Enabled:", -1, FA_NONE, 0, FT_NONE, { 0 },
+    { FIELD_LABEL, 0, 1, 0, 0, "Server Number:", -1, FA_NONE, 0, FT_NONE, { 0 },
       NULL, NULL },
-    { FIELD_CHECKBOX, 16, 4, 0, 0, "[%c]", OFFSETOF(enabled,MailboxReport_t), 
+    { FIELD_FIELD, 16, 1, 20, 1, "%d", OFFSETOF(serverId,MailboxReport_t), 
+      FA_INTEGER, 20, FT_INTEGER, { .integerArgs = { 0, 1, 4000 } }, NULL, 
+      NULL },
+    { FIELD_LABEL, 0, 2, 0, 0, "Channel Number:", -1, FA_NONE, 0, FT_NONE, 
+      { 0 }, NULL, NULL },
+    { FIELD_FIELD, 16, 2, 20, 1, "%d", OFFSETOF(channelId,MailboxReport_t), 
+      FA_INTEGER, 20, FT_INTEGER, { .integerArgs = { 0, 1, 4000 } }, NULL, 
+      NULL },
+    { FIELD_LABEL, 0, 3, 0, 0, "Nick:", -1, FA_NONE, 0, FT_NONE, { 0 }, NULL,
+      NULL },
+    { FIELD_FIELD, 16, 3, 32, 1, "%s", OFFSETOF(nick,MailboxReport_t), 
+      FA_STRING, 64, FT_NONE, { 0 }, NULL, NULL },
+    { FIELD_LABEL, 0, 4, 0, 0, "Format:", -1, FA_NONE, 0, FT_NONE, { 0 }, NULL,
+      NULL },
+    { FIELD_FIELD, 16, 4, 32, 1, "%s", OFFSETOF(format,MailboxReport_t), 
+      FA_STRING, 64, FT_NONE, { 0 }, NULL, NULL },
+    { FIELD_LABEL, 0, 5, 0, 0, "Enabled:", -1, FA_NONE, 0, FT_NONE, { 0 },
+      NULL, NULL },
+    { FIELD_CHECKBOX, 16, 5, 0, 0, "[%c]", OFFSETOF(enabled,MailboxReport_t), 
       FA_BOOL, 0, FT_NONE, { 0 }, NULL, NULL },
-    { FIELD_BUTTON, 2, 5, 0, 0, "Revert", -1, FA_NONE, 0, FT_NONE, { 0 },
+    { FIELD_BUTTON, 2, 6, 0, 0, "Revert", -1, FA_NONE, 0, FT_NONE, { 0 },
       cursesMailboxReportRevert, (void *)(-1) },
-    { FIELD_BUTTON, 10, 5, 0, 0, "Save", -1, FA_NONE, 0, FT_NONE, { 0 },
+    { FIELD_BUTTON, 10, 6, 0, 0, "Save", -1, FA_NONE, 0, FT_NONE, { 0 },
       cursesSave, (void *)(-1) },
-    { FIELD_BUTTON, 16, 5, 0, 0, "Cancel", -1, FA_NONE, 0, FT_NONE, { 0 },
+    { FIELD_BUTTON, 16, 6, 0, 0, "Cancel", -1, FA_NONE, 0, FT_NONE, { 0 },
       cursesCancel, NULL }
 };
 static int mailboxReportFormItemCount = NELEMENTS(mailboxReportFormItems);
@@ -1759,6 +1808,8 @@ static int mailboxReportFormItemCount = NELEMENTS(mailboxReportFormItems);
 
 void mailboxReportSaveFunc( void *arg, int index, char *string )
 {
+    MailboxReport_t        *report;
+
     if( index == -1 ) {
         LogPrint( LOG_DEBUG, "mailbox: %p - complete", arg );
         return;
@@ -1766,6 +1817,8 @@ void mailboxReportSaveFunc( void *arg, int index, char *string )
 
     cursesSaveOffset( arg, index, mailboxReportFormItems, 
                       mailboxReportFormItemCount, string );
+    report = (MailboxReport_t *)arg;
+    report->modified = TRUE;
 }
 
 void cursesMailboxReportRevert( void *arg, char *string )
