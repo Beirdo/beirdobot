@@ -2291,6 +2291,7 @@ void cursesSaveOffset( void *arg, int index, CursesFormItem_t *items,
                        int itemCount, char *string )
 {
     CursesFormItem_t       *item;
+    char                   *buffer;
 
     if( index < 0 || index >= itemCount ) {
         return;
@@ -2313,6 +2314,10 @@ void cursesSaveOffset( void *arg, int index, CursesFormItem_t *items,
             ATOFFSET(arg, item->offset, char *) = NULL;
         } else {
             ATOFFSET(arg, item->offset, char *) = strdup( string );
+            buffer = ATOFFSET(arg, item->offset, char *);
+            while( buffer[strlen(buffer)] == ' ' ) {
+                buffer[strlen(buffer)] = '\0';
+            }
         }
         break;
     case FA_INTEGER:
