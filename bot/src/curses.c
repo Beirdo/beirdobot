@@ -2315,8 +2315,8 @@ void cursesSaveOffset( void *arg, int index, CursesFormItem_t *items,
         } else {
             ATOFFSET(arg, item->offset, char *) = strdup( string );
             buffer = ATOFFSET(arg, item->offset, char *);
-            while( buffer[strlen(buffer)] == ' ' ) {
-                buffer[strlen(buffer)] = '\0';
+            while( buffer[strlen(buffer)-1] == ' ' ) {
+                buffer[strlen(buffer)-1] = '\0';
             }
         }
         break;
