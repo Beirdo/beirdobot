@@ -124,13 +124,18 @@ static SchemaUpgrade_t schemaUpgrade[CURRENT_SCHEMA_TRAC] = {
 static QueryTable_t tracQueryTable[] = {
     /* 0 */
     { "SELECT serverid, chanid, url, svnUrl, svnUser, svnPasswd, enabled "
-      "FROM `plugin_trac` ORDER BY `chanid` ASC", NULL, NULL, FALSE }
+      "FROM `plugin_trac` ORDER BY `chanid` ASC", NULL, NULL, FALSE },
+    /* 1 */
+    { "UPDATE `plugin_trac` SET `serverid` = ?, `chanid` = ?, `url` = ?, "
+      "`svnUrl` = ?, `svnUser` = ?, `svnPasswd` = ?, `enabled` = ? "
+      "WHERE `chanid` = ?", NULL, NULL, FALSE }
 };
 
 typedef struct {
     int                 serverId;
-    int                 chanId;
     IRCServer_t        *server;
+    int                 chanId;
+    int                 oldChanId;
     IRCChannel_t       *channel;
     char               *url;
     char               *svnUrl;
@@ -140,6 +145,7 @@ typedef struct {
     svn_client_ctx_t   *svnContext;
     bool                enabled;
     bool                visited;
+    bool                modified;
     char               *menuText;
 } TracURL_t;
 
@@ -179,6 +185,7 @@ int                     tracMenuId;
 int tracSvnInitialize( TracURL_t *tracItem );
 char *tracDetailsTicket( TracURL_t *tracItem, int number );
 char *tracDetailsChangeset( TracURL_t *tracItem, int number );
+static void db_update_tracitem( TracURL_t *tracItem );
 void uninit_apr( void );
 
 void plugin_initialize( char *args )
@@ -507,6 +514,27 @@ static void db_load_channel_regexp( void )
     free( mutex );
 }
 
+static void db_update_tracitem( TracURL_t *tracItem )
+{
+    MYSQL_BIND         *data;
+
+    data = (MYSQL_BIND *)malloc(8 * sizeof(MYSQL_BIND));
+    memset( data, 0, 8 * sizeof(MYSQL_BIND) );
+
+    bind_numeric( &data[0], tracItem->serverId, MYSQL_TYPE_LONG );
+    bind_numeric( &data[1], tracItem->chanId, MYSQL_TYPE_LONG );
+    bind_string( &data[2], tracItem->url, MYSQL_TYPE_VAR_STRING );
+    bind_string( &data[3], tracItem->svnUrl, MYSQL_TYPE_VAR_STRING );
+    bind_string( &data[4], tracItem->svnUser, MYSQL_TYPE_VAR_STRING );
+    bind_string( &data[5], tracItem->svnPasswd, MYSQL_TYPE_VAR_STRING );
+    bind_numeric( &data[6], tracItem->enabled, MYSQL_TYPE_LONG );
+    bind_numeric( &data[7], tracItem->oldChanId, MYSQL_TYPE_LONG );
+
+    LogPrint( LOG_NOTICE, "Trac: channel %d: updating database", 
+                          tracItem->chanId );
+    db_queue_query( 1, tracQueryTable, data, 8, NULL, NULL, NULL );
+}
+
 /* Assumes the tree is already locked */
 static void result_load_channel_regexp( MYSQL_RES *res, MYSQL_BIND *input, 
                                         void *args )
@@ -568,6 +596,7 @@ static void result_load_channel_regexp( MYSQL_RES *res, MYSQL_BIND *input,
         tracItem->svnPasswd = strdup(row[5]);
         tracItem->enabled   = ( atoi(row[6]) == 0 ? FALSE : TRUE );
         tracItem->visited   = TRUE;
+        tracItem->modified  = FALSE;
 
         len = strlen( tracItem->url ) + 20;
         menuText = (char *)malloc(len);
@@ -1200,13 +1229,19 @@ static int tracFormItemCount = NELEMENTS(tracFormItems);
 
 void tracSaveFunc( void *arg, int index, char *string )
 {
+    TracURL_t      *tracItem;
+
+    tracItem = (TracURL_t *)arg;
+
     if( index == -1 ) {
-        LogPrint( LOG_DEBUG, "trac: %p - complete", arg );
+        db_update_tracitem( tracItem );
+        tracSighup( 0, NULL );
         return;
     }
 
     cursesSaveOffset( arg, index, tracFormItems, tracFormItemCount,
                       string );
+    tracItem->modified = TRUE;
 }
 
 void cursesTracRevert( void *arg, char *string )
@@ -1218,6 +1253,10 @@ void cursesTracRevert( void *arg, char *string )
 
 void cursesTracDisplay( void *arg )
 {
+    TracURL_t      *tracItem;
+
+    tracItem = (TracURL_t *)arg;
+    tracItem->oldChanId = tracItem->chanId;
     cursesFormDisplay( arg, tracFormItems, tracFormItemCount, 
                        tracSaveFunc );
 }
