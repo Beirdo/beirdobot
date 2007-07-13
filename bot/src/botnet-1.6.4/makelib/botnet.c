@@ -286,8 +286,10 @@ void *ThreadProc_Connect(void *Info)
 
 void BN_Disconnect(BN_PInfo I)
 {
-  CLOSE_SOCKET_FUNC(I->Socket);
-  I->Socket = 0;
+  if( I->Socket != 0 ) {
+    CLOSE_SOCKET_FUNC(I->Socket);
+    I->Socket = 0;
+  }
 }
 
 BN_PMessage BN_WaitForData(BN_PInfo I)
@@ -388,6 +390,17 @@ BN_PMessage BN_WaitForData(BN_PInfo I)
 #endif
       tv.tv_sec = BN_SOCKET_TIMEOUT;
       tv.tv_usec = 0;
+
+      if(I->Socket == 0)
+      {
+        if((I->Flags & PROCESS_NEW_PROCESS) == PROCESS_NEW_PROCESS)
+          EXIT_PROCESS_FUNC(1);
+        else if((I->Flags & PROCESS_NEW_THREAD) == PROCESS_NEW_THREAD)
+          EXIT_THREAD_FUNC 1);
+        else
+          return NULL;
+      }
+
       retval = select(I->Socket+1,&rfds,NULL,NULL,&tv);
       if(!retval)
       {
@@ -440,6 +453,17 @@ BN_PMessage BN_WaitForData(BN_PInfo I)
         }
 #endif
       }
+
+      if(I->Socket == 0)
+      {
+        if((I->Flags & PROCESS_NEW_PROCESS) == PROCESS_NEW_PROCESS)
+          EXIT_PROCESS_FUNC(1);
+        else if((I->Flags & PROCESS_NEW_THREAD) == PROCESS_NEW_THREAD)
+          EXIT_THREAD_FUNC 1);
+        else
+          return NULL;
+      }
+
       len = recv(I->Socket,I->Buf+I->BufPos,BN_BUFFERSIZE-I->BufPos-1,0);
 
       /* Setting time stamp for received message */
