@@ -232,6 +232,7 @@ BalancedBTree_t        *mailboxActiveTree;
 BalancedBTree_t        *mailboxStreamTree;
 static bool             threadReload = FALSE;
 int                     mailboxMenuId;
+static ThreadCallback_t callbacks;
 
 
 void plugin_initialize( char *args )
@@ -249,8 +250,10 @@ void plugin_initialize( char *args )
 
     mailboxMenuId = cursesMenuItemAdd( 1, -1, "Mailbox", NULL, NULL );
 
+    memset( &callbacks, 0, sizeof( ThreadCallback_t ) );
+    callbacks.sighupFunc = mailboxSighup;
     thread_create( &mailboxThreadId, mailbox_thread, NULL, "thread_mailbox",
-                   mailboxSighup, NULL );
+                   &callbacks );
     botCmd_add( (const char **)&command, botCmdMailbox, botHelpMailbox, NULL );
 }
 

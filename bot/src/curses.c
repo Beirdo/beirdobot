@@ -383,9 +383,9 @@ void curses_start( void )
     formPageList = LinkedListCreate();
 
     thread_create( &cursesOutThreadId, curses_output_thread, NULL, 
-                   "thread_curses_out", NULL, NULL );
+                   "thread_curses_out", NULL );
     thread_create( &cursesInThreadId, curses_input_thread, NULL, 
-                   "thread_curses_in", NULL, NULL );
+                   "thread_curses_in", NULL );
 }
 
 void *curses_output_thread( void *arg )

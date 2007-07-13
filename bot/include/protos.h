@@ -139,10 +139,9 @@ void LogItemOutput( void *vitem );
 void LogFlushOutput( void );
 
 void thread_create( pthread_t *pthreadId, void * (*routine)(void *), 
-                    void *arg, char *name, SigFunc_t sighupFunc, 
-                    void *sighupArg );
-void thread_register( pthread_t *pthreadId, char *name, SigFunc_t sighupFunc,
-                      void *sighupArg );
+                    void *arg, char *name, ThreadCallback_t *callbacks );
+void thread_register( pthread_t *pthreadId, char *name, 
+                      ThreadCallback_t *callbacks );
 char *thread_name( pthread_t pthreadId );
 void thread_deregister( pthread_t pthreadId );
 void ThreadAllKill( int signum );

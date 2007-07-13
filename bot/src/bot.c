@@ -636,9 +636,12 @@ void serverStart( IRCServer_t *server )
     server->newServer = FALSE;
     server->txQueue = QueueCreate( 1024 );
     thread_create( &server->txThreadId, transmit_thread, (void *)server, 
-                   server->txThreadName, NULL, NULL );
+                   server->txThreadName, NULL );
+
+    server->callbacks.sighupFunc = botSighup;
+    server->callbacks.sighupArg  = (void *)server;
     thread_create( &server->threadId, bot_server_thread, (void *)server, 
-                   server->threadName, botSighup, (void *)server );
+                   server->threadName, &server->callbacks );
 }
 
 void *bot_shutdown(void *arg)

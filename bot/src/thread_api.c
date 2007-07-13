@@ -44,24 +44,22 @@ extern pthread_t    mainThreadId;
 extern pthread_t    cursesOutThreadId;
 
 typedef struct {
-    pthread_t  *threadId;
-    char       *name;
-    SigFunc_t   sighupFunc;
-    void       *sighupArg;
+    pthread_t          *threadId;
+    char               *name;
+    ThreadCallback_t   *callbacks;
 } Thread_t;
 
 void ThreadRecurseKill( BalancedBTreeItem_t *node, int signum );
 
 void thread_create( pthread_t *pthreadId, void * (*routine)(void *), 
-                    void *arg, char *name, SigFunc_t sighupFunc, 
-                    void *sighupArg )
+                    void *arg, char *name, ThreadCallback_t *callbacks )
 {
     pthread_create( pthreadId, NULL, routine, arg );
-    thread_register( pthreadId, name, sighupFunc, sighupArg );
+    thread_register( pthreadId, name, callbacks );
 }
 
-void thread_register( pthread_t *pthreadId, char *name, SigFunc_t sighupFunc,
-                      void *sighupArg )
+void thread_register( pthread_t *pthreadId, char *name, 
+                      ThreadCallback_t *callbacks )
 {
     BalancedBTreeItem_t    *item;
     Thread_t               *thread;
@@ -77,8 +75,7 @@ void thread_register( pthread_t *pthreadId, char *name, SigFunc_t sighupFunc,
     thread = (Thread_t *)malloc(sizeof(Thread_t));
     thread->threadId   = pthreadId;
     thread->name       = name;
-    thread->sighupFunc = sighupFunc;
-    thread->sighupArg  = sighupArg;
+    thread->callbacks  = callbacks;
 
     item = (BalancedBTreeItem_t *)malloc(sizeof(BalancedBTreeItem_t));
     item->item = (void *)thread;
@@ -181,7 +178,7 @@ SigFunc_t ThreadGetHandler( pthread_t threadId, int signum, void **parg )
     thread = (Thread_t *)item->item;
 
     if( parg ) {
-        *parg = thread->sighupArg;
+        *parg = NULL;
     }
 
     switch( signum ) {
@@ -189,7 +186,19 @@ SigFunc_t ThreadGetHandler( pthread_t threadId, int signum, void **parg )
         return( do_backtrace );
         break;
     case SIGHUP:
-        return( thread->sighupFunc );
+        if( parg ) {
+            if( thread->callbacks ) {
+                *parg = thread->callbacks->sighupArg;
+            } else {
+                *parg = NULL;
+            }
+        }
+
+        if( !thread->callbacks ) {
+            return( NULL );
+        }
+
+        return( thread->callbacks->sighupFunc );
         break;
     case SIGWINCH:
         if( !Daemon && pthread_equal( threadId, cursesOutThreadId ) ) {

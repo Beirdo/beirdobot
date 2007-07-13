@@ -152,7 +152,7 @@ void logging_initialize( void )
     }
 
     thread_create( &loggingThreadId, LoggingThread, NULL, "thread_logging",
-                   NULL, NULL );
+                   NULL );
 }
 
 void logging_toggle_debug( int signum, void *info, void *secret )

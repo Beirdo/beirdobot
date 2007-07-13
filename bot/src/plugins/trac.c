@@ -181,6 +181,7 @@ static pthread_mutex_t  shutdownMutex;
 static pthread_mutex_t  signalMutex;
 static pthread_cond_t   kickCond;
 int                     tracMenuId;
+static ThreadCallback_t callbacks;
 
 int tracSvnInitialize( TracURL_t *tracItem );
 char *tracDetailsTicket( TracURL_t *tracItem, int number );
@@ -221,8 +222,10 @@ void plugin_initialize( char *args )
     pthread_mutex_init( &signalMutex, NULL );
     pthread_cond_init( &kickCond, NULL );
 
+    memset( &callbacks, 0, sizeof(ThreadCallback_t) );
+    callbacks.sighupFunc = tracSighup;
     thread_create( &tracThreadId, trac_thread, NULL, "thread_trac", 
-                   tracSighup, NULL );
+                   &callbacks );
 }
 
 void plugin_shutdown( void )

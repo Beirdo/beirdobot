@@ -39,8 +39,23 @@
 static char interthread_h_ident[] _UNUSED_ = 
     "$Id$";
 
+struct _IRCServer_t;
+struct _IRCChannel_t;
+
+typedef void (*SigFunc_t)( int, void * );
+typedef void (*ServerDisableFunc_t)( struct _IRCServer_t * );
+typedef void (*ChannelDisableFunc_t)( struct _IRCChannel_t * );
 
 typedef struct {
+    SigFunc_t               sighupFunc;
+    void                   *sighupArg;
+    ServerDisableFunc_t     serverDisable;
+    ChannelDisableFunc_t    channelDisable;
+} ThreadCallback_t;
+
+
+
+typedef struct _IRCServer_t {
     LinkedList_t       *channels;
     BalancedBTree_t    *channelName;
     BalancedBTree_t    *channelNum;
@@ -72,9 +87,10 @@ typedef struct {
     bool                modified;
     bool                newServer;
     char               *menuText;
+    ThreadCallback_t    callbacks;
 } IRCServer_t;
 
-typedef struct {
+typedef struct _IRCChannel_t {
     LinkedListItem_t    item;
     BalancedBTreeItem_t itemName;
     BalancedBTreeItem_t itemNum;
@@ -311,8 +327,6 @@ typedef struct _QueryItem_t {
     pthread_mutex_t    *queryMutex;
     unsigned int        querySequence;
 } QueryItem_t;
-
-typedef void (*SigFunc_t)( int, void * );
 
 typedef void (*CursesMenuFunc_t)(void *);
 

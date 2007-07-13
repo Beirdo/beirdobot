@@ -95,6 +95,7 @@ int main ( int argc, char **argv )
     struct sigaction    sa;
     sigset_t            sigmsk;
     size_t              len;
+    ThreadCallback_t    callbacks;
 
     GlobalAbort = false;
 
@@ -160,7 +161,9 @@ int main ( int argc, char **argv )
     /* Start up the Logging thread */
     logging_initialize();
 
-    thread_register( &mainThreadId, "thread_main", mainSighup, NULL );
+    memset( &callbacks, 0, sizeof(ThreadCallback_t) );
+    callbacks.sighupFunc = mainSighup;
+    thread_register( &mainThreadId, "thread_main", &callbacks );
 
     /* Setup signal handler for SIGUSR1 (toggles Debug) */
     sa.sa_sigaction = (sigAction_t)logging_toggle_debug;
@@ -585,7 +588,7 @@ void MainDelayExit( void )
 
     /* Shut down IRC connections */
     thread_create( &shutdownThreadId, bot_shutdown, NULL, "thread_shutdown",
-                   NULL, NULL );
+                   NULL );
 
     /* Delay to allow all the other tasks to finish (esp. logging!) */
     for( i = 15; i && !BotDone; i-- ) {

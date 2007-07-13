@@ -181,6 +181,7 @@ static pthread_mutex_t  signalMutex;
 static pthread_cond_t   kickCond;
 static bool             threadReload = FALSE;
 int                     rssfeedMenuId;
+static ThreadCallback_t callbacks;
 
 
 void plugin_initialize( char *args )
@@ -215,8 +216,10 @@ void plugin_initialize( char *args )
     pthread_mutex_init( &signalMutex, NULL );
     pthread_cond_init( &kickCond, NULL );
 
+    memset( &callbacks, 0, sizeof( ThreadCallback_t ) );
+    callbacks.sighupFunc = rssfeedSighup;
     thread_create( &rssfeedThreadId, rssfeed_thread, NULL, "thread_rssfeed",
-                   rssfeedSighup, NULL );
+                   &callbacks );
     botCmd_add( (const char **)&command, botCmdRssfeed, botHelpRssfeed, NULL );
 }
 
