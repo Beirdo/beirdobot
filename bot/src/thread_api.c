@@ -50,6 +50,10 @@ typedef struct {
 } Thread_t;
 
 void ThreadRecurseKill( BalancedBTreeItem_t *node, int signum );
+void ThreadRecurseNotifyServer( BalancedBTreeItem_t *node, 
+                                IRCServer_t *server );
+void ThreadRecurseNotifyChannel( BalancedBTreeItem_t *node, 
+                                 IRCChannel_t *channel );
 
 void thread_create( pthread_t *pthreadId, void * (*routine)(void *), 
                     void *arg, char *name, ThreadCallback_t *callbacks )
@@ -211,6 +215,67 @@ SigFunc_t ThreadGetHandler( pthread_t threadId, int signum, void **parg )
 
     return( NULL );
 }
+
+
+void ThreadAllNotifyServer( IRCServer_t *server )
+{
+    BalancedBTreeLock( ThreadTree );
+
+    ThreadRecurseNotifyServer( ThreadTree->root, server );
+
+    BalancedBTreeUnlock( ThreadTree );
+}
+
+void ThreadRecurseNotifyServer( BalancedBTreeItem_t *node, 
+                                IRCServer_t *server )
+{
+    Thread_t       *thread;
+
+    if( !node ) {
+        return;
+    }
+
+    ThreadRecurseNotifyServer( node->left, server );
+
+    thread = (Thread_t *)node->item;
+
+    if( thread->callbacks && thread->callbacks->serverDisable ) {
+        thread->callbacks->serverDisable( server );
+    }
+
+    ThreadRecurseNotifyServer( node->right, server );
+}
+
+
+void ThreadAllNotifyChannel( IRCChannel_t *channel )
+{
+    BalancedBTreeLock( ThreadTree );
+
+    ThreadRecurseNotifyChannel( ThreadTree->root, channel );
+
+    BalancedBTreeUnlock( ThreadTree );
+}
+
+void ThreadRecurseNotifyChannel( BalancedBTreeItem_t *node, 
+                                 IRCChannel_t *channel )
+{
+    Thread_t       *thread;
+
+    if( !node ) {
+        return;
+    }
+
+    ThreadRecurseNotifyChannel( node->left, channel );
+
+    thread = (Thread_t *)node->item;
+
+    if( thread->callbacks && thread->callbacks->channelDisable ) {
+        thread->callbacks->channelDisable( channel );
+    }
+
+    ThreadRecurseNotifyChannel( node->right, channel );
+}
+
 
 /*
  * vim:ts=4:sw=4:ai:et:si:sts=4

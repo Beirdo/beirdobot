@@ -224,6 +224,8 @@ void cursesAtExit( void );
 void db_update_channel( IRCChannel_t *channel );
 void db_update_server( IRCServer_t *server );
 void mainSighup( int signum, void *arg );
+void ThreadAllNotifyChannel( IRCChannel_t *channel );
+void ThreadAllNotifyServer( IRCServer_t *server );
 
 #endif
 
