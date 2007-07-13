@@ -105,7 +105,11 @@ static QueryTable_t rssfeedQueryTable[] = {
       NULL, NULL, FALSE },
     /* 1 */
     { "UPDATE `plugin_rssfeed` SET `lastpost` = ? WHERE `feedid` = ?", NULL,
-      NULL, FALSE }
+      NULL, FALSE },
+    /* 2 */
+    { "UPDATE `plugin_rssfeed` SET `chanid` = ?, `url` = ?, `userpasswd` = ?, "
+      "`authtype` = ?, `prefix` = ?, `timeout` = ?, `timespec` = ?, "
+      "`feedoffset` = ?, `enabled` = ? WHERE `feedid` = ?", NULL, NULL, FALSE }
 };
 
 
@@ -126,6 +130,7 @@ typedef struct {
     char           *timeSpec;
     long            offset;
     bool            visited;
+    bool            modified;
     char           *menuText;
 } RssFeed_t;
 
@@ -149,6 +154,7 @@ void botCmdRssfeed( IRCServer_t *server, IRCChannel_t *channel, char *who,
 char *botHelpRssfeed( void *tag );
 void *rssfeed_thread(void *arg);
 static void db_load_rssfeeds( void );
+static void db_update_rssfeed( RssFeed_t *feed );
 static void result_load_rssfeeds( MYSQL_RES *res, MYSQL_BIND *input, 
                                   void *args );
 void db_update_lastpost( int feedId, int lastPost );
@@ -796,6 +802,29 @@ static void db_load_rssfeeds( void )
     free( mutex );
 }
 
+static void db_update_rssfeed( RssFeed_t *feed )
+{
+    MYSQL_BIND         *data;
+
+    data = (MYSQL_BIND *)malloc(10 * sizeof(MYSQL_BIND));
+    memset( data, 0, 10 * sizeof(MYSQL_BIND) );
+
+    bind_numeric( &data[0], feed->chanId, MYSQL_TYPE_LONG );
+    bind_string( &data[1], feed->url, MYSQL_TYPE_VAR_STRING );
+    bind_string( &data[2], (feed->userpass ? feed->userpass : ""), 
+                 MYSQL_TYPE_VAR_STRING );
+    bind_numeric( &data[3], feed->authtype, MYSQL_TYPE_LONG );
+    bind_string( &data[4], feed->prefix, MYSQL_TYPE_VAR_STRING );
+    bind_numeric( &data[5], feed->timeout, MYSQL_TYPE_LONG );
+    bind_string( &data[6], feed->timeSpec, MYSQL_TYPE_VAR_STRING );
+    bind_numeric( &data[7], feed->offset, MYSQL_TYPE_LONG );
+    bind_numeric( &data[8], feed->enabled, MYSQL_TYPE_LONG );
+    bind_numeric( &data[9], feed->feedId, MYSQL_TYPE_LONG );
+
+    LogPrint( LOG_NOTICE, "RSSFeed: feed %d: updating database", feed->feedId );
+    db_queue_query( 2, rssfeedQueryTable, data, 10, NULL, NULL, NULL );
+}
+
 /* Assumes both the rssfeedTree and rssfeedActiveTree are locked */
 static void result_load_rssfeeds( MYSQL_RES *res, MYSQL_BIND *input, 
                                   void *args )
@@ -867,6 +896,7 @@ static void result_load_rssfeeds( MYSQL_RES *res, MYSQL_BIND *input,
         data->timeSpec = strdup(row[9]);
         data->offset   = atol(row[10]);
         data->enabled  = ( atoi(row[11]) == 0 ? FALSE : TRUE );
+        data->modified = FALSE;
 
         len = strlen( data->prefix ) + 20;
         menuText = (char *)malloc(len);
@@ -1171,13 +1201,19 @@ static int rssfeedFormItemCount = NELEMENTS(rssfeedFormItems);
 
 void rssfeedSaveFunc( void *arg, int index, char *string )
 {
+    RssFeed_t      *feed;
+
+    feed = (RssFeed_t *)arg;
+
     if( index == -1 ) {
-        LogPrint( LOG_DEBUG, "rssfeed: %p - complete", arg );
+        db_update_rssfeed( feed );
+        rssfeedSighup( 0, NULL );
         return;
     }
 
     cursesSaveOffset( arg, index, rssfeedFormItems, rssfeedFormItemCount,
                       string );
+    feed->modified = TRUE;
 }
 
 void cursesRssfeedRevert( void *arg, char *string )

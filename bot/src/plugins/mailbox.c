@@ -1314,6 +1314,7 @@ static void result_load_reports( MYSQL_RES *res, MYSQL_BIND *input,
         report->format    = strdup(row[3]);
         report->enabled   = ( atoi(row[4]) == 0 ? FALSE : TRUE );
         report->visited   = TRUE;
+        report->modified  = FALSE;
 
         menuText = (char *)malloc(64);
         snprintf( menuText, 64, "Report M: %d, S: %d, C: %d", 
@@ -1797,7 +1798,6 @@ void mailboxSaveFunc( void *arg, int index, char *string )
     mailbox = (Mailbox_t *)arg;
 
     if( index == -1 ) {
-        LogPrint( LOG_DEBUG, "mailbox: %p - complete", arg );
         db_update_mailbox( mailbox );
         mailboxSighup( 0, NULL );
         return;
@@ -1867,7 +1867,6 @@ void mailboxReportSaveFunc( void *arg, int index, char *string )
     report = (MailboxReport_t *)arg;
 
     if( index == -1 ) {
-        LogPrint( LOG_DEBUG, "mailbox report: %p - complete", arg );
         if( report->mailboxId != report->oldMailboxId ||
             report->serverId  != report->oldServerId ||
             report->channelId != report->oldChannelId ) {
