@@ -695,7 +695,7 @@ void serverKill( BalancedBTreeItem_t *node, IRCServer_t *server, bool unalloc )
     IRCChannel_t           *channel;
     BalancedBTreeItem_t    *item;
 
-    if( server->enabled ) {
+    if( server->enabled || server->enabledChanged ) {
         server->threadAbort = TRUE;
         thread_deregister( server->txThreadId );
         thread_deregister( server->threadId );
@@ -773,9 +773,9 @@ void serverKill( BalancedBTreeItem_t *node, IRCServer_t *server, bool unalloc )
     LinkedListDestroy( server->floodList );
     server->floodList = NULL;
 
-    cursesMenuItemRemove( 2, MENU_SERVERS, server->menuText );
-
     if( unalloc ) {
+        cursesMenuItemRemove( 2, MENU_SERVERS, server->menuText );
+
         free( server->threadName );
         free( server->txThreadName );
         free( server );
@@ -1092,8 +1092,18 @@ static int serverFormItemCount = NELEMENTS(serverFormItems);
 
 void serverSaveFunc( void *arg, int index, char *string )
 {
+    IRCServer_t    *server;
+
+    server = (IRCServer_t *)arg;
     if( index == -1 ) {
         LogPrint( LOG_DEBUG, "server: %p - complete", arg );
+        if( server->enabled != server->oldEnabled ) {
+            server->enabledChanged = TRUE;
+        }
+
+        db_update_server( server );
+        mainSighup( 0, NULL );
+        botSighup( 0, server );
         return;
     }
 
@@ -1103,12 +1113,20 @@ void serverSaveFunc( void *arg, int index, char *string )
 
 void cursesServerDisplay( void *arg )
 {
+    IRCServer_t    *server;
+
+    server = (IRCServer_t *)arg;
+    server->oldEnabled = server->enabled;
     cursesFormDisplay( arg, serverFormItems, serverFormItemCount, 
                        serverSaveFunc );
 }
 
 void cursesServerRevert( void *arg, char *string )
 {
+    IRCServer_t    *server;
+
+    server = (IRCServer_t *)arg;
+    server->oldEnabled = server->enabled;
     cursesFormRevert( arg, serverFormItems, serverFormItemCount, 
                       serverSaveFunc );
 }

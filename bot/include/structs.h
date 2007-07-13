@@ -66,6 +66,8 @@ typedef struct {
     QueueObject_t      *txQueue;
     bool                threadAbort;
     bool                enabled;
+    bool                oldEnabled;
+    bool                enabledChanged;
     bool                visited;
     bool                modified;
     bool                newServer;

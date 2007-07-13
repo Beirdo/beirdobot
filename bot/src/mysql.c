@@ -168,7 +168,13 @@ QueryTable_t    QueryTable[] = {
     /* 24 */
     { "UPDATE `channels` SET `serverid` = ?, `channel` = ?, "
       "`url` = ?, `notifywindow` = ?, `cmdChar` = ?, `enabled` = ? "
-      "WHERE `chanid` = ?", NULL, NULL, FALSE }
+      "WHERE `chanid` = ?", NULL, NULL, FALSE },
+    /* 25 */
+    { "UPDATE `servers` SET `server` = ?, `port` = ?, `password` = ?, "
+      "`nick` = ?, `username` = ?, `realname` = ?, `nickserv` = ?, "
+      "`nickservmsg` = ?, `floodInterval` = ?, `floodMaxTime` = ?, "
+      "`floodBuffer` = ?, `floodMaxLine` = ?, `enabled` = ? "
+      "WHERE `serverid` = ? ", NULL, NULL, FALSE }
 };
 
 QueueObject_t   *QueryQ;
@@ -1305,6 +1311,33 @@ void db_update_channel( IRCChannel_t *channel )
     db_queue_query( 24, QueryTable, data, 7, NULL, NULL, NULL );
 }
 
+void db_update_server( IRCServer_t *server )
+{
+    MYSQL_BIND         *data;
+
+    data = (MYSQL_BIND *)malloc(14 * sizeof(MYSQL_BIND));
+    memset( data, 0, 14 * sizeof(MYSQL_BIND) );
+
+    bind_string( &data[0], server->server, MYSQL_TYPE_VAR_STRING );
+    bind_numeric( &data[1], server->port, MYSQL_TYPE_LONG );
+    bind_string( &data[2], server->password, MYSQL_TYPE_VAR_STRING );
+    bind_string( &data[3], server->nick, MYSQL_TYPE_VAR_STRING );
+    bind_string( &data[4], server->username, MYSQL_TYPE_VAR_STRING );
+    bind_string( &data[5], server->realname, MYSQL_TYPE_VAR_STRING );
+    bind_string( &data[6], server->nickserv, MYSQL_TYPE_VAR_STRING );
+    bind_string( &data[7], server->nickservmsg, MYSQL_TYPE_VAR_STRING );
+    bind_numeric( &data[8], server->floodInterval, MYSQL_TYPE_LONG );
+    bind_numeric( &data[9], server->floodMaxTime, MYSQL_TYPE_LONG );
+    bind_numeric( &data[10], server->floodBuffer, MYSQL_TYPE_LONG );
+    bind_numeric( &data[11], server->floodMaxLine, MYSQL_TYPE_LONG );
+    bind_numeric( &data[12], server->enabled, MYSQL_TYPE_LONG );
+    bind_numeric( &data[13], server->serverId, MYSQL_TYPE_LONG );
+
+    LogPrint( LOG_NOTICE, "Bot: server %d: updating database", 
+                          server->serverId );
+    db_queue_query( 25, QueryTable, data, 14, NULL, NULL, NULL );
+}
+
 /*
  * Query result callbacks
  */
@@ -1397,7 +1430,8 @@ void result_load_servers( MYSQL_RES *res, MYSQL_BIND *input, void *arg )
         server->floodMaxLine    = atoi(row[12]);
         server->enabled         = ( atoi(row[13]) == 0 ? FALSE : TRUE );
         server->visited         = TRUE;
-        server->newServer       = !found;
+        server->newServer       = !found || (server->enabledChanged &&
+                                             server->enabled);
 
         if( server->floodInterval <= 0 ) {
             server->floodInterval = 1;
@@ -1465,13 +1499,18 @@ void result_load_servers( MYSQL_RES *res, MYSQL_BIND *input, void *arg )
                                cursesServerDisplay, (void *)server );
         }
 
-        if( (found && oldEnabled && !server->enabled) || killServer ) {
+        if( (found && (oldEnabled || server->enabledChanged) && 
+             !server->enabled) || killServer ) {
             serverKill( item, server, FALSE );
         }
 
         if( !server->floodList ) {
             server->floodList = LinkedListCreate();
         }
+
+        server->oldEnabled = server->enabled;
+        server->enabledChanged = FALSE;
+        server->modified = FALSE;
 
         if( !found ) {
             item->item = (void *)server;
