@@ -640,6 +640,8 @@ static void result_load_channel_regexp( MYSQL_RES *res, MYSQL_BIND *input,
             }
         }
 
+        tracItem->oldChanId = tracItem->chanId;
+
         if( !found ) {
             item->item = (void *)tracItem;
             item->key  = (void *)&tracItem->chanId;

@@ -64,7 +64,6 @@ pthread_t           mainThreadId;
 BalancedBTree_t    *versionTree;
 char               *pthreadsVersion = NULL;
 
-void mainSighup( int signum, void *arg );
 void LogBanner( void );
 void MainParseArgs( int argc, char **argv );
 void MainDisplayUsage( char *program, char *errorMsg );

@@ -386,7 +386,7 @@ void ProcOnInvite(BN_PInfo I, const char Chan[], const char Who[],
      */
     LogPrint( LOG_NOTICE, "Invited to channel %s on server %s by %s", 
               channel->channel, server->server, Who);
-    channel->joined = false;
+    channel->joined = FALSE;
     transmitMsg( server, TX_JOIN, channel->channel, NULL );
 }
 
@@ -430,7 +430,7 @@ void ProcOnKick(BN_PInfo I, const char Chan[], const char Who[],
         /*
          * We just got kicked.  The NERVE!  Join again.
          */
-        channel->joined = false;
+        channel->joined = FALSE;
         transmitMsg( server, TX_JOIN, channel->channel, NULL );
 #endif
         LogPrint( LOG_NOTICE, "Kicked from channel %s on server %s by %s (%s)", 
@@ -789,6 +789,7 @@ void channelLeave( IRCServer_t *server, IRCChannel_t *channel,
     transmitMsg( server, TX_PART, oldChannel, 
                  "Leaving due to reconfiguration" );
     db_nick_history( channel, "", HIST_END );
+    channel->joined = FALSE;
 }
 
 
@@ -1152,17 +1153,35 @@ static int channelFormItemCount = NELEMENTS(channelFormItems);
 
 void channelSaveFunc( void *arg, int index, char *string )
 {
+    IRCChannel_t       *channel;
+
+    channel = (IRCChannel_t *)arg;
     if( index == -1 ) {
-        LogPrint( LOG_DEBUG, "channel: %p - complete", arg );
+        if( channel->enabled != channel->oldEnabled ) {
+            channel->enabledChanged = TRUE;
+        }
+        db_update_channel( channel );
+        mainSighup( 0, NULL );
+        if( channel->server != channel->oldServer ) {
+            botSighup( 0, channel->oldServer );
+            cursesCancel( arg, string );
+        }
+        botSighup( 0, channel->server );
         return;
     }
 
     cursesSaveOffset( arg, index, channelFormItems, channelFormItemCount,
                       string );
+    channel->modified = TRUE;
 }
 
 void cursesChannelRevert( void *arg, char *string )
 {
+    IRCChannel_t       *channel;
+
+    channel = (IRCChannel_t *)arg;
+    channel->oldServer  = channel->server;
+    channel->oldEnabled = channel->enabled; 
     cursesFormRevert( arg, channelFormItems, channelFormItemCount, 
                       channelSaveFunc );
 }
@@ -1170,6 +1189,11 @@ void cursesChannelRevert( void *arg, char *string )
 
 void cursesChannelDisplay( void *arg )
 {
+    IRCChannel_t       *channel;
+
+    channel = (IRCChannel_t *)arg;
+    channel->oldServer  = channel->server;
+    channel->oldEnabled = channel->enabled; 
     cursesFormDisplay( arg, channelFormItems, channelFormItemCount, 
                        channelSaveFunc );
 }

@@ -1347,6 +1347,14 @@ static void result_load_reports( MYSQL_RES *res, MYSQL_BIND *input,
             report->channel = NULL;
         }
 
+        report->oldMailboxId = report->mailboxId;
+        report->oldServerId  = report->serverId;
+        report->oldChannelId = report->channelId;
+        if( report->oldNick ) {
+            free( report->oldNick );
+        }
+        report->oldNick = strdup( report->nick );
+
         if( !found ) {
             LinkedListAdd( mailbox->reports, (LinkedListItem_t *)report, 
                            LOCKED, AT_TAIL );
@@ -1888,6 +1896,17 @@ void mailboxReportSaveFunc( void *arg, int index, char *string )
 
 void cursesMailboxReportRevert( void *arg, char *string )
 {
+    MailboxReport_t        *report;
+
+    report = (MailboxReport_t *)arg;
+    report->oldMailboxId = report->mailboxId;
+    report->oldServerId  = report->serverId;
+    report->oldChannelId = report->channelId;
+    if( report->oldNick ) {
+        free( report->oldNick );
+    }
+    report->oldNick = strdup( report->nick );
+
     cursesFormRevert( arg, mailboxReportFormItems, mailboxReportFormItemCount, 
                       mailboxReportSaveFunc );
 }

@@ -164,7 +164,11 @@ QueryTable_t    QueryTable[] = {
       "`arguments`) VALUES ( ?, ?, ?, ? )", NULL, NULL, FALSE },
     /* 23 */
     { "SELECT `name`, `value` FROM `settings` ORDER BY `name` ASC", NULL, NULL,
-      FALSE }
+      FALSE },
+    /* 24 */
+    { "UPDATE `channels` SET `serverid` = ?, `channel` = ?, "
+      "`url` = ?, `notifywindow` = ?, `cmdChar` = ?, `enabled` = ? "
+      "WHERE `chanid` = ?", NULL, NULL, FALSE }
 };
 
 QueueObject_t   *QueryQ;
@@ -464,6 +468,11 @@ MYSQL_RES *db_query( const char *query, MYSQL_BIND *args, int arg_count,
             buflen -= len;
         } else {
             switch( args->buffer_type ) {
+            case MYSQL_TYPE_TINY:
+                snprintf( buf, 128, "%c", *(char *)(args->buffer) );
+                string = db_quote(buf);
+                len = strlen(string) + 2;
+                break;
             case MYSQL_TYPE_SHORT:
                 len = snprintf( buf, 128, "%d", *(short int *)(args->buffer) );
                 break;
@@ -1276,6 +1285,26 @@ void cursesMySQLSchema( void *arg )
     db_queue_query( 23, QueryTable, NULL, 0, result_MySQL_Schema, NULL, NULL );
 }
 
+void db_update_channel( IRCChannel_t *channel )
+{
+    MYSQL_BIND         *data;
+
+    data = (MYSQL_BIND *)malloc(7 * sizeof(MYSQL_BIND));
+    memset( data, 0, 7 * sizeof(MYSQL_BIND) );
+
+    bind_numeric( &data[0], channel->server->serverId, MYSQL_TYPE_LONG );
+    bind_string( &data[1], channel->channel, MYSQL_TYPE_VAR_STRING );
+    bind_string( &data[2], channel->url, MYSQL_TYPE_VAR_STRING );
+    bind_numeric( &data[3], channel->notifywindow, MYSQL_TYPE_LONG );
+    bind_numeric( &data[4], channel->cmdChar, MYSQL_TYPE_TINY );
+    bind_numeric( &data[5], channel->enabled, MYSQL_TYPE_LONG );
+    bind_numeric( &data[6], channel->channelId, MYSQL_TYPE_LONG );
+
+    LogPrint( LOG_NOTICE, "Bot: channel %d: updating database", 
+                          channel->channelId );
+    db_queue_query( 24, QueryTable, data, 7, NULL, NULL, NULL );
+}
+
 /*
  * Query result callbacks
  */
@@ -1525,10 +1554,13 @@ void result_load_channels( MYSQL_RES *res, MYSQL_BIND *input, void *arg )
         channel->enabled        = ( atoi(row[5]) == 0 ? FALSE : TRUE );
         channel->server         = server;
         if( !found ) {
-            channel->joined         = FALSE;
+            channel->joined     = FALSE;
         }
         channel->visited        = TRUE;
-        channel->newChannel     = (!found || (!oldEnabled && channel->enabled));
+        channel->newChannel     = (!found || 
+                                   ((!oldEnabled || channel->enabledChanged) &&
+                                    channel->enabled));
+        channel->modified       = FALSE;
 
         fullSpec = (char *)malloc(strlen(server->nick) + 10 + 
                                   strlen(server->server) +
@@ -1537,10 +1569,10 @@ void result_load_channels( MYSQL_RES *res, MYSQL_BIND *input, void *arg )
                            server->port, channel->channel );
         if( found ) {
             if( strcmp( fullSpec, channel->fullspec ) || 
-                (oldEnabled && !channel->enabled) ) {
+                ((oldEnabled || channel->enabledChanged) && 
+                 !channel->enabled) ) {
                 free( channel->fullspec );
                 channel->fullspec = fullSpec;
-                /* Leave the channel */
                 channelLeave( server, channel, oldChannel );
                 channel->newChannel = TRUE;
                 if( channel->enabled ) {
@@ -1582,6 +1614,10 @@ void result_load_channels( MYSQL_RES *res, MYSQL_BIND *input, void *arg )
             BalancedBTreeAdd( server->channelName, &channel->itemName, LOCKED,
                               FALSE );
         }
+
+        channel->enabledChanged = FALSE;
+        channel->oldServer  = channel->server;
+        channel->oldEnabled = channel->enabled; 
         
         if( !found ) {
             channel->itemName.item  = (void *)channel;

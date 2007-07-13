@@ -222,6 +222,8 @@ void cursesSaveOffset( void *arg, int index, CursesFormItem_t *items,
 
 void cursesPluginDisplay( void *arg );
 void cursesAtExit( void );
+void db_update_channel( IRCChannel_t *channel );
+void mainSighup( int signum, void *arg );
 
 #endif
 

@@ -67,6 +67,7 @@ typedef struct {
     bool                threadAbort;
     bool                enabled;
     bool                visited;
+    bool                modified;
     bool                newServer;
     char               *menuText;
 } IRCServer_t;
@@ -77,6 +78,7 @@ typedef struct {
     BalancedBTreeItem_t itemNum;
     int                 channelId;
     IRCServer_t        *server;
+    IRCServer_t        *oldServer;
     char               *channel;
     char               *fullspec;
     char               *url;
@@ -84,7 +86,10 @@ typedef struct {
     char                cmdChar;
     bool                joined;
     bool                enabled;
+    bool                oldEnabled;
     bool                visited;
+    bool                modified;
+    bool                enabledChanged;
     bool                newChannel;
     char               *menuText;
 } IRCChannel_t;
