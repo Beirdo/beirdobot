@@ -935,6 +935,8 @@ void *curses_input_thread( void *arg )
         ch = wgetch( stdscr );
         if( ch == ERR ) {
             /* No character, timed out */
+            LogPrint(LOG_DEBUG, "input error: %s", strerror(errno));
+            sleep( 1 );
             continue;
         }
 

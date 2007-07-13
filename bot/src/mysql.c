@@ -1501,7 +1501,7 @@ void result_load_servers( MYSQL_RES *res, MYSQL_BIND *input, void *arg )
 
         if( (found && (oldEnabled || server->enabledChanged) && 
              !server->enabled) || killServer ) {
-            serverKill( item, server, FALSE );
+            serverKill( item, server, killServer );
         }
 
         if( !server->floodList ) {

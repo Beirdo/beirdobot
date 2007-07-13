@@ -77,7 +77,7 @@ void *transmit_thread(void *arg)
                           server->txThreadName );
 
     while( !GlobalAbort && !server->threadAbort ) {
-        item = (TransmitItem_t *)QueueDequeueItem( server->txQueue, -1 );
+        item = (TransmitItem_t *)QueueDequeueItem( server->txQueue, 1000 );
         if( !item ) {
             continue;
         }
@@ -198,8 +198,7 @@ void *transmit_thread(void *arg)
         free( item );
     }
 
-    LogPrint( LOG_NOTICE, "Ending transmit thread - %s", 
-                          server->txThreadName );
+    LogPrint( LOG_NOTICE, "Sending dying gasp - %s", server->txThreadName );
 
     snprintf(string, MAX_STRING_LENGTH, ":%s", 
                      "Received SIGINT, shutting down");
@@ -210,8 +209,13 @@ void *transmit_thread(void *arg)
 
     /* Close the server socket to expedite killing the server thread */
     sock = server->ircInfo.Socket;
-    server->ircInfo.Socket = 0;
-    close( sock );
+    if( sock != 0 ) {
+        server->ircInfo.Socket = 0;
+        close( sock );
+    }
+    
+    LogPrint( LOG_NOTICE, "Ending transmit thread - %s", 
+                          server->txThreadName );
 
     return(NULL);
 }

@@ -29,7 +29,6 @@
  * aka Ze KiLleR / SkyTech 
  */
 
-#include "botnet.h"
 #include "environment.h"
 #ifndef __USE_BSD
 #define __USE_BSD
@@ -43,6 +42,8 @@
 #include <sys/wait.h>
 #endif
 #include <errno.h>
+#include <signal.h>
+#include "botnet.h"
 #include "protos.h"
 #include "structs.h"
 #include "linked_list.h"
@@ -775,7 +776,7 @@ void serverKill( BalancedBTreeItem_t *node, IRCServer_t *server, bool unalloc )
 
     if( unalloc ) {
         cursesMenuItemRemove( 2, MENU_SERVERS, server->menuText );
-
+        free( server->menuText );
         free( server->threadName );
         free( server->txThreadName );
         free( server );
@@ -799,12 +800,16 @@ void *bot_server_thread(void *arg)
     IRCServer_t        *server;
     IRCChannel_t       *channel;
     LinkedListItem_t   *item;
+    sigset_t            sigmsk;
 
     server = (IRCServer_t *)arg;
 
     if( !server ) {
         return(NULL);
     }
+
+    sigemptyset( &sigmsk );
+    pthread_sigmask( SIG_SETMASK, &sigmsk, NULL );
 
     Info = &server->ircInfo;
 
@@ -848,7 +853,7 @@ void *bot_server_thread(void *arg)
         LogPrint( LOG_NOTICE, "Disconnected from %s:%d as %s.", server->server, 
                   server->port, server->nick);
 
-        if( GlobalAbort ) {
+        if( GlobalAbort || server->threadAbort ) {
             break;
         }
 
@@ -1096,7 +1101,6 @@ void serverSaveFunc( void *arg, int index, char *string )
 
     server = (IRCServer_t *)arg;
     if( index == -1 ) {
-        LogPrint( LOG_DEBUG, "server: %p - complete", arg );
         if( server->enabled != server->oldEnabled ) {
             server->enabledChanged = TRUE;
         }
