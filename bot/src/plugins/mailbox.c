@@ -219,6 +219,12 @@ void cursesMailboxDisplay( void *arg );
 void mailboxReportSaveFunc( void *arg, int index, char *string );
 void cursesMailboxReportRevert( void *arg, char *string );
 void cursesMailboxReportDisplay( void *arg );
+void mailboxDisableServer( IRCServer_t *server );
+void mailboxDisableChannel( IRCChannel_t *channel );
+bool mailboxRecurseDisableServer( BalancedBTreeItem_t *node, 
+                                  IRCServer_t *server );
+bool mailboxRecurseDisableChannel( BalancedBTreeItem_t *node, 
+                                   IRCChannel_t *channel );
 
 
 /* INTERNAL VARIABLES  */
@@ -251,7 +257,9 @@ void plugin_initialize( char *args )
     mailboxMenuId = cursesMenuItemAdd( 1, -1, "Mailbox", NULL, NULL );
 
     memset( &callbacks, 0, sizeof( ThreadCallback_t ) );
-    callbacks.sighupFunc = mailboxSighup;
+    callbacks.sighupFunc     = mailboxSighup;
+    callbacks.serverDisable  = mailboxDisableServer;
+    callbacks.channelDisable = mailboxDisableChannel; 
     thread_create( &mailboxThreadId, mailbox_thread, NULL, "thread_mailbox",
                    &callbacks );
     botCmd_add( (const char **)&command, botCmdMailbox, botHelpMailbox, NULL );
@@ -1930,6 +1938,106 @@ void cursesMailboxReportDisplay( void *arg )
 
     cursesFormDisplay( arg, mailboxReportFormItems, mailboxReportFormItemCount, 
                        mailboxReportSaveFunc );
+}
+
+void mailboxDisableServer( IRCServer_t *server )
+{
+    bool            changed;
+
+    BalancedBTreeLock( mailboxTree );
+    changed = mailboxRecurseDisableServer( mailboxTree->root, server );
+    BalancedBTreeUnlock( mailboxTree );
+
+    if( changed ) {
+        /* kick the thread */
+        pthread_mutex_lock( &signalMutex );
+        pthread_cond_broadcast( &kickCond );
+        pthread_mutex_unlock( &signalMutex );
+    }
+}
+
+bool mailboxRecurseDisableServer( BalancedBTreeItem_t *node, 
+                                  IRCServer_t *server )
+{
+    Mailbox_t          *mailbox;
+    LinkedListItem_t   *item;
+    MailboxReport_t    *report;
+    bool                changed;
+
+    if( !node ) {
+        return( FALSE );
+    }
+
+    changed = mailboxRecurseDisableServer( node->left, server );
+
+    mailbox = (Mailbox_t *)node->item;
+    if( mailbox->reports ) {
+        LinkedListLock( mailbox->reports );
+        for( item = mailbox->reports->head; item; item = item->next ) {
+            report = (MailboxReport_t *)item;
+            if( report->server == server ) {
+                LogPrint( LOG_INFO, "Mailbox: %d: Disabling server", 
+                          mailbox->mailboxId );
+                report->server = NULL;
+                changed = TRUE;
+            }
+        }
+        LinkedListUnlock( mailbox->reports );
+    }
+
+    changed = mailboxRecurseDisableServer( node->right, server ) || changed;
+
+    return( changed );
+}
+
+void mailboxDisableChannel( IRCChannel_t *channel )
+{
+    bool            changed;
+
+    BalancedBTreeLock( mailboxTree );
+    changed = mailboxRecurseDisableChannel( mailboxTree->root, channel );
+    BalancedBTreeUnlock( mailboxTree );
+
+    if( changed ) {
+        /* kick the thread */
+        pthread_mutex_lock( &signalMutex );
+        pthread_cond_broadcast( &kickCond );
+        pthread_mutex_unlock( &signalMutex );
+    }
+}
+
+bool mailboxRecurseDisableChannel( BalancedBTreeItem_t *node, 
+                                   IRCChannel_t *channel )
+{
+    Mailbox_t          *mailbox;
+    LinkedListItem_t   *item;
+    MailboxReport_t    *report;
+    bool                changed;
+
+    if( !node ) {
+        return( FALSE );
+    }
+
+    changed = mailboxRecurseDisableChannel( node->left, channel );
+
+    mailbox = (Mailbox_t *)node->item;
+    if( mailbox->reports ) {
+        LinkedListLock( mailbox->reports );
+        for( item = mailbox->reports->head; item; item = item->next ) {
+            report = (MailboxReport_t *)item;
+            if( report->channel == channel ) {
+                LogPrint( LOG_INFO, "Mailbox: %d: Disabling channel", 
+                          mailbox->mailboxId );
+                report->channel = NULL;
+                changed = TRUE;
+            }
+        }
+        LinkedListUnlock( mailbox->reports );
+    }
+
+    changed = mailboxRecurseDisableChannel( node->right, channel ) || changed;
+
+    return( changed );
 }
 
 
