@@ -630,6 +630,28 @@ void BalancedBTreeRebalance( BalancedBTree_t *btree,
     BalancedBTreeRebalance( btree, root->right );
 }
 
+BalancedBTreeItem_t *BalancedBTreeFindLeastCond( BalancedBTreeItem_t *node,
+                                                 NodeCondFunc_t condFunc )
+{
+    BalancedBTreeItem_t    *retnode;
+
+    if( !node ) {
+        return( NULL );
+    }
+
+    retnode = BalancedBTreeFindLeastCond( node->left, condFunc );
+    if( retnode ) {
+        return( retnode );
+    }
+
+    if( condFunc && condFunc( node ) ) {
+        return( node );
+    }
+
+    retnode = BalancedBTreeFindLeastCond( node->right, condFunc );
+    return( retnode );
+}
+
 /*
  * vim:ts=4:sw=4:ai:et:si:sts=4
  */

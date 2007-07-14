@@ -703,15 +703,21 @@ void serverKill( BalancedBTreeItem_t *node, IRCServer_t *server, bool unalloc )
         server->threadAbort = TRUE;
         thread_deregister( server->txThreadId );
         thread_deregister( server->threadId );
+        server->threadAbort = FALSE;
     }
 
-    BalancedBTreeRemove( node->btree, node, LOCKED, FALSE );
+    if( unalloc ) {
+        BalancedBTreeRemove( node->btree, node, LOCKED, FALSE );
+    } else {
+        server->enabled = FALSE;
+    }
 
     if( server->txQueue ) {
         /* This *might* leak the contents of any queue entries? */
         QueueClear( server->txQueue, TRUE );
         QueueLock( server->txQueue );
         QueueDestroy( server->txQueue );
+        server->txQueue = NULL;
     }
 
     if( server->channels ) {

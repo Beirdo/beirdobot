@@ -65,6 +65,7 @@ typedef struct _BalancedBTree_t
     pthread_mutex_t              mutex;
 } BalancedBTree_t;
 
+typedef bool (*NodeCondFunc_t)( BalancedBTreeItem_t * );
 
 #ifdef __cplusplus
 extern "C" {
@@ -83,6 +84,8 @@ void *BalancedBTreeFind( BalancedBTree_t *btree, void *key,
                          Locked_t locked );
 BalancedBTreeItem_t *BalancedBTreeFindGreatest( BalancedBTreeItem_t *root );
 BalancedBTreeItem_t *BalancedBTreeFindLeast( BalancedBTreeItem_t *root );
+BalancedBTreeItem_t *BalancedBTreeFindLeastCond( BalancedBTreeItem_t *root,
+                                                 NodeCondFunc_t condFunc );
 
 #ifdef __cplusplus
 }

@@ -168,6 +168,13 @@ bool rssfeedFlushUnvisited( BalancedBTreeItem_t *node );
 void rssfeedSaveFunc( void *arg, int index, char *string );
 void cursesRssfeedRevert( void *arg, char *string );
 void cursesRssfeedDisplay( void *arg );
+void rssfeedDisableServer( IRCServer_t *server );
+void rssfeedDisableChannel( IRCChannel_t *channel );
+bool rssfeedRecurseDisableServer( BalancedBTreeItem_t *node, 
+                                  IRCServer_t *server );
+bool rssfeedRecurseDisableChannel( BalancedBTreeItem_t *node, 
+                                   IRCChannel_t *channel );
+bool rssfeedIsReady( BalancedBTreeItem_t *node );
 
 
 /* INTERNAL VARIABLES  */
@@ -218,6 +225,8 @@ void plugin_initialize( char *args )
 
     memset( &callbacks, 0, sizeof( ThreadCallback_t ) );
     callbacks.sighupFunc = rssfeedSighup;
+    callbacks.serverDisable = rssfeedDisableServer;
+    callbacks.channelDisable = rssfeedDisableChannel;
     thread_create( &rssfeedThreadId, rssfeed_thread, NULL, "thread_rssfeed",
                    &callbacks );
     botCmd_add( (const char **)&command, botCmdRssfeed, botHelpRssfeed, NULL );
@@ -291,6 +300,24 @@ void plugin_shutdown( void )
     thread_deregister( rssfeedThreadId );
 }
 
+bool rssfeedIsReady( BalancedBTreeItem_t *node )
+{
+    RssFeed_t      *feed;
+
+    feed = (RssFeed_t *)node->item;
+
+    if( (!feed->server || !feed->channel) && ChannelsLoaded ) {
+        feed->server  = FindServerNum( feed->serverId );
+        feed->channel = FindChannelNum( feed->server, feed->chanId );
+    }
+
+    if( feed->server && feed->channel && feed->channel->joined ) {
+        return( TRUE );
+    }
+
+    return( FALSE );
+}
+
 void *rssfeed_thread(void *arg)
 {
     mrss_t                 *data;
@@ -323,7 +350,8 @@ void *rssfeed_thread(void *arg)
 
     while( !GlobalAbort && !threadAbort ) {
         BalancedBTreeLock( rssfeedActiveTree );
-        item = BalancedBTreeFindLeast( rssfeedActiveTree->root );
+        item = BalancedBTreeFindLeastCond( rssfeedActiveTree->root,
+                                           rssfeedIsReady );
         BalancedBTreeUnlock( rssfeedActiveTree );
 
         gettimeofday( &now, NULL );
@@ -332,8 +360,8 @@ void *rssfeed_thread(void *arg)
 
         delta = 60;
         if( !item ) {
-            /* Nothing configured to be active, check in 15min */
-            delta = 900;
+            /* Nothing configured to be active, check in 1min */
+            delta = 60;
             goto DelayPoll;
         } 
 
@@ -1139,6 +1167,87 @@ char *rssfeedShowDetails( RssFeed_t *feed )
     message = strdup(buf);
     return( message );
 }
+
+void rssfeedDisableServer( IRCServer_t *server )
+{
+    bool            changed;
+
+    BalancedBTreeLock( rssfeedTree );
+    changed = rssfeedRecurseDisableServer( rssfeedTree->root, server );
+    BalancedBTreeUnlock( rssfeedTree );
+
+    if( changed ) {
+        /* kick the thread */
+        pthread_mutex_lock( &signalMutex );
+        pthread_cond_broadcast( &kickCond );
+        pthread_mutex_unlock( &signalMutex );
+    }
+}
+
+bool rssfeedRecurseDisableServer( BalancedBTreeItem_t *node, 
+                                  IRCServer_t *server )
+{
+    RssFeed_t      *feed;
+    bool            changed;
+
+    if( !node ) {
+        return( FALSE );
+    }
+
+    changed = rssfeedRecurseDisableServer( node->left, server );
+
+    feed = (RssFeed_t *)node->item;
+    if( feed->server == server ) {
+        LogPrint( LOG_INFO, "RSS: Feed %d: Disabling server", feed->feedId );
+        feed->server = NULL;
+        changed = TRUE;
+    }
+
+    changed = rssfeedRecurseDisableServer( node->right, server ) || changed;
+
+    return( changed );
+}
+
+void rssfeedDisableChannel( IRCChannel_t *channel )
+{
+    bool            changed;
+
+    BalancedBTreeLock( rssfeedTree );
+    changed = rssfeedRecurseDisableChannel( rssfeedTree->root, channel );
+    BalancedBTreeUnlock( rssfeedTree );
+
+    if( changed ) {
+        /* kick the thread */
+        pthread_mutex_lock( &signalMutex );
+        pthread_cond_broadcast( &kickCond );
+        pthread_mutex_unlock( &signalMutex );
+    }
+}
+
+bool rssfeedRecurseDisableChannel( BalancedBTreeItem_t *node, 
+                                   IRCChannel_t *channel )
+{
+    RssFeed_t      *feed;
+    bool            changed;
+
+    if( !node ) {
+        return( FALSE );
+    }
+
+    changed = rssfeedRecurseDisableChannel( node->left, channel );
+
+    feed = (RssFeed_t *)node->item;
+    if( feed->channel == channel ) {
+        LogPrint( LOG_INFO, "RSS: Feed %d: Disabling channel", feed->feedId );
+        feed->channel = NULL;
+        changed = TRUE;
+    }
+
+    changed = rssfeedRecurseDisableChannel( node->right, channel ) || changed;
+
+    return( changed );
+}
+
 
 static CursesFormItem_t rssfeedFormItems[] = {
     { FIELD_LABEL, 0, 0, 0, 0, "RSSFeed Number: %d", 
