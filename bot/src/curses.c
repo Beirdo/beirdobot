@@ -649,32 +649,36 @@ void *curses_output_thread( void *arg )
 
                 switch( textItem->align ) {
                 case ALIGN_LEFT:
+                    len = MIN( textItem->len, maxx - textItem->x );
                     mvwaddnstr( *windows[i].window, starty, textItem->x, 
-                                textItem->string, textItem->len );
+                                textItem->string, len );
                     if( i == WINDOW_DETAILS ) {
                         detailsBottomLine = MAX( detailsBottomLine, starty );
                     }
                     break;
                 case ALIGN_RIGHT:
+                    len = MIN( textItem->len, maxx - textItem->x );
                     mvwaddnstr( *windows[i].window, starty, 
-                                windows[i].width - textItem->x - textItem->len, 
-                                textItem->string, textItem->len );
+                                maxx - textItem->x - textItem->len, 
+                                textItem->string, len );
                     if( i == WINDOW_DETAILS ) {
                         detailsBottomLine = MAX( detailsBottomLine, starty );
                     }
                     break;
                 case ALIGN_CENTER:
+                    len = MIN( textItem->len, maxx - textItem->x );
                     mvwaddnstr( *windows[i].window, starty, 
-                                ((windows[i].width - textItem->len) / 2) + 
-                                textItem->x, textItem->string, textItem->len );
+                                ((maxx - len) / 2) + textItem->x, 
+                                textItem->string, len );
                     if( i == WINDOW_DETAILS ) {
                         detailsBottomLine = MAX( detailsBottomLine, starty );
                     }
                     break;
                 case ALIGN_FROM_CENTER:
+                    len = MIN( textItem->len, maxx - textItem->x );
                     mvwaddnstr( *windows[i].window, starty, 
-                                (windows[i].width / 2) + textItem->x, 
-                                textItem->string, textItem->len );
+                                (maxx / 2) + textItem->x, textItem->string, 
+                                len );
                     if( i == WINDOW_DETAILS ) {
                         detailsBottomLine = MAX( detailsBottomLine, starty );
                     }
