@@ -52,7 +52,7 @@
 static char ident[] _UNUSED_ = 
     "$Id$";
 
-#define CURRENT_SCHEMA_MAILBOX  3
+#define CURRENT_SCHEMA_MAILBOX  4
 
 typedef struct {
     int                 mailboxId;
@@ -149,7 +149,16 @@ static SchemaUpgrade_t schemaUpgrade[CURRENT_SCHEMA_MAILBOX] = {
         "AFTER `mailboxId`", NULL, NULL, FALSE },
       { "ALTER TABLE `plugin_mailbox_report` ADD `enabled` INT NOT NULL "
         "DEFAULT '1' AFTER `mailboxId`", NULL, NULL, FALSE },
-      { NULL, NULL, NULL, FALSE } }
+      { NULL, NULL, NULL, FALSE } },
+    /* 3 -> 4 */
+    { { "ALTER TABLE `plugin_mailbox_report` DROP PRIMARY KEY ,\n"
+        "ADD PRIMARY KEY ( `mailboxId` , `channelId` , `serverId` , `nick` )",
+        NULL, NULL, FALSE },
+      { "ALTER TABLE `plugin_mailbox` DROP PRIMARY KEY, \n"
+        "ADD PRIMARY KEY ( `mailboxId` )", NULL, NULL, FALSE },
+      { NULL, NULL, FALSE }
+    }
+
 };
 
 static QueryTable_t mailboxQueryTable[] = {
