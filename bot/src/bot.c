@@ -66,6 +66,8 @@ void cursesServerRevert( void *arg, char *string );
 void cursesChannelRevert( void *arg, char *string );
 void serverSaveFunc( void *arg, int index, char *string );
 void channelSaveFunc( void *arg, int index, char *string );
+IRCServer_t *RecurseFindServerWithChannel( BalancedBTreeItem_t *node, 
+                                           int channelId );
 
 
 void ProcOnConnected(BN_PInfo I, const char HostName[])
@@ -954,6 +956,49 @@ IRCServer_t *FindServerNum( int serverId )
     server = (IRCServer_t *)item->item;
 
     return( server );
+}
+
+int FindServerWithChannel( int channelId )
+{
+    IRCServer_t    *server;
+
+    if( !ChannelsLoaded ) {
+        return( -1 );
+    }
+
+    BalancedBTreeLock( ServerTree );
+    server = RecurseFindServerWithChannel( ServerTree->root, channelId );
+    BalancedBTreeUnlock( ServerTree );
+
+    if( server ) {
+        return( server->serverId );
+    }
+
+    return( -1 );
+}
+
+IRCServer_t *RecurseFindServerWithChannel( BalancedBTreeItem_t *node, 
+                                           int channelId )
+{
+    IRCServer_t    *server;
+    IRCChannel_t   *channel;
+
+    if( !node ) {
+        return( NULL );
+    }
+
+    server = RecurseFindServerWithChannel( node->left, channelId );
+    if( server ) {
+        return( server );
+    }
+
+    server = (IRCServer_t *)node->item;
+    channel = FindChannelNum( server, channelId );
+    if( channel ) {
+        return( server );
+    }
+
+    return( RecurseFindServerWithChannel( node->right, channelId ) );
 }
 
 void LoggedChannelMessage( IRCServer_t *server, IRCChannel_t *channel,

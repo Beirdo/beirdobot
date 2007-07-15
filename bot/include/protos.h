@@ -226,6 +226,7 @@ void db_update_server( IRCServer_t *server );
 void mainSighup( int signum, void *arg );
 void ThreadAllNotifyChannel( IRCChannel_t *channel );
 void ThreadAllNotifyServer( IRCServer_t *server );
+int FindServerWithChannel( int channelId );
 
 #endif
 

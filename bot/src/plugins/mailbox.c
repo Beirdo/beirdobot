@@ -52,7 +52,7 @@
 static char ident[] _UNUSED_ = 
     "$Id$";
 
-#define CURRENT_SCHEMA_MAILBOX  4
+#define CURRENT_SCHEMA_MAILBOX  5
 
 typedef struct {
     int                 mailboxId;
@@ -85,11 +85,11 @@ typedef struct {
     LinkedListItem_t    linkage;
     int                 mailboxId;
     int                 oldMailboxId;
+    int                 chanServId;
+    int                 oldChanServId;
     int                 serverId;
-    int                 oldServerId;
     IRCServer_t        *server;
     int                 channelId;
-    int                 oldChannelId;
     IRCChannel_t       *channel;
     char               *nick;
     char               *oldNick;
@@ -124,12 +124,11 @@ static QueryTable_t defSchema[] = {
     ") TYPE = MYISAM\n", NULL, NULL, FALSE },
   { "CREATE TABLE `plugin_mailbox_report` (\n"
     "  `mailboxId` INT NOT NULL ,\n"
-    "  `channelId` INT NOT NULL ,\n"
-    "  `serverId` INT NOT NULL ,\n"
     "  `enabled` INT NOT NULL DEFAULT '1',\n"
+    "  `channelId` INT NOT NULL ,\n"
     "  `nick` VARCHAR( 64 ) NOT NULL ,\n"
     "  `format` TEXT NOT NULL\n"
-    "  PRIMARY KEY ( `mailboxId` , `channelId` , `serverId` , `nick` )\n"
+    "  PRIMARY KEY ( `mailboxId` , `channelId` , `nick` )\n"
     ") TYPE = MYISAM\n", NULL, NULL, FALSE }
 };
 static int defSchemaCount = NELEMENTS(defSchema);
@@ -158,9 +157,14 @@ static SchemaUpgrade_t schemaUpgrade[CURRENT_SCHEMA_MAILBOX] = {
         NULL, NULL, FALSE },
       { "ALTER TABLE `plugin_mailbox` DROP PRIMARY KEY, \n"
         "ADD PRIMARY KEY ( `mailboxId` )", NULL, NULL, FALSE },
-      { NULL, NULL, FALSE }
-    }
-
+      { NULL, NULL, FALSE } },
+    /* 4 -> 5 */
+    { { "UPDATE `plugin_mailbox_report` SET `channelId` = `serverId` "
+        "WHERE `nick` != ''", NULL, NULL, FALSE },
+      { "ALTER TABLE `plugin_mailbox_report` DROP PRIMARY KEY, \n"
+        "ADD PRIMARY KEY ( `mailboxId`, `channelId`, `nick` ), \n"
+        "DROP `serverId", NULL, NULL, FALSE },
+      { NULL, NULL, NULL, FALSE } }
 };
 
 static QueryTable_t mailboxQueryTable[] = {
@@ -172,7 +176,7 @@ static QueryTable_t mailboxQueryTable[] = {
     { "UPDATE `plugin_mailbox` SET `lastCheck` = ? WHERE `mailboxId` = ?", 
       NULL, NULL, FALSE },
     /* 2 */
-    { "SELECT channelId, serverId, nick, format, enabled "
+    { "SELECT channelId, nick, format, enabled "
       "FROM `plugin_mailbox_report` WHERE mailboxId = ?", NULL, NULL, FALSE },
     /* 3 */
     { "UPDATE `plugin_mailbox` SET `lastRead` = ? WHERE `mailboxId` = ?", 
@@ -184,9 +188,9 @@ static QueryTable_t mailboxQueryTable[] = {
       FALSE },
     /* 5 */
     { "UPDATE `plugin_mailbox_report` SET `mailboxId` = ?, `channelId` = ?, "
-      "`serverId` = ?, `nick` = ?, `format` = ?, `enabled` = ? "
-      "WHERE `mailboxId` = ? AND `channelId` = ? AND `serverId` = ? AND "
-      "`nick` = ?", NULL, NULL, FALSE }
+      "`nick` = ?, `format` = ?, `enabled` = ? "
+      "WHERE `mailboxId` = ? AND `channelId` = ? AND `nick` = ?", NULL, NULL, 
+      FALSE }
 };
 
 
@@ -510,8 +514,13 @@ void *mailbox_thread(void *arg)
                      * If the server info isn't initialized, 
                      * but is ready to be... 
                      */
-                    if( !report->server && ChannelsLoaded ) {
-                        report->server  = FindServerNum( report->serverId );
+                    if( (!report->server || report->serverId == -1) && 
+                        ChannelsLoaded ) {
+                        if( !strcmp( report->nick, "" ) ) {
+                            report->serverId = 
+                                FindServerWithChannel( report->channelId );
+                        }
+                        report->server   = FindServerNum( report->serverId );
 
                         if( report->channelId > 0 ) {
                             report->channel = 
@@ -1035,22 +1044,20 @@ void db_update_report( MailboxReport_t *report )
 {
     MYSQL_BIND         *data;
 
-    data = (MYSQL_BIND *)malloc(10 * sizeof(MYSQL_BIND));
-    memset( data, 0, 10 * sizeof(MYSQL_BIND) );
+    data = (MYSQL_BIND *)malloc(8 * sizeof(MYSQL_BIND));
+    memset( data, 0, 8 * sizeof(MYSQL_BIND) );
 
     bind_numeric( &data[0], report->mailboxId, MYSQL_TYPE_LONG );
-    bind_numeric( &data[1], report->channelId, MYSQL_TYPE_LONG );
-    bind_numeric( &data[2], report->serverId, MYSQL_TYPE_LONG );
-    bind_string( &data[3], report->nick, MYSQL_TYPE_VAR_STRING );
-    bind_string( &data[4], report->format, MYSQL_TYPE_VAR_STRING );
-    bind_numeric( &data[5], report->enabled, MYSQL_TYPE_LONG );
-    bind_numeric( &data[6], report->oldMailboxId, MYSQL_TYPE_LONG );
-    bind_numeric( &data[7], report->oldChannelId, MYSQL_TYPE_LONG );
-    bind_numeric( &data[8], report->oldServerId, MYSQL_TYPE_LONG );
-    bind_string( &data[9], report->oldNick, MYSQL_TYPE_VAR_STRING );
+    bind_numeric( &data[1], report->chanServId, MYSQL_TYPE_LONG );
+    bind_string( &data[2], report->nick, MYSQL_TYPE_VAR_STRING );
+    bind_string( &data[3], report->format, MYSQL_TYPE_VAR_STRING );
+    bind_numeric( &data[4], report->enabled, MYSQL_TYPE_LONG );
+    bind_numeric( &data[5], report->oldMailboxId, MYSQL_TYPE_LONG );
+    bind_numeric( &data[6], report->oldChanServId, MYSQL_TYPE_LONG );
+    bind_string( &data[7], report->oldNick, MYSQL_TYPE_VAR_STRING );
 
     LogPrintNoArg( LOG_NOTICE, "Mailbox: updating report in database" );
-    db_queue_query( 5, mailboxQueryTable, data, 10, NULL, NULL, NULL );
+    db_queue_query( 5, mailboxQueryTable, data, 8, NULL, NULL, NULL );
 }
 
 /* Assumes the mailboxTree is already locked */
@@ -1309,8 +1316,8 @@ static void result_load_reports( MYSQL_RES *res, MYSQL_BIND *input,
         for( rptItem = mailbox->reports->head, found = FALSE; 
              rptItem && !found; rptItem = rptItem->next ) {
             report = (MailboxReport_t *)rptItem;
-            if( report->channelId == atoi(row[0]) &&
-                report->serverId  == atoi(row[1]) ) {
+            if( report->chanServId == atoi(row[0]) &&
+                !strcmp( report->nick, row[1] ) ) {
                 found = TRUE;
                 break;
             }
@@ -1322,19 +1329,26 @@ static void result_load_reports( MYSQL_RES *res, MYSQL_BIND *input,
         }
 
         report->mailboxId = mailbox->mailboxId;
-        report->channelId = atoi(row[0]);
-        report->serverId  = atoi(row[1]);
+        if( strcmp( row[1], "" ) ) {
+            report->chanServId = atoi(row[0]);
+            report->channelId  = 0;
+            report->serverId   = report->chanServId;
+        } else {
+            report->chanServId = atoi(row[0]);
+            report->channelId  = report->chanServId;
+            report->serverId   = FindServerWithChannel( report->channelId );
+        }
 
         if( found ) {
             free( report->nick );
         }
-        report->nick      = strdup(row[2]);
+        report->nick      = strdup(row[1]);
 
         if( found ) {
             free( report->format );
         }
-        report->format    = strdup(row[3]);
-        report->enabled   = ( atoi(row[4]) == 0 ? FALSE : TRUE );
+        report->format    = strdup(row[2]);
+        report->enabled   = ( atoi(row[3]) == 0 ? FALSE : TRUE );
         report->visited   = TRUE;
         report->modified  = FALSE;
 
@@ -1358,6 +1372,9 @@ static void result_load_reports( MYSQL_RES *res, MYSQL_BIND *input,
         }
 
         if( ChannelsLoaded ) {
+            if( !strcmp( report->nick, "" ) ) {
+                report->serverId = FindServerWithChannel( report->channelId );
+            }
             report->server  = FindServerNum( report->serverId );
 
             if( report->channelId > 0 ) {
@@ -1370,8 +1387,7 @@ static void result_load_reports( MYSQL_RES *res, MYSQL_BIND *input,
         }
 
         report->oldMailboxId = report->mailboxId;
-        report->oldServerId  = report->serverId;
-        report->oldChannelId = report->channelId;
+        report->oldChanServId = report->chanServId;
         if( report->oldNick ) {
             free( report->oldNick );
         }
@@ -1858,34 +1874,33 @@ static CursesFormItem_t mailboxReportFormItems[] = {
     { FIELD_FIELD, 16, 0, 20, 1, "%d", OFFSETOF(mailboxId,MailboxReport_t), 
       FA_INTEGER, 20, FT_INTEGER, { .integerArgs = { 0, 1, 4000 } }, NULL, 
       NULL },
-    { FIELD_LABEL, 0, 1, 0, 0, "Server Number:", -1, FA_NONE, 0, FT_NONE, { 0 },
-      NULL, NULL },
-    { FIELD_FIELD, 16, 1, 20, 1, "%d", OFFSETOF(serverId,MailboxReport_t), 
-      FA_INTEGER, 20, FT_INTEGER, { .integerArgs = { 0, 1, 4000 } }, NULL, 
-      NULL },
-    { FIELD_LABEL, 0, 2, 0, 0, "Channel Number:", -1, FA_NONE, 0, FT_NONE, 
+    { FIELD_LABEL, 0, 1, 0, 0, "Channel Number:", -1, FA_NONE, 0, FT_NONE, 
       { 0 }, NULL, NULL },
-    { FIELD_FIELD, 16, 2, 20, 1, "%d", OFFSETOF(channelId,MailboxReport_t), 
+    { FIELD_FIELD, 16, 1, 20, 1, "%d", OFFSETOF(chanServId,MailboxReport_t), 
       FA_INTEGER, 20, FT_INTEGER, { .integerArgs = { 0, 1, 4000 } }, NULL, 
       NULL },
-    { FIELD_LABEL, 0, 3, 0, 0, "Nick:", -1, FA_NONE, 0, FT_NONE, { 0 }, NULL,
+    { FIELD_LABEL, 0, 2, 0, 0, "Nick:", -1, FA_NONE, 0, FT_NONE, { 0 }, NULL,
       NULL },
-    { FIELD_FIELD, 16, 3, 32, 1, "%s", OFFSETOF(nick,MailboxReport_t), 
+    { FIELD_FIELD, 16, 2, 32, 1, "%s", OFFSETOF(nick,MailboxReport_t), 
       FA_STRING, 64, FT_NONE, { 0 }, NULL, NULL },
-    { FIELD_LABEL, 0, 4, 0, 0, "Format:", -1, FA_NONE, 0, FT_NONE, { 0 }, NULL,
+    { FIELD_LABEL, 0, 3, 0, 0, "Format:", -1, FA_NONE, 0, FT_NONE, { 0 }, NULL,
       NULL },
-    { FIELD_FIELD, 16, 4, 32, 1, "%s", OFFSETOF(format,MailboxReport_t), 
+    { FIELD_FIELD, 16, 3, 32, 1, "%s", OFFSETOF(format,MailboxReport_t), 
       FA_STRING, 64, FT_NONE, { 0 }, NULL, NULL },
-    { FIELD_LABEL, 0, 5, 0, 0, "Enabled:", -1, FA_NONE, 0, FT_NONE, { 0 },
+    { FIELD_LABEL, 0, 4, 0, 0, "Enabled:", -1, FA_NONE, 0, FT_NONE, { 0 },
       NULL, NULL },
-    { FIELD_CHECKBOX, 16, 5, 0, 0, "[%c]", OFFSETOF(enabled,MailboxReport_t), 
+    { FIELD_CHECKBOX, 16, 4, 0, 0, "[%c]", OFFSETOF(enabled,MailboxReport_t), 
       FA_BOOL, 0, FT_NONE, { 0 }, NULL, NULL },
-    { FIELD_BUTTON, 2, 6, 0, 0, "Revert", -1, FA_NONE, 0, FT_NONE, { 0 },
+    { FIELD_BUTTON, 2, 5, 0, 0, "Revert", -1, FA_NONE, 0, FT_NONE, { 0 },
       cursesMailboxReportRevert, (void *)(-1) },
-    { FIELD_BUTTON, 10, 6, 0, 0, "Save", -1, FA_NONE, 0, FT_NONE, { 0 },
+    { FIELD_BUTTON, 10, 5, 0, 0, "Save", -1, FA_NONE, 0, FT_NONE, { 0 },
       cursesSave, (void *)(-1) },
-    { FIELD_BUTTON, 16, 6, 0, 0, "Cancel", -1, FA_NONE, 0, FT_NONE, { 0 },
-      cursesCancel, NULL }
+    { FIELD_BUTTON, 16, 5, 0, 0, "Cancel", -1, FA_NONE, 0, FT_NONE, { 0 },
+      cursesCancel, NULL },
+    { FIELD_LABEL, 0, 7, 0, 0, "NOTE: if Nick is set, Channel Number", -1, 
+      FA_NONE, 0, FT_NONE, { 0 }, NULL, NULL },
+    { FIELD_LABEL, 6, 8, 0, 0, "above is actually Server Number", -1, FA_NONE,
+      0, FT_NONE, { 0 }, NULL, NULL }
 };
 static int mailboxReportFormItemCount = NELEMENTS(mailboxReportFormItems);
 
@@ -1898,14 +1913,23 @@ void mailboxReportSaveFunc( void *arg, int index, char *string )
 
     if( index == -1 ) {
         if( report->mailboxId != report->oldMailboxId ||
-            report->serverId  != report->oldServerId ||
-            report->channelId != report->oldChannelId ) {
+            report->chanServId != report->oldChanServId ||
+            strcmp( report->nick, report->oldNick ) ) {
             /* 
              * As the report is about to be blown away and reloaded to a new
              * report item, leave the form 
              */
             cursesCancel( arg, string );
         }
+
+        if( strcmp( report->nick, "" ) ) {
+            report->channelId = 0;
+            report->serverId  = report->chanServId;
+        } else {
+            report->channelId = report->chanServId;
+            report->serverId  = FindServerWithChannel( report->channelId );
+        }
+        
         db_update_report( report );
         mailboxSighup( 0, NULL );
         return;
@@ -1922,8 +1946,7 @@ void cursesMailboxReportRevert( void *arg, char *string )
 
     report = (MailboxReport_t *)arg;
     report->oldMailboxId = report->mailboxId;
-    report->oldServerId  = report->serverId;
-    report->oldChannelId = report->channelId;
+    report->oldChanServId = report->chanServId;
     if( report->oldNick ) {
         free( report->oldNick );
     }
@@ -1940,8 +1963,7 @@ void cursesMailboxReportDisplay( void *arg )
 
     report = (MailboxReport_t *)arg;
     report->oldMailboxId = report->mailboxId;
-    report->oldServerId  = report->serverId;
-    report->oldChannelId = report->channelId;
+    report->oldChanServId = report->chanServId;
     if( report->oldNick ) {
         free( report->oldNick );
     }
