@@ -120,6 +120,7 @@ static QueryTable_t defSchema[] = {
     "    `pollInterval` INT NOT NULL DEFAULT '600',\n"
     "    `lastCheck` INT NOT NULL DEFAULT '0',\n"
     "    `lastRead` INT NOT NULL DEFAULT '0'\n"
+    "    PRIMARY KEY ( `mailboxId` )\n"
     ") TYPE = MYISAM\n", NULL, NULL, FALSE },
   { "CREATE TABLE `plugin_mailbox_report` (\n"
     "  `mailboxId` INT NOT NULL ,\n"
@@ -128,6 +129,7 @@ static QueryTable_t defSchema[] = {
     "  `enabled` INT NOT NULL DEFAULT '1',\n"
     "  `nick` VARCHAR( 64 ) NOT NULL ,\n"
     "  `format` TEXT NOT NULL\n"
+    "  PRIMARY KEY ( `mailboxId` , `channelId` , `serverId` , `nick` )\n"
     ") TYPE = MYISAM\n", NULL, NULL, FALSE }
 };
 static int defSchemaCount = NELEMENTS(defSchema);
