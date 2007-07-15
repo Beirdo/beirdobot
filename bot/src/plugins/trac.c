@@ -90,18 +90,17 @@ void cursesTracRevert( void *arg, char *string );
 static char ident[] _UNUSED_ = 
     "$Id$";
 
-#define CURRENT_SCHEMA_TRAC 3
+#define CURRENT_SCHEMA_TRAC 4
 
 static QueryTable_t defSchema[] = {
   { "CREATE TABLE `plugin_trac` (\n"
-    "  `serverid` int(11) NOT NULL default '0',\n"
     "  `chanid` int(11) NOT NULL default '0',\n"
     "  `enabled` INT NOT NULL DEFAULT '1',\n"
     "  `url` varchar(255) NOT NULL default '',\n"
     "  `svnUrl` varchar(255) NOT NULL default '',\n"
     "  `svnUser` varchar(64) NOT NULL default '',\n"
     "  `svnPasswd` varchar(64) NOT NULL default '',\n"
-    "  PRIMARY KEY  (`serverid`, `chanid`)\n"
+    "  PRIMARY KEY  (`chanid`)\n"
     ") TYPE = MyISAM\n", NULL, NULL, FALSE }
 };
 static int defSchemaCount = NELEMENTS(defSchema);
@@ -118,15 +117,20 @@ static SchemaUpgrade_t schemaUpgrade[CURRENT_SCHEMA_TRAC] = {
     /* 2 -> 3 */
     { { "ALTER TABLE `plugin_trac` ADD `enabled` INT NOT NULL DEFAULT '1' "
         "AFTER `chanid`", NULL, NULL, FALSE },
+      { NULL, NULL, NULL, FALSE } },
+    /* 3 -> 4 */
+    { { "ALTER TABLE `plugin_trac` DROP PRIMARY KEY,\n"
+        "ADD PRIMARY KEY ( `chanid` ), DROP `serverid`", NULL, NULL, FALSE },
       { NULL, NULL, NULL, FALSE } }
 };
 
 static QueryTable_t tracQueryTable[] = {
     /* 0 */
-    { "SELECT serverid, chanid, url, svnUrl, svnUser, svnPasswd, enabled "
-      "FROM `plugin_trac` ORDER BY `chanid` ASC", NULL, NULL, FALSE },
+    { "SELECT b.serverid, a.chanid, a.url, a.svnUrl, a.svnUser, a.svnPasswd, "
+      "a.enabled FROM `plugin_trac` AS a JOIN `channels` as b "
+      "ON a.`chanid` = b.`chanid` ORDER BY a.`chanid` ASC", NULL, NULL, FALSE },
     /* 1 */
-    { "UPDATE `plugin_trac` SET `serverid` = ?, `chanid` = ?, `url` = ?, "
+    { "UPDATE `plugin_trac` SET `chanid` = ?, `url` = ?, "
       "`svnUrl` = ?, `svnUser` = ?, `svnPasswd` = ?, `enabled` = ? "
       "WHERE `chanid` = ?", NULL, NULL, FALSE }
 };
@@ -522,20 +526,19 @@ static void db_update_tracitem( TracURL_t *tracItem )
     MYSQL_BIND         *data;
 
     data = (MYSQL_BIND *)malloc(8 * sizeof(MYSQL_BIND));
-    memset( data, 0, 8 * sizeof(MYSQL_BIND) );
+    memset( data, 0, 7 * sizeof(MYSQL_BIND) );
 
-    bind_numeric( &data[0], tracItem->serverId, MYSQL_TYPE_LONG );
-    bind_numeric( &data[1], tracItem->chanId, MYSQL_TYPE_LONG );
-    bind_string( &data[2], tracItem->url, MYSQL_TYPE_VAR_STRING );
-    bind_string( &data[3], tracItem->svnUrl, MYSQL_TYPE_VAR_STRING );
-    bind_string( &data[4], tracItem->svnUser, MYSQL_TYPE_VAR_STRING );
-    bind_string( &data[5], tracItem->svnPasswd, MYSQL_TYPE_VAR_STRING );
-    bind_numeric( &data[6], tracItem->enabled, MYSQL_TYPE_LONG );
-    bind_numeric( &data[7], tracItem->oldChanId, MYSQL_TYPE_LONG );
+    bind_numeric( &data[0], tracItem->chanId, MYSQL_TYPE_LONG );
+    bind_string( &data[1], tracItem->url, MYSQL_TYPE_VAR_STRING );
+    bind_string( &data[2], tracItem->svnUrl, MYSQL_TYPE_VAR_STRING );
+    bind_string( &data[3], tracItem->svnUser, MYSQL_TYPE_VAR_STRING );
+    bind_string( &data[4], tracItem->svnPasswd, MYSQL_TYPE_VAR_STRING );
+    bind_numeric( &data[5], tracItem->enabled, MYSQL_TYPE_LONG );
+    bind_numeric( &data[6], tracItem->oldChanId, MYSQL_TYPE_LONG );
 
     LogPrint( LOG_NOTICE, "Trac: channel %d: updating database", 
                           tracItem->chanId );
-    db_queue_query( 1, tracQueryTable, data, 8, NULL, NULL, NULL );
+    db_queue_query( 1, tracQueryTable, data, 7, NULL, NULL, NULL );
 }
 
 /* Assumes the tree is already locked */
@@ -1194,39 +1197,35 @@ void tracTicketCsv( BalancedBTree_t *tree, char *page )
 }
 
 static CursesFormItem_t tracFormItems[] = {
-    { FIELD_LABEL, 0, 0, 0, 0, "Server Number:", -1, FA_NONE, 0, FT_NONE, 
+    { FIELD_LABEL, 0, 0, 0, 0, "Channel Number:", -1, FA_NONE, 0, FT_NONE, 
       { 0 }, NULL, NULL },
-    { FIELD_FIELD, 16, 0, 20, 1, "%d", OFFSETOF(serverId,TracURL_t), FA_INTEGER,
+    { FIELD_FIELD, 16, 0, 20, 1, "%d", OFFSETOF(chanId,TracURL_t), FA_INTEGER,
       20, FT_INTEGER, { .integerArgs = { 0, 1,  4000 } }, NULL, NULL },
-    { FIELD_LABEL, 0, 1, 0, 0, "Channel Number:", -1, FA_NONE, 0, FT_NONE, 
-      { 0 }, NULL, NULL },
-    { FIELD_FIELD, 16, 1, 20, 1, "%d", OFFSETOF(chanId,TracURL_t), FA_INTEGER,
-      20, FT_INTEGER, { .integerArgs = { 0, 1,  4000 } }, NULL, NULL },
-    { FIELD_LABEL, 0, 2, 0, 0, "Trac URL:", -1, FA_NONE, 0, FT_NONE, { 0 }, 
+    { FIELD_LABEL, 0, 1, 0, 0, "Trac URL:", -1, FA_NONE, 0, FT_NONE, { 0 }, 
       NULL, NULL },
-    { FIELD_FIELD, 16, 2, 32, 1, "%s", OFFSETOF(url,TracURL_t), FA_STRING, 255,
+    { FIELD_FIELD, 16, 1, 32, 1, "%s", OFFSETOF(url,TracURL_t), FA_STRING, 255,
       FT_NONE, { 0 }, NULL, NULL },
-    { FIELD_LABEL, 0, 3, 0, 0, "SVN URL:", -1, FA_NONE, 0, FT_NONE, { 0 }, 
+    { FIELD_LABEL, 0, 2, 0, 0, "SVN URL:", -1, FA_NONE, 0, FT_NONE, { 0 }, 
       NULL, NULL },
-    { FIELD_FIELD, 16, 3, 32, 1, "%s", OFFSETOF(svnUrl,TracURL_t), FA_STRING, 
+    { FIELD_FIELD, 16, 2, 32, 1, "%s", OFFSETOF(svnUrl,TracURL_t), FA_STRING, 
       255, FT_NONE, { 0 }, NULL, NULL },
-    { FIELD_LABEL, 0, 4, 0, 0, "SVN User:", -1, FA_NONE, 0, FT_NONE, { 0 },
+    { FIELD_LABEL, 0, 3, 0, 0, "SVN User:", -1, FA_NONE, 0, FT_NONE, { 0 },
       NULL, NULL },
-    { FIELD_FIELD, 16, 4, 32, 1, "%s", OFFSETOF(svnUser,TracURL_t), FA_STRING,
+    { FIELD_FIELD, 16, 3, 32, 1, "%s", OFFSETOF(svnUser,TracURL_t), FA_STRING,
       64, FT_NONE, { 0 }, NULL, NULL },
-    { FIELD_LABEL, 0, 5, 0, 0, "SVN Password:", -1, FA_NONE, 0, FT_NONE, { 0 },
+    { FIELD_LABEL, 0, 4, 0, 0, "SVN Password:", -1, FA_NONE, 0, FT_NONE, { 0 },
       NULL, NULL },
-    { FIELD_FIELD, 16, 5, 32, 1, "%s", OFFSETOF(svnPasswd,TracURL_t), FA_STRING,
+    { FIELD_FIELD, 16, 4, 32, 1, "%s", OFFSETOF(svnPasswd,TracURL_t), FA_STRING,
       64, FT_NONE, { 0 }, NULL, NULL },
-    { FIELD_LABEL, 0, 6, 0, 0, "Enabled:", -1, FA_NONE, 0, FT_NONE, { 0 },
+    { FIELD_LABEL, 0, 5, 0, 0, "Enabled:", -1, FA_NONE, 0, FT_NONE, { 0 },
       NULL, NULL },
-    { FIELD_CHECKBOX, 16, 6, 0, 0, "[%c]", OFFSETOF(enabled,TracURL_t), 
+    { FIELD_CHECKBOX, 16, 5, 0, 0, "[%c]", OFFSETOF(enabled,TracURL_t), 
       FA_BOOL, 0, FT_NONE, { 0 }, NULL, NULL },
-    { FIELD_BUTTON, 2, 7, 0, 0, "Revert", -1, FA_NONE, 0, FT_NONE, { 0 },
+    { FIELD_BUTTON, 2, 6, 0, 0, "Revert", -1, FA_NONE, 0, FT_NONE, { 0 },
       cursesTracRevert, (void *)(-1) },
-    { FIELD_BUTTON, 10, 7, 0, 0, "Save", -1, FA_NONE, 0, FT_NONE, { 0 },
+    { FIELD_BUTTON, 10, 6, 0, 0, "Save", -1, FA_NONE, 0, FT_NONE, { 0 },
       cursesSave, (void *)(-1) },
-    { FIELD_BUTTON, 16, 7, 0, 0, "Cancel", -1, FA_NONE, 0, FT_NONE, { 0 },
+    { FIELD_BUTTON, 16, 6, 0, 0, "Cancel", -1, FA_NONE, 0, FT_NONE, { 0 },
       cursesCancel, NULL }
 };
 static int tracFormItemCount = NELEMENTS(tracFormItems);
