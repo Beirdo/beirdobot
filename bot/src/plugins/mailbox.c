@@ -240,6 +240,7 @@ bool mailboxRecurseDisableServer( BalancedBTreeItem_t *node,
                                   IRCServer_t *server );
 bool mailboxRecurseDisableChannel( BalancedBTreeItem_t *node, 
                                    IRCChannel_t *channel );
+void resetMenuText( MailboxReport_t *report );
 
 
 /* INTERNAL VARIABLES  */
@@ -391,6 +392,7 @@ void *mailbox_thread(void *arg)
     SEARCHPGM               searchProgram;
     static char             sequence[200];
     MailboxUID_t           *msg;
+    int                     oldServerId;
 
     pthread_mutex_lock( &shutdownMutex );
 
@@ -517,8 +519,12 @@ void *mailbox_thread(void *arg)
                     if( (!report->server || report->serverId == -1) && 
                         ChannelsLoaded ) {
                         if( !strcmp( report->nick, "" ) ) {
+                            oldServerId = report->serverId;
                             report->serverId = 
                                 FindServerWithChannel( report->channelId );
+                            if( oldServerId != report->serverId ) {
+                                resetMenuText( report );
+                            }
                         }
                         report->server   = FindServerNum( report->serverId );
 
@@ -1298,6 +1304,7 @@ static void result_load_reports( MYSQL_RES *res, MYSQL_BIND *input,
     LinkedListItem_t       *rptItem;
     bool                    found;
     char                   *menuText;
+    int                     oldServerId;
 
     mailbox = (Mailbox_t *)args;
     if( !mailbox ) {
@@ -1373,7 +1380,11 @@ static void result_load_reports( MYSQL_RES *res, MYSQL_BIND *input,
 
         if( ChannelsLoaded ) {
             if( !strcmp( report->nick, "" ) ) {
+                oldServerId = report->serverId;
                 report->serverId = FindServerWithChannel( report->channelId );
+                if( oldServerId != report->serverId ) {
+                    resetMenuText( report );
+                }
             }
             report->server  = FindServerNum( report->serverId );
 
@@ -2073,6 +2084,16 @@ bool mailboxRecurseDisableChannel( BalancedBTreeItem_t *node,
     return( changed );
 }
 
+void resetMenuText( MailboxReport_t *report )
+{
+    cursesMenuItemRemove( 2, mailboxMenuId, report->menuText );
+    free( report->menuText );
+    report->menuText = (char *)malloc(64);
+    snprintf( report->menuText, 64, "Report M: %d, S: %d, C: %d", 
+              report->mailboxId, report->serverId, report->channelId );
+    cursesMenuItemAdd( 2, mailboxMenuId, report->menuText,
+                       cursesMailboxReportDisplay, report );
+}
 
 
 /*
