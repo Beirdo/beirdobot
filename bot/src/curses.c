@@ -346,7 +346,7 @@ void cursesWindowSet( void )
 
     windows[WINDOW_LOG_HSCROLLBAR].startx = 0;
     windows[WINDOW_LOG_HSCROLLBAR].starty = y - 3;
-    windows[WINDOW_LOG_HSCROLLBAR].width  = x - 2;
+    windows[WINDOW_LOG_HSCROLLBAR].width  = x - 1;
     windows[WINDOW_LOG_HSCROLLBAR].height = 1;
 
     windows[WINDOW_TAILER].startx = 0;
@@ -432,7 +432,6 @@ void *curses_output_thread( void *arg )
     int                 key;
     int                 starty;
     int                 maxx, maxy;
-    double              logPerLine;
     int                 logLineOffset = 0;
     int                 logOffset;
 
@@ -871,12 +870,10 @@ void *curses_output_thread( void *arg )
             }
         }
 
-        getmaxyx( winLogScrollbar, y, x );
-        logPerLine = (1.0/(double)(y - 1))/2.0;
-        for( i = 0; i < y; i++ ) {
-            if( fabs( ((double)logCurr/(double)logCount) - 
-                      (((double)i/(double)(y - 1)) + logPerLine) )  <=
-                  logPerLine ) {
+        getmaxyx( winLogScrollbar, maxy, maxx );
+        for( i = 0; i < maxy; i++ ) {
+            y = (logCurr * (maxy - 1)) - ((logCount - 1) * i);
+            if( y >= 0 && y < logCount - 1 ) {
                 mvwaddch( winLogScrollbar, i, 0, ACS_BLOCK );
             } else {
                 mvwaddch( winLogScrollbar, i, 0, ACS_CKBOARD );
