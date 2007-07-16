@@ -62,6 +62,7 @@ WINDOW         *winMenu2;
 WINDOW         *winDetails;
 WINDOW         *winLog;
 WINDOW         *winLogScrollbar;
+WINDOW         *winLogHScrollbar;
 WINDOW         *winTailer;
 WINDOW         *winDetailsForm;
 
@@ -117,14 +118,15 @@ typedef struct {
 } CursesWindowDef_t;
 
 CursesWindowDef_t   windows[] = {
-    { &winHeader,       0, 0, 0, 0 },
-    { &winMenu1,        0, 0, 0, 0 },
-    { &winMenu2,        0, 0, 0, 0 },
-    { &winDetails,      0, 0, 0, 0 },
-    { &winDetailsForm,  0, 0, 0, 0 },
-    { &winLog,          0, 0, 0, 0 },
-    { &winLogScrollbar, 0, 0, 0, 0 },
-    { &winTailer,       0, 0, 0, 0 }
+    { &winHeader,        0, 0, 0, 0 },
+    { &winMenu1,         0, 0, 0, 0 },
+    { &winMenu2,         0, 0, 0, 0 },
+    { &winDetails,       0, 0, 0, 0 },
+    { &winDetailsForm,   0, 0, 0, 0 },
+    { &winLog,           0, 0, 0, 0 },
+    { &winLogScrollbar,  0, 0, 0, 0 },
+    { &winLogHScrollbar, 0, 0, 0, 0 },
+    { &winTailer,        0, 0, 0, 0 }
 };
 
 typedef struct {
@@ -335,12 +337,17 @@ void cursesWindowSet( void )
     windows[WINDOW_LOG].startx = 0;
     windows[WINDOW_LOG].starty = lines + 3;
     windows[WINDOW_LOG].width  = x - 1;
-    windows[WINDOW_LOG].height = lines + ((y-5) & 1);
+    windows[WINDOW_LOG].height = lines + ((y-5) & 1) - 1;
 
     windows[WINDOW_LOG_SCROLLBAR].startx = x - 1;
     windows[WINDOW_LOG_SCROLLBAR].starty = lines + 3;
     windows[WINDOW_LOG_SCROLLBAR].width  = 1;
-    windows[WINDOW_LOG_SCROLLBAR].height = lines + ((y-5) & 1);
+    windows[WINDOW_LOG_SCROLLBAR].height = lines + ((y-5) & 1) - 1;
+
+    windows[WINDOW_LOG_HSCROLLBAR].startx = 0;
+    windows[WINDOW_LOG_HSCROLLBAR].starty = y - 3;
+    windows[WINDOW_LOG_HSCROLLBAR].width  = x - 2;
+    windows[WINDOW_LOG_HSCROLLBAR].height = 1;
 
     windows[WINDOW_TAILER].startx = 0;
     windows[WINDOW_TAILER].starty = y - 1;
@@ -386,6 +393,14 @@ void curses_start( void )
                    "thread_curses_out", NULL );
     thread_create( &cursesInThreadId, curses_input_thread, NULL, 
                    "thread_curses_in", NULL );
+
+#if 0
+    for( i = KEY_MIN; i < KEY_MAX; i++ ) {
+        if( has_key( i ) ) {
+            LogPrint( LOG_DEBUG, "Has key %04o", i );
+        }
+    }
+#endif
 }
 
 void *curses_output_thread( void *arg )
@@ -418,6 +433,8 @@ void *curses_output_thread( void *arg )
     int                 starty;
     int                 maxx, maxy;
     double              logPerLine;
+    int                 logLineOffset = 0;
+    int                 logOffset;
 
     scrolledBack = FALSE;
 
@@ -563,6 +580,17 @@ void *curses_output_thread( void *arg )
                         logTop = (logTop + lines) & CursesLogQ->numMask;
                     }
                     QueueUnlock( CursesLogQ );
+                    break;
+                case KEY_F(1):
+                    getmaxyx( winLog, maxy, maxx );
+                    logLineOffset -= (maxx - 1) / 2;
+                    if( logLineOffset < 0 ) {
+                        logLineOffset = 0;
+                    }
+                    break;
+                case KEY_F(2):
+                    getmaxyx( winLog, maxy, maxx );
+                    logLineOffset += (maxx - 1) / 2;
                     break;
                 case 10:    /* Enter */
                 case KEY_RIGHT:
@@ -831,10 +859,16 @@ void *curses_output_thread( void *arg )
         logCurr = (logTop + CursesLogQ->numElements + count - 
                    CursesLogQ->tail) & CursesLogQ->numMask;
 
+        wclear( winLog );
+
         for( i = 0; i < count; i++ ) {
             logEntry = (logTop + i) & CursesLogQ->numMask;
             logItem = (CursesLog_t *)CursesLogQ->itemTable[logEntry];
-            mvwprintw( winLog, i, 0, "%s", logItem->message );
+            len = strlen( logItem->message );
+            if( len > logLineOffset ) {
+                mvwprintw( winLog, i, 0, "%s", 
+                           &logItem->message[logLineOffset] );
+            }
         }
 
         getmaxyx( winLogScrollbar, y, x );
@@ -848,6 +882,22 @@ void *curses_output_thread( void *arg )
                 mvwaddch( winLogScrollbar, i, 0, ACS_CKBOARD );
             }
         }
+
+        getmaxyx( winLogHScrollbar, maxy, maxx );
+        logOffset = (2 * logLineOffset) / (maxx - 1);
+        if( logOffset > 4 ) {
+            logOffset = 4;
+        }
+
+        for( i = 0; i < maxx; i++ ) {
+            x = (logOffset * (maxx - 1)) - (i * 4);
+            if( x >= 0 && x < 4 ) {
+                mvwaddch( winLogHScrollbar, 0, i, ACS_BLOCK );
+            } else {
+                mvwaddch( winLogHScrollbar, 0, i, ACS_CKBOARD );
+            }
+        }
+
 
         QueueUnlock( CursesLogQ );
 
@@ -1477,6 +1527,8 @@ int cursesDetailsKeyhandle( int ch )
     case KEY_PPAGE:
     case KEY_NPAGE:
     case 18:    /* Ctrl-R */
+    case KEY_F(1):
+    case KEY_F(2):
         return( ch );
     case KEY_UP:
         detailsTopLine--;
@@ -1964,6 +2016,8 @@ int cursesFormKeyhandle( int ch )
     case KEY_PPAGE:
     case KEY_NPAGE:
     case 18:    /* Ctrl-R */
+    case KEY_F(1):
+    case KEY_F(2):
         return( ch );
     case KEY_DOWN:
     case 9:     /* Tab */
