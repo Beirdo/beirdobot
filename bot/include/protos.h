@@ -221,6 +221,7 @@ void cursesSaveOffset( void *arg, int index, CursesFormItem_t *items,
 void cursesRegisterCleanupFunc( CursesMenuFunc_t callback );
 int cursesMenuItemFind( int level, int menuId, char *string );
 void cursesMenuSetIndex( int menuId, int index );
+void cursesMenuLeave( void );
 
 void cursesPluginDisplay( void *arg );
 void cursesAtExit( void );

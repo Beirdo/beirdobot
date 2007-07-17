@@ -77,6 +77,7 @@ bool serverFlushUnvisited( BalancedBTreeItem_t *node );
 void mainAbout( void *arg );
 void mainLicensing( void *arg );
 void mainVersions( void *arg );
+void mainReloadAll( void *arg );
 int versionShowRecurse( BalancedBTreeItem_t *node, int line );
 
 typedef void (*sigAction_t)(int, siginfo_t *, void *);
@@ -204,6 +205,7 @@ int main ( int argc, char **argv )
     cursesMenuItemAdd( 2, MENU_SYSTEM, "About", mainAbout, NULL );
     cursesMenuItemAdd( 2, MENU_SYSTEM, "Licensing", mainLicensing, NULL );
     cursesMenuItemAdd( 2, MENU_SYSTEM, "Versions", mainVersions, NULL );
+    cursesMenuItemAdd( 2, MENU_SYSTEM, "Reload All", mainReloadAll, NULL );
 
     /* Add the terminal setting as a version */
     versionAdd( "TERM", getenv("TERM") );
@@ -799,6 +801,12 @@ int versionShowRecurse( BalancedBTreeItem_t *node, int line )
     line = versionShowRecurse( node->right, line );
 
     return( line );
+}
+
+void mainReloadAll( void *arg )
+{
+    pthread_kill( mainThreadId, SIGHUP );
+    cursesMenuLeave();
 }
 
 /*

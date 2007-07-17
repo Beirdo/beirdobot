@@ -97,6 +97,7 @@ void cursesNextPage( void *arg, char *string );
 void cursesUpdateFormLabels( void );
 bool cursesRecurseMenuItemFind( BalancedBTreeItem_t *node, char *string, 
                                 int *pIndex );
+void cursesMenuLeave( void );
 
 typedef enum {
     CURSES_TEXT_ADD,
@@ -424,7 +425,6 @@ void *curses_output_thread( void *arg )
     int                 i;
     ITEM               *currItem;
     CursesMenuItem_t   *menuItem;
-    int                 mainMenu = -1;
     int                 len;
     char               *string;
     char               *word;
@@ -620,24 +620,7 @@ void *curses_output_thread( void *arg )
                     break;
                 case 27:    /* Escape */
                 case KEY_LEFT:
-                    if( !inSubMenuFunc ) {
-                        if( currMenuId != -1 ) {
-                            pos_menu_cursor( menus[currMenuId+1]->menu );
-                            cursesDoSubMenu( &mainMenu );
-                        }
-                    } else {
-                        inSubMenuFunc = FALSE;
-                        currDetailKeyhandler = NULL;
-                        cursesWindowClear( WINDOW_DETAILS );
-                        cursesFormClear();
-                        curs_set(0);
-                        detailsTopLine = 0;
-                        detailsBottomLine = 0;
-                        if( cursesCleanupFunc ) {
-                            cursesCleanupFunc(NULL);
-                        }
-                        cursesCleanupFunc = NULL;
-                    }
+                    cursesMenuLeave();
                     break;
                 default:
                     break;
@@ -2483,6 +2466,30 @@ void cursesMenuSetIndex( int menuId, int index )
 #if 0
     LogPrint( LOG_DEBUG, "Set current item in menu %d to %d", menuId, index );
 #endif
+}
+
+void cursesMenuLeave( void )
+{
+    int         mainMenu = -1;
+
+    if( !inSubMenuFunc ) {
+        if( currMenuId != -1 ) {
+            pos_menu_cursor( menus[currMenuId+1]->menu );
+            cursesDoSubMenu( &mainMenu );
+        }
+    } else {
+        inSubMenuFunc = FALSE;
+        currDetailKeyhandler = NULL;
+        cursesWindowClear( WINDOW_DETAILS );
+        cursesFormClear();
+        curs_set(0);
+        detailsTopLine = 0;
+        detailsBottomLine = 0;
+        if( cursesCleanupFunc ) {
+            cursesCleanupFunc(NULL);
+        }
+        cursesCleanupFunc = NULL;
+    }
 }
 
 /*
