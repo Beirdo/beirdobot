@@ -85,6 +85,8 @@ void tracUnvisitTree( BalancedBTreeItem_t *node );
 void tracSaveFunc( void *arg, int index, char *string );
 void cursesTracDisplay( void *arg );
 void cursesTracRevert( void *arg, char *string );
+void cursesTracNew( void *arg );
+void cursesTracCleanup( void *arg );
 
 /* CVS generated ID string */
 static char ident[] _UNUSED_ = 
@@ -132,25 +134,31 @@ static QueryTable_t tracQueryTable[] = {
     /* 1 */
     { "UPDATE `plugin_trac` SET `chanid` = ?, `url` = ?, "
       "`svnUrl` = ?, `svnUser` = ?, `svnPasswd` = ?, `enabled` = ? "
-      "WHERE `chanid` = ?", NULL, NULL, FALSE }
+      "WHERE `chanid` = ?", NULL, NULL, FALSE },
+    /* 2 */
+    { "INSERT INTO `plugin_trac` ( `chanid`, `url`, `svnUrl`, `svnUser`, "
+      "`svnPasswd`, `enabled` ) VALUES ( ?, ?, ?, ?, ?, ? )", NULL, NULL, 
+      FALSE }
 };
 
 typedef struct {
-    int                 serverId;
-    IRCServer_t        *server;
-    int                 chanId;
-    int                 oldChanId;
-    IRCChannel_t       *channel;
-    char               *url;
-    char               *svnUrl;
-    char               *svnUser;
-    char               *svnPasswd;
-    apr_pool_t         *svnPool;
-    svn_client_ctx_t   *svnContext;
-    bool                enabled;
-    bool                visited;
-    bool                modified;
-    char               *menuText;
+    int                     serverId;
+    IRCServer_t            *server;
+    int                     chanId;
+    int                     oldChanId;
+    IRCChannel_t           *channel;
+    char                   *url;
+    char                   *svnUrl;
+    char                   *svnUser;
+    char                   *svnPasswd;
+    apr_pool_t             *svnPool;
+    svn_client_ctx_t       *svnContext;
+    bool                    enabled;
+    bool                    visited;
+    bool                    modified;
+    bool                    justAdded;
+    BalancedBTreeItem_t    *item;
+    char                   *menuText;
 } TracURL_t;
 
 typedef struct {
@@ -186,6 +194,7 @@ static pthread_mutex_t  signalMutex;
 static pthread_cond_t   kickCond;
 int                     tracMenuId;
 static ThreadCallback_t callbacks;
+static TracURL_t       *newTracItem = NULL;
 
 int tracSvnInitialize( TracURL_t *tracItem );
 char *tracDetailsTicket( TracURL_t *tracItem, int number );
@@ -212,6 +221,7 @@ void plugin_initialize( char *args )
                      defSchema, defSchemaCount, schemaUpgrade );
 
     tracMenuId = cursesMenuItemAdd( 1, -1, "Trac", NULL, NULL );
+    cursesMenuItemAdd( 2, tracMenuId, "New Trac Setup", cursesTracNew, NULL );
 
     urlTree = BalancedBTreeCreate( BTREE_KEY_INT );
 
@@ -285,6 +295,7 @@ void plugin_shutdown( void )
         apr_initialized = FALSE;
     }
 
+    cursesMenuItemRemove( 2, tracMenuId, "New Trac Setup" );
     cursesMenuItemRemove( 1, tracMenuId, "Trac" );
 
     thread_deregister( tracThreadId );
@@ -524,6 +535,7 @@ static void db_load_channel_regexp( void )
 static void db_update_tracitem( TracURL_t *tracItem )
 {
     MYSQL_BIND         *data;
+    pthread_mutex_t    *mutex;
 
     data = (MYSQL_BIND *)malloc(8 * sizeof(MYSQL_BIND));
     memset( data, 0, 7 * sizeof(MYSQL_BIND) );
@@ -538,7 +550,26 @@ static void db_update_tracitem( TracURL_t *tracItem )
 
     LogPrint( LOG_NOTICE, "Trac: channel %d: updating database", 
                           tracItem->chanId );
-    db_queue_query( 1, tracQueryTable, data, 7, NULL, NULL, NULL );
+    if( tracItem == newTracItem ) {
+        mutex = (pthread_mutex_t *)malloc(sizeof(pthread_mutex_t));
+        pthread_mutex_init( mutex, NULL );
+
+        db_queue_query( 2, tracQueryTable, data, 6, NULL, NULL, mutex );
+
+        pthread_mutex_unlock( mutex );
+        pthread_mutex_destroy( mutex );
+        free( mutex );
+
+        tracItem->justAdded = TRUE;
+        BalancedBTreeLock( urlTree );
+        BalancedBTreeRemove( urlTree, tracItem->item, LOCKED, FALSE );
+        BalancedBTreeAdd( urlTree, tracItem->item, LOCKED, TRUE );
+        BalancedBTreeUnlock( urlTree );
+        cursesCancel( NULL, NULL );
+        newTracItem = NULL;
+    } else {
+        db_queue_query( 1, tracQueryTable, data, 7, NULL, NULL, NULL );
+    }
 }
 
 /* Assumes the tree is already locked */
@@ -555,6 +586,7 @@ static void result_load_channel_regexp( MYSQL_RES *res, MYSQL_BIND *input,
     bool                    found;
     int                     len;
     char                   *menuText;
+    int                     index;
 
     if( !res || !(count = mysql_num_rows(res)) ) {
         channelRegexp = NULL;
@@ -607,7 +639,7 @@ static void result_load_channel_regexp( MYSQL_RES *res, MYSQL_BIND *input,
         len = strlen( tracItem->url ) + 20;
         menuText = (char *)malloc(len);
         snprintf( menuText, len, "%d - %s", tracItem->chanId, tracItem->url );
-        if( found ) {
+        if( found && tracItem->menuText ) {
             if( strcmp( menuText, tracItem->menuText ) ) {
                 cursesMenuItemRemove( 2, tracMenuId, tracItem->menuText );
                 free( tracItem->menuText );
@@ -621,6 +653,15 @@ static void result_load_channel_regexp( MYSQL_RES *res, MYSQL_BIND *input,
             tracItem->menuText = menuText;
             cursesMenuItemAdd( 2, tracMenuId, tracItem->menuText, 
                                cursesTracDisplay, tracItem );
+        }
+
+        if( tracItem->justAdded ) {
+            tracItem->justAdded = FALSE;
+
+            index = cursesMenuItemFind( 2, tracMenuId, tracItem->menuText );
+            if( index != -1 ) {
+                cursesMenuSetIndex( tracMenuId, index );
+            }
         }
 
         if( found && oldEnabled && !tracItem->enabled ) {
@@ -651,6 +692,7 @@ static void result_load_channel_regexp( MYSQL_RES *res, MYSQL_BIND *input,
         if( !found ) {
             item->item = (void *)tracItem;
             item->key  = (void *)&tracItem->chanId;
+            tracItem->item = item;
             BalancedBTreeAdd( urlTree, item, LOCKED, FALSE );
         }
     }
@@ -1265,6 +1307,55 @@ void cursesTracDisplay( void *arg )
                        tracSaveFunc );
 }
 
+void cursesTracNew( void *arg )
+{
+    TracURL_t              *tracItem;
+    BalancedBTreeItem_t    *item;
+
+    newTracItem = (TracURL_t *)malloc(sizeof(TracURL_t));
+    tracItem = newTracItem;
+    memset( tracItem, 0, sizeof(TracURL_t) );
+    tracItem->chanId = -1;
+
+    item = (BalancedBTreeItem_t *)malloc(sizeof(BalancedBTreeItem_t));
+    item->item = (void *)tracItem;
+    item->key  = (void *)&tracItem->chanId;
+    tracItem->item = item;
+    BalancedBTreeAdd( urlTree, item, UNLOCKED, TRUE );
+
+    tracItem->url       = strdup("");
+    tracItem->svnUrl    = strdup("");
+    tracItem->svnUser   = strdup("");
+    tracItem->svnPasswd = strdup("");
+
+    cursesRegisterCleanupFunc( cursesTracCleanup );
+    cursesTracDisplay( tracItem );
+}
+
+void cursesTracCleanup( void *arg )
+{
+    TracURL_t              *tracItem;
+    BalancedBTreeItem_t    *item;
+    int                     num;
+
+    num = -1;
+    item = BalancedBTreeFind( urlTree, &num, UNLOCKED );
+    if( !item ) {
+        return;
+    }
+
+    BalancedBTreeRemove( urlTree, item, UNLOCKED, TRUE );
+    tracItem = (TracURL_t *)item->item;
+    free( tracItem->url );
+    free( tracItem->svnUrl );
+    free( tracItem->svnUser );
+    free( tracItem->svnPasswd );
+    if( tracItem->menuText ) {
+        free( tracItem->menuText );
+    }
+    free( tracItem );
+    free( item );
+}
 
 /*
  * vim:ts=4:sw=4:ai:et:si:sts=4
