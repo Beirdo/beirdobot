@@ -57,7 +57,8 @@ char *botHelpNotice( void *tag );
 char *botHelpSymbol( void *tag );
 void db_search_text( IRCServer_t *server, IRCChannel_t *channel, char *who, 
                      char *text );
-void result_search_text( MYSQL_RES *res, MYSQL_BIND *input, void *args );
+void result_search_text( MYSQL_RES *res, MYSQL_BIND *input, void *args, 
+                         long insertid );
 
 /* CVS generated ID string */
 static char ident[] _UNUSED_ = 
@@ -357,7 +358,8 @@ void db_search_text( IRCServer_t *server, IRCChannel_t *channel, char *who,
                     NULL, NULL );
 }
 
-void result_search_text( MYSQL_RES *res, MYSQL_BIND *input, void *args )
+void result_search_text( MYSQL_RES *res, MYSQL_BIND *input, void *args, 
+                         long insertid )
 {
     IRCServer_t    *server; 
     IRCChannel_t   *channel;

@@ -95,6 +95,8 @@ void cursesUpdateLines( void );
 void cursesFieldChanged( FORM *form );
 void cursesNextPage( void *arg, char *string );
 void cursesUpdateFormLabels( void );
+bool cursesRecurseMenuItemFind( BalancedBTreeItem_t *node, char *string, 
+                                int *pIndex );
 
 typedef enum {
     CURSES_TEXT_ADD,
@@ -227,6 +229,7 @@ static CursesLine_t      menuLines[] = {
     { LINE_UP_TEE, 0, 0, 0, 0 }
 };
 static int menuLinesCount = NELEMENTS( menuLines );
+static CursesMenuFunc_t cursesCleanupFunc = NULL;
 
 typedef struct {
     LinkedListItem_t        linkage;
@@ -630,6 +633,10 @@ void *curses_output_thread( void *arg )
                         curs_set(0);
                         detailsTopLine = 0;
                         detailsBottomLine = 0;
+                        if( cursesCleanupFunc ) {
+                            cursesCleanupFunc(NULL);
+                        }
+                        cursesCleanupFunc = NULL;
                     }
                     break;
                 default:
@@ -1081,7 +1088,7 @@ void cursesMenuItemRemove( int level, int menuId, char *string )
     BalancedBTreeItem_t    *item;
     int                     mainMenu = -1;
 
-    if( Daemon ) {
+    if( Daemon || !string ) {
         return;
     }
 
@@ -1305,6 +1312,7 @@ void cursesMenuRegenerate( void )
             menus[i]->posted = FALSE;
         }
     }
+    pos_menu_cursor( menus[currMenuId+1]->menu );
 }
 
 int cursesItemCount( BalancedBTree_t *tree )
@@ -2402,6 +2410,79 @@ void cursesSaveOffset( void *arg, int index, CursesFormItem_t *items,
     default:
         return;
     }
+}
+
+void cursesRegisterCleanupFunc( CursesMenuFunc_t callback )
+{
+    cursesCleanupFunc = callback;
+}
+
+int cursesMenuItemFind( int level, int menuId, char *string )
+{
+    CursesMenuItem_t       *menuItem;
+    BalancedBTree_t        *tree;
+    int                     index;
+
+    if( Daemon ) {
+        return( -1 );
+    }
+
+    if( level == 1 ) {
+        tree = menu1NumTree;
+    } else {
+        menuItem = cursesMenu1Find( menuId );
+        if( !menuItem ) {
+            return( -1 );
+        }
+
+        tree = menuItem->subMenuTree;
+    }
+
+    BalancedBTreeLock( tree );
+    index = -1;
+    cursesRecurseMenuItemFind( tree->root, string, &index );
+    BalancedBTreeUnlock( tree );
+
+    if( level == 1 && index != -1 ) {
+        index += menu1StaticCount;
+    }
+
+#if 0
+    LogPrint( LOG_DEBUG, "Found \"%s\" in menu %d at %d", string, menuId, 
+              index );
+#endif
+    return( index );
+}
+
+bool cursesRecurseMenuItemFind( BalancedBTreeItem_t *node, char *string, 
+                                int *pIndex )
+{
+    CursesMenuItem_t       *menuItem;
+
+    if( !node || !pIndex ) {
+        return( FALSE );
+    }
+
+    if( cursesRecurseMenuItemFind( node->left, string, pIndex ) ) {
+        return( TRUE );
+    }
+
+    (*pIndex)++;
+    menuItem = (CursesMenuItem_t *)node->item;
+    if( !strcmp( menuItem->string, string ) ) {
+        return( TRUE );
+    }
+
+    return( cursesRecurseMenuItemFind( node->right, string, pIndex ) );
+}
+
+void cursesMenuSetIndex( int menuId, int index )
+{
+    menus[menuId+1]->current = index;
+    set_current_item( menus[menuId+1]->menu, menus[menuId+1]->items[index] );
+#if 0
+    LogPrint( LOG_DEBUG, "Set current item in menu %d to %d", menuId, index );
+#endif
 }
 
 /*

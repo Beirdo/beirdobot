@@ -207,9 +207,9 @@ void db_update_mailbox( Mailbox_t *mailbox );
 void db_update_report( MailboxReport_t *report );
 static void db_load_reports( void );
 static void result_load_mailboxes( MYSQL_RES *res, MYSQL_BIND *input, 
-                                   void *args );
+                                   void *args, long insertid );
 static void result_load_reports( MYSQL_RES *res, MYSQL_BIND *input, 
-                                   void *args );
+                                   void *args, long insertid );
 void mailboxFindUnconflictingTime( BalancedBTree_t *tree, time_t *key );
 char *botMailboxDump( BalancedBTreeItem_t *item );
 Mailbox_t *mailboxFindByNetmbx( NETMBX *netmbx );
@@ -1068,7 +1068,7 @@ void db_update_report( MailboxReport_t *report )
 
 /* Assumes the mailboxTree is already locked */
 static void result_load_mailboxes( MYSQL_RES *res, MYSQL_BIND *input, 
-                                   void *args )
+                                   void *args, long insertid )
 {
     int                     count;
     int                     i;
@@ -1294,7 +1294,7 @@ static void result_load_mailboxes( MYSQL_RES *res, MYSQL_BIND *input,
 }
 
 static void result_load_reports( MYSQL_RES *res, MYSQL_BIND *input, 
-                                 void *args )
+                                 void *args, long insertid )
 {
     int                     count;
     int                     i;

@@ -60,7 +60,7 @@ void botCmdTrac( IRCServer_t *server, IRCChannel_t *channel, char *who,
 char *botHelpTrac( void *tag );
 static void db_load_channel_regexp( void );
 static void result_load_channel_regexp( MYSQL_RES *res, MYSQL_BIND *input, 
-                                        void *args );
+                                        void *args, long insertid );
 void *trac_thread(void *arg);
 char *tracRecurseBuildChannelRegexp( BalancedBTreeItem_t *node );
 void log_svn_error( svn_error_t *error );
@@ -543,7 +543,7 @@ static void db_update_tracitem( TracURL_t *tracItem )
 
 /* Assumes the tree is already locked */
 static void result_load_channel_regexp( MYSQL_RES *res, MYSQL_BIND *input, 
-                                        void *args )
+                                        void *args, long insertid )
 {
     int                     count;
     int                     i;

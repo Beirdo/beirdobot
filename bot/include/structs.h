@@ -315,7 +315,8 @@ typedef struct {
 typedef QueryTable_t SchemaUpgrade_t[MAX_SCHEMA_QUERY];
 
 
-typedef void (*QueryResFunc_t)( MYSQL_RES *res, MYSQL_BIND *input, void *arg );
+typedef void (*QueryResFunc_t)( MYSQL_RES *res, MYSQL_BIND *input, void *arg,
+                                long insertid );
 
 typedef struct _QueryItem_t {
     int                 queryId;

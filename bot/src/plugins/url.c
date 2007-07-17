@@ -142,18 +142,19 @@ void regexpFuncUrl( IRCServer_t *server, IRCChannel_t *channel, char *who,
                     void *tag );
 char *db_get_url_keyword( IRCChannel_t *channel, char *keyword );
 static void result_get_url_keyword( MYSQL_RES *res, MYSQL_BIND *input, 
-                                    void *args );
+                                    void *args, long insertid );
 void db_log_url( IRCChannel_t *channel, time_t timestamp, char *url );
 void db_last_url( IRCChannel_t *channel, char *who );
-static void result_last_url( MYSQL_RES *res, MYSQL_BIND *input, void *args );
+static void result_last_url( MYSQL_RES *res, MYSQL_BIND *input, void *args,
+                             long insertid );
 void db_search_url( IRCChannel_t *channel, char *who, char *text );
 char *db_list_keywords( IRCChannel_t *channel );
 static void result_list_keywords( MYSQL_RES *res, MYSQL_BIND *input, 
-                                  void *args );
+                                  void *args, long insertid );
 static void result_url_show_last( MYSQL_RES *res, MYSQL_BIND *input, 
-                                  void *args );
+                                  void *args, long insertid );
 static void result_url_get_keywords( MYSQL_RES *res, MYSQL_BIND *input, 
-                                     void *args );
+                                     void *args, long insertid );
 void urlShowLast( void *arg );
 void urlGetKeywords( void );
 void urlSaveFunc( void *arg, int index, char *string );
@@ -371,7 +372,8 @@ char *db_get_url_keyword( IRCChannel_t *channel, char *keyword )
 }
 
 
-void result_get_url_keyword( MYSQL_RES *res, MYSQL_BIND *input, void *args )
+void result_get_url_keyword( MYSQL_RES *res, MYSQL_BIND *input, void *args, 
+                             long insertid )
 {
     MYSQL_ROW       row;
     char          **pUrlFmt;
@@ -446,7 +448,8 @@ void db_last_url( IRCChannel_t *channel, char *who )
                    (void *)chanArgs, NULL );
 }
 
-static void result_last_url( MYSQL_RES *res, MYSQL_BIND *input, void *args )
+static void result_last_url( MYSQL_RES *res, MYSQL_BIND *input, void *args,
+                             long insertid )
 {
     int             count;
     int             i;
@@ -544,7 +547,7 @@ char *db_list_keywords( IRCChannel_t *channel )
 }
 
 static void result_list_keywords( MYSQL_RES *res, MYSQL_BIND *input, 
-                                  void *args )
+                                  void *args, long insertid )
 {
     MYSQL_ROW       row;
     char          **pKeywords;
@@ -604,7 +607,7 @@ void urlShowLast( void *arg )
 }
 
 static void result_url_show_last( MYSQL_RES *res, MYSQL_BIND *input, 
-                                  void *args )
+                                  void *args, long insertid )
 {
     MYSQL_ROW       row;
     int             count;
@@ -639,7 +642,7 @@ void urlGetKeywords( void )
 }
 
 static void result_url_get_keywords( MYSQL_RES *res, MYSQL_BIND *input, 
-                                     void *args )
+                                     void *args, long insertid )
 {
     MYSQL_ROW       row;
     int             count;

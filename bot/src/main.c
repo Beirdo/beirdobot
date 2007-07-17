@@ -206,7 +206,7 @@ int main ( int argc, char **argv )
     cursesMenuItemAdd( 2, MENU_SYSTEM, "Versions", mainVersions, NULL );
 
     /* Add the terminal setting as a version */
-    versionAdd( "term", getenv("TERM") );
+    versionAdd( "TERM", getenv("TERM") );
 
     /* Print the startup log messages */
     LogBanner();

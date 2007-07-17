@@ -53,7 +53,8 @@ void botCmdLuascript( IRCServer_t *server, IRCChannel_t *channel, char *who,
 char *botHelpLuascript( void *tag );
 
 BalancedBTree_t *db_get_luascripts( void );
-void result_get_luascripts( MYSQL_RES *res, MYSQL_BIND *input, void *arg );
+void result_get_luascripts( MYSQL_RES *res, MYSQL_BIND *input, void *arg,
+                            long insertid );
 void cursesLuascriptDisplay( void *arg );
 void luascriptSaveFunc( void *arg, int index, char *string );
 
@@ -250,7 +251,8 @@ BalancedBTree_t *db_get_luascripts( void )
     return( tree );
 }
 
-void result_get_luascripts( MYSQL_RES *res, MYSQL_BIND *input, void *arg )
+void result_get_luascripts( MYSQL_RES *res, MYSQL_BIND *input, void *arg,
+                            long insertid )
 {
     Luascript_t            *luascript;
     int                     count;

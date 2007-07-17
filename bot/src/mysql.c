@@ -65,7 +65,7 @@ pthread_t       sqlThreadId;
 /* Internal protos */
 char *db_quote(char *string);
 MYSQL_RES *db_query( const char *query, MYSQL_BIND *args, int arg_count, 
-                     bool *connected );
+                     bool *connected, long *insertid );
 bool db_server_connect( MYSQL *sql );
 
 void serverTreeLoadChannels( BalancedBTreeItem_t *node, 
@@ -76,15 +76,24 @@ void chain_flush_nick( MYSQL_RES *res, QueryItem_t *item );
 void chain_set_setting( MYSQL_RES *res, QueryItem_t *item );
 void chain_set_auth( MYSQL_RES *res, QueryItem_t *item );
 
-void result_load_servers( MYSQL_RES *res, MYSQL_BIND *input, void *arg );
-void result_load_channels( MYSQL_RES *res, MYSQL_BIND *input, void *arg );
-void result_check_nick_notify( MYSQL_RES *res, MYSQL_BIND *input, void *arg );
-void result_get_plugins( MYSQL_RES *res, MYSQL_BIND *input, void *arg );
-void result_get_seen( MYSQL_RES *res, MYSQL_BIND *input, void *arg );
-void result_get_setting( MYSQL_RES *res, MYSQL_BIND *input, void *arg );
-void result_get_auth( MYSQL_RES *res, MYSQL_BIND *input, void *arg );
-void result_check_plugins( MYSQL_RES *res, MYSQL_BIND *input, void *arg );
-void result_MySQL_Schema( MYSQL_RES *res, MYSQL_BIND *input, void *arg );
+void result_load_servers( MYSQL_RES *res, MYSQL_BIND *input, void *arg,
+                          long insertid );
+void result_load_channels( MYSQL_RES *res, MYSQL_BIND *input, void *arg,
+                           long insertid );
+void result_check_nick_notify( MYSQL_RES *res, MYSQL_BIND *input, void *arg,
+                               long insertid );
+void result_get_plugins( MYSQL_RES *res, MYSQL_BIND *input, void *arg,
+                         long insertid );
+void result_get_seen( MYSQL_RES *res, MYSQL_BIND *input, void *arg,
+                      long insertid );
+void result_get_setting( MYSQL_RES *res, MYSQL_BIND *input, void *arg,
+                         long insertid );
+void result_get_auth( MYSQL_RES *res, MYSQL_BIND *input, void *arg,
+                      long insertid );
+void result_check_plugins( MYSQL_RES *res, MYSQL_BIND *input, void *arg,
+                          long insertid );
+void result_MySQL_Schema( MYSQL_RES *res, MYSQL_BIND *input, void *arg,
+                          long insertid );
 
 void cursesMySQLSchema( void *arg );
 
@@ -179,7 +188,8 @@ QueryTable_t    QueryTable[] = {
 
 QueueObject_t   *QueryQ;
 
-void *mysql_thread( void *arg ) {
+void *mysql_thread( void *arg ) 
+{
     QueryItem_t        *item;
     MysqlData_t        *protItem;
     QueryTable_t       *query = NULL;
@@ -189,6 +199,7 @@ void *mysql_thread( void *arg ) {
     struct timeval      now;
     int                 timeout;
     bool                connected;
+    long                insertid;
 
     LogPrintNoArg( LOG_NOTICE, "Starting MySQL thread" );
     mysql_thread_init();
@@ -246,7 +257,7 @@ void *mysql_thread( void *arg ) {
                 connected = TRUE;
                 query = &item->queryTable[item->queryId];
                 res = db_query( query->queryPattern, item->queryData, 
-                                item->queryDataCount, &connected );
+                                item->queryDataCount, &connected, &insertid );
 
                 if( !connected ) {
                     LogPrintNoArg( LOG_NOTICE, "MySQL connection is gone, "
@@ -256,10 +267,10 @@ void *mysql_thread( void *arg ) {
         } while( !BotDone && !connected );
 
         if( !BotDone ) {
-            if( res ) {
+            if( res || insertid ) {
                 if( item->queryCallback ) {
                     item->queryCallback( res, item->queryData, 
-                                         item->queryCallbackArg );
+                                         item->queryCallbackArg, insertid );
                 } else if( query->queryChainFunc ) {
                     query->queryChainFunc( res, item );
                 }
@@ -407,7 +418,7 @@ char *db_quote(char *string)
 
 
 MYSQL_RES *db_query( const char *query, MYSQL_BIND *args, int arg_count, 
-                     bool *connected )
+                     bool *connected, long *insertid )
 {
     MYSQL_RES      *res;
     MysqlData_t    *item;
@@ -539,6 +550,10 @@ MYSQL_RES *db_query( const char *query, MYSQL_BIND *args, int arg_count,
     }
 
     res = mysql_store_result(item->sql);
+
+    if( insertid ) {
+        *insertid = mysql_insert_id(item->sql);
+    }
 
     ProtectedDataUnlock( sql );
 
@@ -1342,7 +1357,8 @@ void db_update_server( IRCServer_t *server )
  */
 
 /* Assumes that ServerTree is already locked */
-void result_load_servers( MYSQL_RES *res, MYSQL_BIND *input, void *arg )
+void result_load_servers( MYSQL_RES *res, MYSQL_BIND *input, void *arg,
+                          long insertid )
 {
     IRCServer_t            *server;
     BalancedBTreeItem_t    *item;
@@ -1520,7 +1536,8 @@ void result_load_servers( MYSQL_RES *res, MYSQL_BIND *input, void *arg )
     BalancedBTreeAdd( ServerTree, NULL, LOCKED, TRUE );
 }
 
-void result_load_channels( MYSQL_RES *res, MYSQL_BIND *input, void *arg )
+void result_load_channels( MYSQL_RES *res, MYSQL_BIND *input, void *arg,
+                           long insertid )
 {
     IRCServer_t        *server;
     IRCChannel_t       *channel;
@@ -1688,7 +1705,8 @@ void result_load_channels( MYSQL_RES *res, MYSQL_BIND *input, void *arg )
     BalancedBTreeUnlock( server->channelNum );
 }
 
-void result_check_nick_notify( MYSQL_RES *res, MYSQL_BIND *input, void *arg )
+void result_check_nick_notify( MYSQL_RES *res, MYSQL_BIND *input, void *arg,
+                               long insertid )
 {
     int             count;
     bool           *retval;
@@ -1707,7 +1725,8 @@ void result_check_nick_notify( MYSQL_RES *res, MYSQL_BIND *input, void *arg )
 /*
  * Assumes that the tree is already locked!
  */
-void result_get_plugins( MYSQL_RES *res, MYSQL_BIND *input, void *arg )
+void result_get_plugins( MYSQL_RES *res, MYSQL_BIND *input, void *arg,
+                         long insertid )
 {
     Plugin_t               *plugin;
     int                     count;
@@ -1780,7 +1799,8 @@ void result_get_plugins( MYSQL_RES *res, MYSQL_BIND *input, void *arg )
 }
 
 
-void result_get_seen( MYSQL_RES *res, MYSQL_BIND *input, void *arg )
+void result_get_seen( MYSQL_RES *res, MYSQL_BIND *input, void *arg, 
+                      long insertid )
 {
     char           *nick;
     IRCChannel_t   *channel;
@@ -1888,7 +1908,8 @@ void result_get_seen( MYSQL_RES *res, MYSQL_BIND *input, void *arg )
 }
 
 
-void result_get_setting( MYSQL_RES *res, MYSQL_BIND *input, void *arg )
+void result_get_setting( MYSQL_RES *res, MYSQL_BIND *input, void *arg,
+                         long insertid )
 {
     int             count;
     MYSQL_ROW       row;
@@ -1909,7 +1930,8 @@ void result_get_setting( MYSQL_RES *res, MYSQL_BIND *input, void *arg )
 }
 
 
-void result_get_auth( MYSQL_RES *res, MYSQL_BIND *input, void *arg )
+void result_get_auth( MYSQL_RES *res, MYSQL_BIND *input, void *arg, 
+                      long insertid )
 {
     int             count;
     MYSQL_ROW       row;
@@ -1943,7 +1965,8 @@ void result_get_auth( MYSQL_RES *res, MYSQL_BIND *input, void *arg )
     *datap = data;
 }
 
-void result_check_plugins( MYSQL_RES *res, MYSQL_BIND *input, void *arg )
+void result_check_plugins( MYSQL_RES *res, MYSQL_BIND *input, void *arg,
+                           long insertid )
 {
     int         *found;
 
@@ -1956,7 +1979,8 @@ void result_check_plugins( MYSQL_RES *res, MYSQL_BIND *input, void *arg )
     }
 }
 
-void result_MySQL_Schema( MYSQL_RES *res, MYSQL_BIND *input, void *arg )
+void result_MySQL_Schema( MYSQL_RES *res, MYSQL_BIND *input, void *arg, 
+                          long insertid )
 {
     int             i;
     int             count;

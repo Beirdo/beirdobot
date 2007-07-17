@@ -109,7 +109,12 @@ static QueryTable_t rssfeedQueryTable[] = {
     /* 2 */
     { "UPDATE `plugin_rssfeed` SET `chanid` = ?, `url` = ?, `userpasswd` = ?, "
       "`authtype` = ?, `prefix` = ?, `timeout` = ?, `timespec` = ?, "
-      "`feedoffset` = ?, `enabled` = ? WHERE `feedid` = ?", NULL, NULL, FALSE }
+      "`feedoffset` = ?, `enabled` = ? WHERE `feedid` = ?", NULL, NULL, FALSE },
+    /* 3 */
+    { "INSERT INTO `plugin_rssfeed` ( `feedid`, `chanid`, `url`, `userpasswd`, "
+      "`authtype`, `prefix`, `timeout`, `lastpost`, `timespec`, `feedoffset`, "
+      "`enabled` ) VALUES ( NULL, ?, ?, ?, ?, ?, ?, 0, ?, ?, ? )", NULL, NULL, 
+      FALSE }
 };
 
 
@@ -131,6 +136,7 @@ typedef struct {
     long            offset;
     bool            visited;
     bool            modified;
+    bool            justAdded;
     char           *menuText;
 } RssFeed_t;
 
@@ -156,7 +162,9 @@ void *rssfeed_thread(void *arg);
 static void db_load_rssfeeds( void );
 static void db_update_rssfeed( RssFeed_t *feed );
 static void result_load_rssfeeds( MYSQL_RES *res, MYSQL_BIND *input, 
-                                  void *args );
+                                  void *args, long insertid );
+static void result_insert_rssfeed( MYSQL_RES *res, MYSQL_BIND *input, 
+                                   void *args, long insertid );
 void db_update_lastpost( int feedId, int lastPost );
 void rssfeedFindUnconflictingTime( BalancedBTree_t *tree, time_t *key );
 char *botRssfeedDepthFirst( BalancedBTreeItem_t *item, IRCServer_t *server,
@@ -168,6 +176,7 @@ bool rssfeedFlushUnvisited( BalancedBTreeItem_t *node );
 void rssfeedSaveFunc( void *arg, int index, char *string );
 void cursesRssfeedRevert( void *arg, char *string );
 void cursesRssfeedDisplay( void *arg );
+void cursesRssfeedCleanup( void *arg );
 void rssfeedDisableServer( IRCServer_t *server );
 void rssfeedDisableChannel( IRCChannel_t *channel );
 bool rssfeedRecurseDisableServer( BalancedBTreeItem_t *node, 
@@ -175,6 +184,8 @@ bool rssfeedRecurseDisableServer( BalancedBTreeItem_t *node,
 bool rssfeedRecurseDisableChannel( BalancedBTreeItem_t *node, 
                                    IRCChannel_t *channel );
 bool rssfeedIsReady( BalancedBTreeItem_t *node );
+void cursesRssfeedNew( void *arg );
+void cursesRssfeedCleanup( void *arg );
 
 
 /* INTERNAL VARIABLES  */
@@ -204,6 +215,8 @@ void plugin_initialize( char *args )
                      defSchema, defSchemaCount, schemaUpgrade );
 
     rssfeedMenuId = cursesMenuItemAdd( 1, -1, "RSSfeed", NULL, NULL );
+    cursesMenuItemAdd( 2, rssfeedMenuId, "New RSS Feed", cursesRssfeedNew, 
+                       NULL );
 
     snprintf( buf, 32, "%d.%d.%d", (LIBCURL_VERSION_NUM >> 16) & 0xFF,
                        (LIBCURL_VERSION_NUM >> 8) & 0xFF,
@@ -836,6 +849,7 @@ static void db_load_rssfeeds( void )
 static void db_update_rssfeed( RssFeed_t *feed )
 {
     MYSQL_BIND         *data;
+    pthread_mutex_t    *mutex;
 
     data = (MYSQL_BIND *)malloc(10 * sizeof(MYSQL_BIND));
     memset( data, 0, 10 * sizeof(MYSQL_BIND) );
@@ -853,12 +867,48 @@ static void db_update_rssfeed( RssFeed_t *feed )
     bind_numeric( &data[9], feed->feedId, MYSQL_TYPE_LONG );
 
     LogPrint( LOG_NOTICE, "RSSFeed: feed %d: updating database", feed->feedId );
-    db_queue_query( 2, rssfeedQueryTable, data, 10, NULL, NULL, NULL );
+    if( feed->feedId == -1 ) {
+        mutex = (pthread_mutex_t *)malloc(sizeof(pthread_mutex_t));
+        pthread_mutex_init( mutex, NULL );
+
+        db_queue_query( 3, rssfeedQueryTable, data, 9, result_insert_rssfeed, 
+                        (void *)feed, mutex );
+
+        pthread_mutex_unlock( mutex );
+        pthread_mutex_destroy( mutex );
+        free( mutex );
+
+        cursesCancel( NULL, NULL );
+    } else {
+        db_queue_query( 2, rssfeedQueryTable, data, 10, NULL, NULL, NULL );
+    }
+}
+
+static void result_insert_rssfeed( MYSQL_RES *res, MYSQL_BIND *input, 
+                                   void *args, long insertid )
+{
+    RssFeed_t              *feed;
+    BalancedBTreeItem_t    *item;
+
+    feed = (RssFeed_t *)args;
+    LogPrint( LOG_DEBUG, "Inserted RSS Feed: old ID %d, new ID %ld", 
+                         feed->feedId, insertid );
+    if( feed->feedId == -1 ) {
+        BalancedBTreeLock( rssfeedTree );
+        item = BalancedBTreeFind( rssfeedTree, &feed->feedId, LOCKED );
+        if( item ) {
+            BalancedBTreeRemove( rssfeedTree, item, LOCKED, FALSE );
+            feed->feedId = insertid;
+            feed->justAdded = TRUE;
+            BalancedBTreeAdd( rssfeedTree, item, LOCKED, TRUE );
+        }
+        BalancedBTreeUnlock( rssfeedTree );
+    }
 }
 
 /* Assumes both the rssfeedTree and rssfeedActiveTree are locked */
 static void result_load_rssfeeds( MYSQL_RES *res, MYSQL_BIND *input, 
-                                  void *args )
+                                  void *args, long insertid )
 {
     int                     count;
     int                     i;
@@ -873,6 +923,7 @@ static void result_load_rssfeeds( MYSQL_RES *res, MYSQL_BIND *input,
     bool                    oldEnabled;
     int                     len;
     char                   *menuText;
+    int                     index;
 
     if( !res || !(count = mysql_num_rows(res)) ) {
         return;
@@ -933,7 +984,7 @@ static void result_load_rssfeeds( MYSQL_RES *res, MYSQL_BIND *input,
         menuText = (char *)malloc(len);
         snprintf( menuText, len, "%d - %s (%d)", data->feedId, data->prefix,
                             data->chanId );
-        if( found ) {
+        if( found && data->menuText ) {
             if( strcmp( menuText, data->menuText ) ) {
                 cursesMenuItemRemove( 2, rssfeedMenuId, data->menuText );
                 free( data->menuText );
@@ -947,6 +998,15 @@ static void result_load_rssfeeds( MYSQL_RES *res, MYSQL_BIND *input,
             data->menuText = menuText;
             cursesMenuItemAdd( 2, rssfeedMenuId, data->menuText, 
                                cursesRssfeedDisplay, data );
+        }
+
+        if( data->justAdded ) {
+            data->justAdded = FALSE;
+
+            index = cursesMenuItemFind( 2, rssfeedMenuId, data->menuText );
+            if( index != -1 ) {
+                cursesMenuSetIndex( rssfeedMenuId, index );
+            }
         }
         
         if( ChannelsLoaded ) {
@@ -1339,6 +1399,55 @@ void cursesRssfeedDisplay( void *arg )
 {
     cursesFormDisplay( arg, rssfeedFormItems, rssfeedFormItemCount, 
                        rssfeedSaveFunc );
+}
+
+void cursesRssfeedNew( void *arg )
+{
+    RssFeed_t              *feed;
+    BalancedBTreeItem_t    *item;
+
+    feed = (RssFeed_t *)malloc(sizeof(RssFeed_t));
+    memset( feed, 0, sizeof(RssFeed_t) );
+    feed->feedId = -1;
+
+    item = (BalancedBTreeItem_t *)malloc(sizeof(BalancedBTreeItem_t));
+    item->item = (void *)feed;
+    item->key  = (void *)&feed->feedId;
+    BalancedBTreeAdd( rssfeedTree, item, UNLOCKED, TRUE );
+
+    feed->url      = strdup("");
+    feed->prefix   = strdup("");
+    feed->timeSpec = strdup("");
+
+    cursesRegisterCleanupFunc( cursesRssfeedCleanup );
+    cursesRssfeedDisplay( feed );
+}
+
+void cursesRssfeedCleanup( void *arg )
+{
+    RssFeed_t              *feed;
+    BalancedBTreeItem_t    *item;
+    int                     num;
+
+    num = -1;
+    item = BalancedBTreeFind( rssfeedTree, &num, UNLOCKED );
+    if( !item ) {
+        return;
+    }
+
+    BalancedBTreeRemove( rssfeedTree, item, UNLOCKED, TRUE );
+    feed = (RssFeed_t *)item->item;
+    free( feed->url );
+    if( feed->userpass ) {
+        free( feed->userpass );
+    }
+    free( feed->prefix );
+    free( feed->timeSpec );
+    if( feed->menuText ) {
+        free( feed->menuText );
+    }
+    free( feed );
+    free( item );
 }
 
 
