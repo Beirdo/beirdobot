@@ -38,6 +38,7 @@
 #include <mysql.h>
 #include <sys/time.h>
 #include <time.h>
+#include <math.h>
 #include "structs.h"
 #include "protos.h"
 #include "queue.h"
@@ -924,10 +925,13 @@ static void result_load_rssfeeds( MYSQL_RES *res, MYSQL_BIND *input,
     int                     len;
     char                   *menuText;
     int                     index;
+    int                     digits;
 
     if( !res || !(count = mysql_num_rows(res)) ) {
         return;
     }
+
+    digits = (int)(log((double)count)/log(10.0) + 0.99999);
 
     gettimeofday( &tv, NULL );
     nextpoll = tv.tv_sec;
@@ -982,8 +986,8 @@ static void result_load_rssfeeds( MYSQL_RES *res, MYSQL_BIND *input,
 
         len = strlen( data->prefix ) + 20;
         menuText = (char *)malloc(len);
-        snprintf( menuText, len, "%d - %s (%d)", data->feedId, data->prefix,
-                            data->chanId );
+        snprintf( menuText, len, "%*d - %s (%d)", digits, data->feedId, 
+                            data->prefix, data->chanId );
         if( found && data->menuText ) {
             if( strcmp( menuText, data->menuText ) ) {
                 cursesMenuItemRemove( 2, rssfeedMenuId, data->menuText );
