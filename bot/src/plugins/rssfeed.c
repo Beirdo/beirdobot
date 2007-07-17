@@ -309,6 +309,7 @@ void plugin_shutdown( void )
     }
     BalancedBTreeDestroy( rssItemTree );
 
+    cursesMenuItemRemove( 2, rssfeedMenuId, "New RSS Feed" );
     cursesMenuItemRemove( 1, rssfeedMenuId, "RSSfeed" );
 
     thread_deregister( rssfeedThreadId );
