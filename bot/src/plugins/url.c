@@ -34,7 +34,7 @@
 #include <string.h>
 #include <sys/time.h>
 #include <time.h>
-#include <mysql.h>
+#include <math.h>
 #include "botnet.h"
 #include "structs.h"
 #include "protos.h"
@@ -114,7 +114,10 @@ static QueryTable_t urlQueryTable[] = {
     /* 7 */
     { "UPDATE `plugin_url_keywords` SET `chanid` = ?, `keyword` = ?, "
       "`url` = ?, `enabled` = ? WHERE `chanid` = ? AND `keyword` = ?", NULL, 
-      NULL, FALSE }
+      NULL, FALSE },
+    /* 8 */
+    { "INSERT INTO `plugin_url_keywords` ( `chanid`, `keyword`, `url`, "
+      "`enabled` ) VALUES ( ?, ?, ?, ? )", NULL, NULL, FALSE }
 };
 
 typedef struct {
@@ -160,12 +163,15 @@ void urlGetKeywords( void );
 void urlSaveFunc( void *arg, int index, char *string );
 void urlKeywordRevert( void *arg, char *string );
 void urlKeywordDisplay( void *arg );
+void urlKeywordNew( void *arg );
+void urlKeywordReportCleanup( void *arg );
 void db_update_keyword( URLKeyword_t *keyword );
 
 static char *urlRegexp = "(?i)(?:\\s|^)((?:https?|ftp)\\:\\/\\/\\S+)(?:\\s|$)";
 int             urlMenuId;
 URLKeyword_t   *keywords = NULL;
 int             keywordCount = 0;
+URLKeyword_t   *newKeyword = NULL;
 
 void plugin_initialize( char *args )
 {
@@ -179,6 +185,7 @@ void plugin_initialize( char *args )
 
     urlMenuId = cursesMenuItemAdd( 1, -1, "URL", NULL, NULL );
     cursesMenuItemAdd( 2, urlMenuId, "Last URLs Seen", urlShowLast, NULL );
+    cursesMenuItemAdd( 2, urlMenuId, "New URL Keyword", urlKeywordNew, NULL );
 
     urlGetKeywords();
 
@@ -211,6 +218,8 @@ void plugin_shutdown( void )
     keywords = NULL;
     keywordCount = 0;
 
+
+    cursesMenuItemRemove( 2, urlMenuId, "New URL Keyword" );
     cursesMenuItemRemove( 2, urlMenuId, "Last URLs Seen" );
     cursesMenuItemRemove( 1, urlMenuId, "URL" );
     regexp_remove( NULL, urlRegexp );
@@ -637,8 +646,8 @@ static void result_url_show_last( MYSQL_RES *res, MYSQL_BIND *input,
 
 void urlGetKeywords( void )
 {
-    db_queue_query( 6, urlQueryTable, NULL, 0, result_url_get_keywords, NULL,
-                    NULL );
+    db_queue_query( 6, urlQueryTable, NULL, 0, result_url_get_keywords, 
+                    newKeyword, NULL );
 }
 
 static void result_url_get_keywords( MYSQL_RES *res, MYSQL_BIND *input, 
@@ -648,6 +657,12 @@ static void result_url_get_keywords( MYSQL_RES *res, MYSQL_BIND *input,
     int             count;
     int             i;
     int             len;
+    URLKeyword_t   *keyword;
+    URLKeyword_t   *newkey;
+    int             index;
+    int             digits;
+
+    newkey = (URLKeyword_t *)args;
 
     if( !res || !( count = mysql_num_rows(res) ) ) {
         count = 0;
@@ -671,6 +686,9 @@ static void result_url_get_keywords( MYSQL_RES *res, MYSQL_BIND *input,
         return;
     }
 
+    digits = (int)(log((double)count)/log(10.0) + 0.99999);
+
+    keyword = NULL;
     keywords = (URLKeyword_t *)realloc( keywords, 
                                         keywordCount * sizeof(URLKeyword_t) );
     memset( keywords, 0, keywordCount * sizeof(URLKeyword_t) );
@@ -683,10 +701,34 @@ static void result_url_get_keywords( MYSQL_RES *res, MYSQL_BIND *input,
         keywords[i].enabled   = (atoi(row[3]) ? TRUE : FALSE);
         len = strlen(keywords[i].keyword) + 20;
         keywords[i].menuText  = (char *)malloc(len);
-        snprintf( keywords[i].menuText, len, "%d - %s", keywords[i].channelId,
-                  keywords[i].keyword );
+        snprintf( keywords[i].menuText, len, "%*d - %s", digits,
+                  keywords[i].channelId, keywords[i].keyword );
         cursesMenuItemAdd( 2, urlMenuId, keywords[i].menuText, 
                            urlKeywordDisplay, &keywords[i] );
+
+        if( newkey && !keyword && 
+            keywords[i].channelId == newkey->channelId &&
+            !strcmp( keywords[i].keyword, newkey->keyword ) ) {
+            keyword = &keywords[i];
+        }
+    }
+
+    if( keyword ) {
+        index = cursesMenuItemFind( 2, urlMenuId, keyword->menuText );
+        if( index != -1 ) {
+            cursesMenuSetIndex( urlMenuId, index );
+        }
+
+        free( newkey->keyword );
+        if( newkey->oldKeyword ) {
+            free( newkey->oldKeyword );
+        }
+        free( newkey->url );
+        if( newkey->menuText ) {
+            free( newkey->menuText );
+        }
+        free( newkey );
+        newKeyword = NULL;
     }
 }
 
@@ -729,8 +771,8 @@ void urlSaveFunc( void *arg, int index, char *string )
         db_update_keyword( keyword );
         if( keyword->channelId != keyword->oldChannelId ||
             strcmp( keyword->keyword, keyword->oldKeyword ) ) {
-            cursesCancel( arg, string );
             urlGetKeywords();
+            cursesCancel( arg, string );
         }
         return;
     }
@@ -765,9 +807,23 @@ void urlKeywordDisplay( void *arg )
     cursesFormDisplay( arg, urlFormItems, urlFormItemCount, urlSaveFunc );
 }
 
+void urlKeywordNew( void *arg )
+{
+    newKeyword = (URLKeyword_t *)malloc(sizeof(URLKeyword_t));
+    memset( newKeyword, 0, sizeof(URLKeyword_t) );
+
+    newKeyword->channelId = -1;
+    newKeyword->keyword = strdup("");
+    newKeyword->url = strdup("");
+
+    urlKeywordDisplay( (void *)newKeyword );
+}
+
+
 void db_update_keyword( URLKeyword_t *keyword )
 {
     MYSQL_BIND             *data;
+    pthread_mutex_t        *mutex;
 
     if( !keyword ) {
         return;
@@ -783,7 +839,18 @@ void db_update_keyword( URLKeyword_t *keyword )
     bind_numeric( &data[4], keyword->oldChannelId, MYSQL_TYPE_LONG );
     bind_string( &data[5], keyword->oldKeyword, MYSQL_TYPE_VAR_STRING );
 
-    db_queue_query( 7, urlQueryTable, data, 6, NULL, NULL, NULL );
+    if( keyword == newKeyword ) {
+        mutex = (pthread_mutex_t *)malloc(sizeof(pthread_mutex_t));
+        pthread_mutex_init( mutex, NULL );
+
+        db_queue_query( 8, urlQueryTable, data, 4, NULL, NULL, mutex );
+
+        pthread_mutex_unlock( mutex );
+        pthread_mutex_destroy( mutex );
+        free( mutex );
+    } else {
+        db_queue_query( 7, urlQueryTable, data, 6, NULL, NULL, NULL );
+    }
 }
 
 /*

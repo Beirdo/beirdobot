@@ -35,6 +35,7 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <string.h>
+#include <math.h>
 #include "structs.h"
 #include "protos.h"
 #include "logging.h"
@@ -587,11 +588,14 @@ static void result_load_channel_regexp( MYSQL_RES *res, MYSQL_BIND *input,
     int                     len;
     char                   *menuText;
     int                     index;
+    int                     digits;
 
     if( !res || !(count = mysql_num_rows(res)) ) {
         channelRegexp = NULL;
         return;
     }
+
+    digits = (int)(log((double)count)/log(10.0) + 0.99999);
 
     for( i = 0; i < count; i++ ) {
         row = mysql_fetch_row(res);
@@ -638,7 +642,8 @@ static void result_load_channel_regexp( MYSQL_RES *res, MYSQL_BIND *input,
 
         len = strlen( tracItem->url ) + 20;
         menuText = (char *)malloc(len);
-        snprintf( menuText, len, "%d - %s", tracItem->chanId, tracItem->url );
+        snprintf( menuText, len, "%*d - %s", digits, tracItem->chanId, 
+                            tracItem->url );
         if( found && tracItem->menuText ) {
             if( strcmp( menuText, tracItem->menuText ) ) {
                 cursesMenuItemRemove( 2, tracMenuId, tracItem->menuText );

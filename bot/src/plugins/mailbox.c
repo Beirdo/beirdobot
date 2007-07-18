@@ -393,6 +393,14 @@ void plugin_shutdown( void )
         free( mailbox );
     }
     BalancedBTreeDestroy( mailboxTree );
+    if( newReport ) {
+        free( newReport->nick );
+        if( newReport->oldNick ) {
+            free( newReport->oldNick );
+        }
+        free( newReport->format );
+        free( newReport );
+    }
 
     cursesMenuItemRemove( 2, mailboxMenuId, "New Mailbox" );
     cursesMenuItemRemove( 2, mailboxMenuId, "New Report" );
