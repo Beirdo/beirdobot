@@ -2173,6 +2173,7 @@ void cursesFormDisplay( void *arg, CursesFormItem_t *items, int count,
     int                     len;
     void                   *buttonArg;
     struct tm               tm;
+    IRCServer_t            *server;
 
     cursesKeyhandleRegister( cursesFormKeyhandle );
 
@@ -2209,8 +2210,12 @@ void cursesFormDisplay( void *arg, CursesFormItem_t *items, int count,
                               ATOFFSET(arg, item->offset, char) );
                     break;
                 case FA_SERVER:
-                    snprintf( buf, 1024, item->format,
-                        ATOFFSET(arg, item->offset, IRCServer_t *)->serverId );
+                    server = ATOFFSET(arg, item->offset, IRCServer_t *);
+                    if( server ) {
+                        snprintf( buf, 1024, item->format, server->serverId );
+                    } else {
+                        snprintf( buf, 1024, item->format, 0 );
+                    }
                     break;
                 case FA_TIMESTAMP:
                     localtime_r((const time_t *)
@@ -2259,8 +2264,12 @@ void cursesFormDisplay( void *arg, CursesFormItem_t *items, int count,
                           ATOFFSET(arg, item->offset, char) );
                 break;
             case FA_SERVER:
-                snprintf( buf, len, item->format,
-                        ATOFFSET(arg, item->offset, IRCServer_t *)->serverId );
+                server = ATOFFSET(arg, item->offset, IRCServer_t *);
+                if( server ) {
+                    snprintf( buf, len, item->format, server->serverId );
+                } else {
+                    snprintf( buf, len, item->format, 0 );
+                }
                 break;
             case FA_TIMESTAMP:
                 localtime_r((const time_t *)&ATOFFSET(arg,item->offset,time_t),

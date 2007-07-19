@@ -57,6 +57,7 @@ static char ident[] _UNUSED_ =
 
 BalancedBTree_t    *ServerTree = NULL;
 bool                ChannelsLoaded = FALSE;
+IRCChannel_t       *newChannel;
 
 void *bot_server_thread(void *arg);
 void botSighup( int signum, void *arg );
@@ -68,6 +69,10 @@ void serverSaveFunc( void *arg, int index, char *string );
 void channelSaveFunc( void *arg, int index, char *string );
 IRCServer_t *RecurseFindServerWithChannel( BalancedBTreeItem_t *node, 
                                            int channelId );
+void cursesServerNew( void *arg );
+void cursesServerCleanup( void *arg );
+void cursesChannelNew( void *arg );
+void cursesChannelCleanup( void *arg );
 
 
 void ProcOnConnected(BN_PInfo I, const char HostName[])
@@ -602,9 +607,13 @@ void bot_start(void)
     BalancedBTreeLock( ServerTree );
 
     /* Read the list of servers */
+    cursesMenuItemAdd( 2, MENU_SERVERS, "New Server", cursesServerNew, NULL );
     db_load_servers();
 
     /* Read the list of channels */
+    cursesMenuItemAdd( 2, MENU_CHANNELS, "New Channel", cursesChannelNew, 
+                       NULL );
+
     db_load_channels();
 
     ChannelsLoaded = TRUE;
@@ -1195,6 +1204,60 @@ void cursesServerRevert( void *arg, char *string )
                       serverSaveFunc );
 }
 
+void cursesServerNew( void *arg )
+{
+    IRCServer_t            *server;
+    BalancedBTreeItem_t    *item;
+
+    server = (IRCServer_t *)malloc(sizeof(IRCServer_t));
+    memset( server, 0, sizeof(IRCServer_t) );
+    server->serverId = -1;
+
+    item = (BalancedBTreeItem_t *)malloc(sizeof(BalancedBTreeItem_t));
+    item->item = (void *)server;
+    item->key  = (void *)&server->serverId;
+    BalancedBTreeAdd( ServerTree, item, UNLOCKED, TRUE );
+
+    server->server      = strdup("");
+    server->password    = strdup("");
+    server->nick        = strdup("");
+    server->username    = strdup("");
+    server->realname    = strdup("");
+    server->nickserv    = strdup("");
+    server->nickservmsg = strdup("");
+
+    cursesRegisterCleanupFunc( cursesServerCleanup );
+    cursesServerDisplay( server );
+}
+
+void cursesServerCleanup( void *arg )
+{
+    IRCServer_t            *server;
+    BalancedBTreeItem_t    *item;
+    int                     num;
+
+    num = -1;
+    item = BalancedBTreeFind( ServerTree, &num, UNLOCKED );
+    if( !item ) {
+        return;
+    }
+
+    BalancedBTreeRemove( ServerTree, item, UNLOCKED, TRUE );
+    server = (IRCServer_t *)item->item;
+    free( server->server );
+    free( server->password );
+    free( server->nick );
+    free( server->username );
+    free( server->realname );
+    free( server->nickserv );
+    free( server->nickservmsg );
+    if( server->menuText ) {
+        free( server->menuText );
+    }
+    free( server );
+    free( item );
+}
+
 static CursesFormItem_t     channelFormItems[] = {
     { FIELD_LABEL, 0, 0, 0, 0, "Channel Number: %d", 
       OFFSETOF(channelId,IRCChannel_t), FA_INTEGER, 0, FT_NONE, { 0 }, NULL, 
@@ -1280,6 +1343,38 @@ void cursesChannelDisplay( void *arg )
                        channelSaveFunc );
 }
 
+void cursesChannelNew( void *arg )
+{
+    IRCChannel_t           *channel;
+
+    channel = (IRCChannel_t *)malloc(sizeof(IRCChannel_t));
+    newChannel = channel;
+    memset( channel, 0, sizeof(IRCChannel_t) );
+    channel->channelId = -1;
+
+    channel->channel  = strdup("");
+    channel->fullspec = strdup("");
+    channel->url      = strdup("");
+
+    cursesRegisterCleanupFunc( cursesChannelCleanup );
+    cursesChannelDisplay( channel );
+}
+
+void cursesChannelCleanup( void *arg )
+{
+    if( !newChannel ) {
+        return;
+    }
+
+    free( newChannel->channel );
+    free( newChannel->fullspec );
+    free( newChannel->url );
+    if( newChannel->menuText ) {
+        free( newChannel->menuText );
+    }
+    free( newChannel );
+    newChannel = NULL;
+}
 
 /*
  * vim:ts=4:sw=4:ai:et:si:sts=4

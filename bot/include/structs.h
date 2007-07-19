@@ -86,6 +86,7 @@ typedef struct _IRCServer_t {
     bool                visited;
     bool                modified;
     bool                newServer;
+    bool                justAdded;
     char               *menuText;
     ThreadCallback_t    callbacks;
 } IRCServer_t;
@@ -109,6 +110,7 @@ typedef struct _IRCChannel_t {
     bool                modified;
     bool                enabledChanged;
     bool                newChannel;
+    bool                justAdded;
     char               *menuText;
 } IRCChannel_t;
 

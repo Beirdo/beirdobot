@@ -36,6 +36,7 @@
 #include <sys/time.h>
 #include <time.h>
 #include <unistd.h>
+#include <math.h>
 #include "botnet.h"
 #include "structs.h"
 #include "protos.h"
@@ -80,6 +81,10 @@ void result_load_servers( MYSQL_RES *res, MYSQL_BIND *input, void *arg,
                           long insertid );
 void result_load_channels( MYSQL_RES *res, MYSQL_BIND *input, void *arg,
                            long insertid );
+void result_insert_server( MYSQL_RES *res, MYSQL_BIND *input, void *arg,
+                           long insertid );
+void result_insert_channel( MYSQL_RES *res, MYSQL_BIND *input, void *arg,
+                            long insertid );
 void result_check_nick_notify( MYSQL_RES *res, MYSQL_BIND *input, void *arg,
                                long insertid );
 void result_get_plugins( MYSQL_RES *res, MYSQL_BIND *input, void *arg,
@@ -183,7 +188,15 @@ QueryTable_t    QueryTable[] = {
       "`nick` = ?, `username` = ?, `realname` = ?, `nickserv` = ?, "
       "`nickservmsg` = ?, `floodInterval` = ?, `floodMaxTime` = ?, "
       "`floodBuffer` = ?, `floodMaxLine` = ?, `enabled` = ? "
-      "WHERE `serverid` = ? ", NULL, NULL, FALSE }
+      "WHERE `serverid` = ? ", NULL, NULL, FALSE },
+    /* 26 */
+    { "INSERT INTO `channels` ( `serverid`, `channel`, `url`, `notifywindow`, "
+      "`cmdChar`, `enabled`) VALUES ( ?, ?, ?, ?, ?, ? )", NULL, NULL, FALSE },
+    /* 27 */
+    { "INSERT INTO `servers` ( `server`, `port`, `password`, `nick`, "
+      "`username`, `realname`, `nickserv`, `nickservmsg`, `floodInterval`, "
+      "`floodMaxTime`, `floodBuffer`, `floodMaxLine`, `enabled` ) "
+      "VALUES ( ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ? )", NULL, NULL, FALSE }
 };
 
 QueueObject_t   *QueryQ;
@@ -1307,12 +1320,15 @@ void cursesMySQLSchema( void *arg )
 
 void db_update_channel( IRCChannel_t *channel )
 {
-    MYSQL_BIND         *data;
+    MYSQL_BIND             *data;
+    pthread_mutex_t        *mutex;
+    extern IRCChannel_t    *newChannel;
 
     data = (MYSQL_BIND *)malloc(7 * sizeof(MYSQL_BIND));
     memset( data, 0, 7 * sizeof(MYSQL_BIND) );
 
-    bind_numeric( &data[0], channel->server->serverId, MYSQL_TYPE_LONG );
+    bind_numeric( &data[0], (channel->server ? channel->server->serverId : 0), 
+                  MYSQL_TYPE_LONG );
     bind_string( &data[1], channel->channel, MYSQL_TYPE_VAR_STRING );
     bind_string( &data[2], channel->url, MYSQL_TYPE_VAR_STRING );
     bind_numeric( &data[3], channel->notifywindow, MYSQL_TYPE_LONG );
@@ -1322,12 +1338,34 @@ void db_update_channel( IRCChannel_t *channel )
 
     LogPrint( LOG_NOTICE, "Bot: channel %d: updating database", 
                           channel->channelId );
-    db_queue_query( 24, QueryTable, data, 7, NULL, NULL, NULL );
+    if( channel == newChannel ) {
+        mutex = (pthread_mutex_t *)malloc(sizeof(pthread_mutex_t));
+        pthread_mutex_init( mutex, NULL );
+
+        db_queue_query( 26, QueryTable, data, 6, result_insert_channel, 
+                        channel, mutex );
+
+        pthread_mutex_unlock( mutex );
+        pthread_mutex_destroy( mutex );
+        free( mutex );
+
+        if( channel->server ) {
+            LinkedListAdd( channel->server->channels, 
+                           (LinkedListItem_t *)channel, UNLOCKED, AT_TAIL );
+            channel->justAdded = TRUE;
+            newChannel = NULL;
+        }
+
+        cursesCancel( NULL, NULL );
+    } else {
+        db_queue_query( 24, QueryTable, data, 7, NULL, NULL, NULL );
+    }
 }
 
 void db_update_server( IRCServer_t *server )
 {
     MYSQL_BIND         *data;
+    pthread_mutex_t    *mutex;
 
     data = (MYSQL_BIND *)malloc(14 * sizeof(MYSQL_BIND));
     memset( data, 0, 14 * sizeof(MYSQL_BIND) );
@@ -1349,7 +1387,21 @@ void db_update_server( IRCServer_t *server )
 
     LogPrint( LOG_NOTICE, "Bot: server %d: updating database", 
                           server->serverId );
-    db_queue_query( 25, QueryTable, data, 14, NULL, NULL, NULL );
+    if( server->serverId == -1 ) {
+        mutex = (pthread_mutex_t *)malloc(sizeof(pthread_mutex_t));
+        pthread_mutex_init( mutex, NULL );
+
+        db_queue_query( 27, QueryTable, data, 13, result_insert_server, 
+                        (void *)server, mutex );
+
+        pthread_mutex_unlock( mutex );
+        pthread_mutex_destroy( mutex );
+        free( mutex );
+
+        cursesCancel( NULL, NULL );
+    } else {
+        db_queue_query( 25, QueryTable, data, 14, NULL, NULL, NULL );
+    }
 }
 
 /*
@@ -1371,10 +1423,14 @@ void result_load_servers( MYSQL_RES *res, MYSQL_BIND *input, void *arg,
     bool                    oldEnabled;
     char                   *threadName;
     bool                    killServer;
+    int                     digits;
+    int                     index;
 
     if( !res || !(count = mysql_num_rows(res)) ) {
         return;
     }
+
+    digits = (int)(log((double)count)/log(10.0) + 0.99999);
 
     for( i = 0; i < count; i++ ) {
         row = mysql_fetch_row(res);
@@ -1462,7 +1518,7 @@ void result_load_servers( MYSQL_RES *res, MYSQL_BIND *input, void *arg,
         sprintf( threadName, "thread_%s@%s:%d", server->nick, server->server, 
                              server->port );
 
-        if( found ) {
+        if( found && server->threadName ) {
             if( strcmp( threadName, server->threadName ) ) {
                 free( server->threadName );
                 server->threadName = threadName;
@@ -1481,7 +1537,7 @@ void result_load_servers( MYSQL_RES *res, MYSQL_BIND *input, void *arg,
         sprintf( threadName, "tx_thread_%s@%s:%d", server->nick, server->server,
                              server->port );
 
-        if( found ) {
+        if( found && server->txThreadName ) {
             if( strcmp( threadName, server->txThreadName ) ) {
                 free( server->txThreadName );
                 server->txThreadName = threadName;
@@ -1496,9 +1552,9 @@ void result_load_servers( MYSQL_RES *res, MYSQL_BIND *input, void *arg,
 
         len = strlen(server->server) + strlen(server->nick) + 18;
         threadName = (char *)malloc(len);
-        sprintf( threadName, "%d - %s@%s:%d", server->serverId, server->nick,
-                             server->server, server->port );
-        if( found ) {
+        sprintf( threadName, "%*d - %s@%s:%d", digits, server->serverId, 
+                             server->nick, server->server, server->port );
+        if( found && server->menuText ) {
             if( strcmp( threadName, server->menuText ) ) {
                 cursesMenuItemRemove( 2, MENU_SERVERS, server->menuText );
                 free( server->menuText );
@@ -1513,6 +1569,16 @@ void result_load_servers( MYSQL_RES *res, MYSQL_BIND *input, void *arg,
             cursesMenuItemAdd( 2, MENU_SERVERS, server->menuText, 
                                cursesServerDisplay, (void *)server );
         }
+
+        if( server->justAdded ) {
+            server->justAdded = FALSE;
+
+            index = cursesMenuItemFind( 2, MENU_SERVERS, server->menuText );
+            if( index != -1 ) {
+                cursesMenuSetIndex( MENU_SERVERS, index );
+            }
+        }
+
 
         if( (found && (oldEnabled || server->enabledChanged) && 
              !server->enabled) || killServer ) {
@@ -1550,6 +1616,8 @@ void result_load_channels( MYSQL_RES *res, MYSQL_BIND *input, void *arg,
     char               *fullSpec;
     char               *oldChannel;
     bool                oldEnabled;
+    int                 digits;
+    int                 index;
 
     server = (IRCServer_t *)arg;
     
@@ -1566,6 +1634,8 @@ void result_load_channels( MYSQL_RES *res, MYSQL_BIND *input, void *arg,
     LinkedListLock( server->channels );
     BalancedBTreeLock( server->channelName );
     BalancedBTreeLock( server->channelNum );
+
+    digits = (int)(log((double)count)/log(10.0) + 0.99999);
 
     for( i = 0; i < count; i++ ) {
         row = mysql_fetch_row(res);
@@ -1643,9 +1713,9 @@ void result_load_channels( MYSQL_RES *res, MYSQL_BIND *input, void *arg,
                               ( channel->enabled ? "" : " (disabled)") );
 
         fullSpec = (char *)malloc(30 + strlen(channel->channel));
-        sprintf( fullSpec, "%d - (%d) %s", channel->channelId, server->serverId,
-                           channel->channel );
-        if( found ) {
+        sprintf( fullSpec, "%*d - (%d) %s", digits, channel->channelId, 
+                 server->serverId, channel->channel );
+        if( found && channel->menuText ) {
             if( strcmp( fullSpec, channel->menuText ) ) {
                 cursesMenuItemRemove( 2, MENU_CHANNELS, channel->menuText );
                 free( channel->menuText );
@@ -1661,7 +1731,15 @@ void result_load_channels( MYSQL_RES *res, MYSQL_BIND *input, void *arg,
                                cursesChannelDisplay, channel );
         }
 
-        if( found && strcmp( oldChannel, channel->channel ) ) {
+        if( channel->justAdded ) {
+            index = cursesMenuItemFind( 2, MENU_CHANNELS, channel->menuText );
+            if( index != -1 ) {
+                cursesMenuSetIndex( MENU_CHANNELS, index );
+            }
+        }
+
+        if( found && strcmp( oldChannel, channel->channel ) &&
+            !channel->justAdded ) {
             channel->itemName.key = (void *)&oldChannel;
             BalancedBTreeRemove( server->channelName, &channel->itemName, 
                                  LOCKED, FALSE );
@@ -1674,7 +1752,7 @@ void result_load_channels( MYSQL_RES *res, MYSQL_BIND *input, void *arg,
         channel->oldServer  = channel->server;
         channel->oldEnabled = channel->enabled; 
         
-        if( !found ) {
+        if( !found || channel->justAdded ) {
             channel->itemName.item  = (void *)channel;
             channel->itemName.key   = (void *)&channel->channel;
             channel->itemNum.item   = (void *)channel;
@@ -1684,12 +1762,18 @@ void result_load_channels( MYSQL_RES *res, MYSQL_BIND *input, void *arg,
                               FALSE );
             BalancedBTreeAdd( server->channelNum, &channel->itemNum, LOCKED,
                               FALSE );
-            LinkedListAdd( server->channels, (LinkedListItem_t *)channel,
-                           LOCKED, AT_TAIL );
+
+            if( !channel->justAdded ) {
+                LinkedListAdd( server->channels, (LinkedListItem_t *)channel,
+                               LOCKED, AT_TAIL );
+            }
+
             if( server->enabled ) {
                 regexpBotCmdAdd( server, channel );
             }
         }
+
+        channel->justAdded = FALSE;
 
         if( oldChannel ) {
             free( oldChannel );
@@ -1703,6 +1787,41 @@ void result_load_channels( MYSQL_RES *res, MYSQL_BIND *input, void *arg,
     LinkedListUnlock( server->channels );
     BalancedBTreeUnlock( server->channelName );
     BalancedBTreeUnlock( server->channelNum );
+}
+
+void result_insert_channel( MYSQL_RES *res, MYSQL_BIND *input, void *arg,
+                            long insertid )
+{
+    IRCChannel_t       *channel;
+
+    channel = (IRCChannel_t *)arg;
+    LogPrint( LOG_DEBUG, "Inserted Channel: old ID %d, new ID %ld",
+                         channel->channelId, insertid );
+    if( channel->channelId == -1 ) {
+        channel->channelId = insertid;
+    }
+}
+
+void result_insert_server( MYSQL_RES *res, MYSQL_BIND *input, void *arg,
+                           long insertid )
+{
+    IRCServer_t            *server;
+    BalancedBTreeItem_t    *item;
+
+    server = (IRCServer_t *)arg;
+    LogPrint( LOG_DEBUG, "Inserted Server: old ID %d, new ID %ld", 
+                         server->serverId, insertid );
+    if( server->serverId == -1 ) {
+        BalancedBTreeLock( ServerTree );
+        item = BalancedBTreeFind( ServerTree, &server->serverId, LOCKED );
+        if( item ) {
+            BalancedBTreeRemove( ServerTree, item, LOCKED, FALSE );
+            server->serverId = insertid;
+            server->justAdded = TRUE;
+            BalancedBTreeAdd( ServerTree, item, LOCKED, TRUE );
+        }
+        BalancedBTreeUnlock( ServerTree );
+    }
 }
 
 void result_check_nick_notify( MYSQL_RES *res, MYSQL_BIND *input, void *arg,
