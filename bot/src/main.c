@@ -213,6 +213,9 @@ int main ( int argc, char **argv )
     /* Print the startup log messages */
     LogBanner();
 
+    LogPrint( LOG_INFO, "CFLAGS: %s", CFLAGS );
+    LogPrint( LOG_INFO, "LDFLAGS: %s", LDFLAGS );
+
     /* Setup the MySQL connection */
     db_setup();
     db_check_schema_main();

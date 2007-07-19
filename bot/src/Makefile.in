@@ -16,7 +16,8 @@ CFLAGS  += $(shell ${MYSQLCFG} --cflags)
 
 CFLAGS_regexp = $(shell ${PCRECFG} --cflags)
 CFLAGS_plugin_api = -DPLUGIN_PATH=\"${pkglibdir}\" -Wno-strict-aliasing
-CFLAGS_main = $(shell ${CURLCFG} --cflags)
+CFLAGS_main  = $(shell ${CURLCFG} --cflags) -DCFLAGS="\"${CFLAGS}\""
+CFLAGS_main += -DLDFLAGS="\"${LDFLAGS}\""
 
 LDFLAGS = -g -rdynamic
 
