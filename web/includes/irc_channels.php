@@ -167,7 +167,9 @@ class irc_channel {
                              $time
                             );
             while ($row = $sh->fetch_assoc()) {
-                $this->users[$row['nick']] = $row;
+		if( $row['present'] == 1 ) {
+		    $this->users[$row['nick']] = $row;
+                }
             }
             $sh->finish();
         }
