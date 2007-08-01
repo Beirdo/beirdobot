@@ -19,6 +19,12 @@ Please use the above link to report any bugs.
 </p>
 
 <!--
+<?php
+/*
+ * If you wish to put in Google Ads, please replace this with your own Google
+ * Ads code, or the author will get your clicks!
+ */
+?>
 <script type="text/javascript"><!--
 google_ad_client = "pub-5082450290612770";
 google_ad_width = 728;
