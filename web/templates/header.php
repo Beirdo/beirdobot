@@ -30,6 +30,3 @@
 
 <body>
 
-<p>header...</p>
-<hr >
-
