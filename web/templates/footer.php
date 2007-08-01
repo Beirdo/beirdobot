@@ -18,6 +18,7 @@
 Please use the above link to report any bugs.
 </p>
 
+<!--
 <script type="text/javascript"><!--
 google_ad_client = "pub-5082450290612770";
 google_ad_width = 728;
@@ -34,6 +35,7 @@ google_color_text = "BBBBBC";
 <script type="text/javascript"
   src="http://pagead2.googlesyndication.com/pagead/show_ads.js">
 </script>
+-->
 
 </body>
 </html>
