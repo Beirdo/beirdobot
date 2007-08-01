@@ -36,7 +36,7 @@
 </p>
 
 <div id="current_users">
-<h4>Current users:</h4>
+<h4>Current users (<?php echo count($Channel->users); ?>):</h4>
 <?php
     if (empty($Channel->users)) {
         echo '<tr><td>No one is currently logged into ', $Channel->channel, "</td></tr>";
