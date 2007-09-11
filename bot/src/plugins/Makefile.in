@@ -119,19 +119,19 @@ cleanall:	clean
 install:	install-data install-exec
 
 install-exec:
-	[ "${OBJS}" != "" ] && \
+	-[ "${OBJS}" != "" ] && \
 	for i in ${OBJS} ; do \
 		@INSTALL@ -D -m 755 $$i ${DESTDIR}${pkglibdir}/$$i ; \
 	done
 
 install-data:
-	[ "${LUASCRIPTS} ${EXTRAS}" != " " ] && \
+	-[ "${LUASCRIPTS} ${EXTRAS}" != " " ] && \
 	for i in ${LUASCRIPTS} ${EXTRAS} ; do \
 		@INSTALL@ -D -m 644 $$i ${DESTDIR}${pkglibdir}/$$i ; \
 	done
 
 uninstall:
-	[ "${OBJS} ${LUASCRIPTS} ${EXTRAS}" != "  " ] && \
+	-[ "${OBJS} ${LUASCRIPTS} ${EXTRAS}" != "  " ] && \
 	for i in ${OBJS} ${LUASCRIPTS} ${EXTRAS} ; do \
 		${RM} ${DESTDIR}${pkglibdir}/$$i ; \
 	done
