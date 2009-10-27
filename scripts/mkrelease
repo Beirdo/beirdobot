@@ -29,40 +29,30 @@ done
 scripts/tagversion -R ${RELEASENUM}
 
 # Check everything in (from above web & bot)
-svn commit
+git add -u
+git commit
 
 # Create the tag
-svn copy https://trac.beirdo.ca:4443/svn/beirdobot/trunk \
-         https://trac.beirdo.ca:4443/svn/beirdobot/tags/release-${RELEASENUM} \
-	 -m "Tagging release ${RELEASENUM}"
+git tag -m "Tagging release ${RELEASENUM}" -u F0B5CC69 v${RELEASENUM}
 
 # Create a temp dir to export in
 mkdir ${TMPDIR}
 
 # Check out the tagged release
-cd ${TMPDIR}
-svn co https://trac.beirdo.ca:4443/svn/beirdobot/tags/release-${RELEASENUM} \
-	beirdobot-${RELEASENUM}
-cd beirdobot-${RELEASENUM}
+git archive --format=tar --prefix=beirdobot-${RELEASENUM} v${RELEASENUM} | \
+	( cd ${TMPDIR} && tar xf -)
+cd ${TMPDIR}/beirdobot-${RELEASENUM}
 
 # Make the release.h
 scripts/tagversion -r ${RELEASENUM}
 
 # Generate the ChangeLog
-svn log --xml --verbose | \
-	scripts/svn2log.py -F -u scripts/.users -o ChangeLog.tag
-svn log --xml --verbose | \
-	scripts/svn2log.py -F -u scripts/.users -p /trunk -o ChangeLog.trunk
-cat ChangeLog.tag ChangeLog.trunk > ChangeLog
-rm ChangeLog.tag ChangeLog.trunk
+scripts/gitlog2changelog.py
 
-# Create an excludes file
 cd ${TMPDIR}
-find beirdobot-${RELEASENUM} -name .svn -type d > excludes
 
 # Create a tarball as beirdobot-${RELEASENUM}
-tar --exclude-from excludes -czvf beirdobot-${RELEASENUM}.tar.gz \
-	beirdobot-${RELEASENUM}
+tar -czvf beirdobot-${RELEASENUM}.tar.gz  beirdobot-${RELEASENUM}
 cp beirdobot-${RELEASENUM}.tar.gz ${ORIGDIR}
 
 # (future) Create an RPM
@@ -73,6 +63,7 @@ cd ${ORIGDIR}
 rm -rf ${TMPDIR}
 
 # Make the new configure.ac
-scripts/tagversion -R ${RELEASENUM}+SVN
-svn commit -m "Post-commit release tagging for configure.ac"
+scripts/tagversion -R ${RELEASENUM}+GIT
+git add -u
+git commit -m "Post-release tagging for configure.ac"
 
