@@ -2226,7 +2226,7 @@ void cursesFormDisplay( void *arg, CursesFormItem_t *items, int count,
                     buf[0] = '\0';
                 }
             } else {
-                snprintf( buf, 1024, item->format );
+                snprintf( buf, 1024, "%s", item->format );
             }
             cursesFormLabelAdd( item->startx, item->starty, buf );
             break;
