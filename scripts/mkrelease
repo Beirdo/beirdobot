@@ -39,7 +39,7 @@ git tag -m "Tagging release ${RELEASENUM}" -u F0B5CC69 v${RELEASENUM}
 mkdir ${TMPDIR}
 
 # Check out the tagged release
-git archive --format=tar --prefix=beirdobot-${RELEASENUM} v${RELEASENUM} | \
+git archive --format=tar --prefix=beirdobot-${RELEASENUM}/ v${RELEASENUM} | \
 	( cd ${TMPDIR} && tar xf -)
 cd ${TMPDIR}/beirdobot-${RELEASENUM}
 
