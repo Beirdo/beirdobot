@@ -1,0 +1,1759 @@
+2009-10-27  Gavin Hurlbut <gjhurlbu@gmail.com>
+
+  * configure.ac: Release 0.4 change
+
+  * scripts/gitlog2changelog.py, scripts/mkrelease: Change mkrelease to use
+  git.  Added gitlog2changelog.py
+
+2009-10-26  Gavin Hurlbut <gjhurlbu@gmail.com>
+
+  * scripts/tagversion: Change tagversion to create git versions rather than
+  svn
+
+2007-09-18  Gavin Hurlbut <gjhurlbu@gmail.com>
+
+  * bot/src/plugins/burp.lua, bot/src/plugins/fart.c: Added , to the fart and
+  burp regexps (as an optional ending)   
+
+2007-09-11  Gavin Hurlbut <gjhurlbu@gmail.com>
+
+  * bot/src/plugins/Makefile.in: Make the install-data, install-exec, uninstall
+  not barf in no files are to be installed/uninstalled.   
+
+2007-08-01  Gavin Hurlbut <gjhurlbu@gmail.com>
+
+  * web/templates/footer.php: Added a comment to the Google Ads chunk   
+
+  * web/templates/footer.php: Comment out the google ads   
+
+  * web/templates/footer.php, web/templates/header.php: Check in the header and
+  footer (need to subsequently disable the google ads code)   
+
+  * web/templates/channel.php: Added count of users to the channel log display 
+   
+
+  * web/includes/irc_channels.php: Actually check that the nick is still
+  present (after carefully calculating it)   
+
+2007-07-19  Gavin Hurlbut <gjhurlbu@gmail.com>
+
+  * bot/src/Makefile.in, bot/src/main.c: Added logging of CFLAGS and LDFLAGS.  
+
+  * bot/include/structs.h, bot/src/bot.c, bot/src/curses.c, bot/src/mysql.c:
+  Added "New Server" and "New Channel"   
+
+2007-07-18  Gavin Hurlbut <gjhurlbu@gmail.com>
+
+  * bot/src/plugins/mailbox.c, bot/src/plugins/trac.c, bot/src/plugins/url.c:
+  Added "New URL Keyword" to url plugin   
+
+2007-07-17  Gavin Hurlbut <gjhurlbu@gmail.com>
+
+  * bot/src/plugins/trac.c: Added "New Trac Setuo" to trac plugin   
+
+  * bot/include/protos.h, bot/src/curses.c, bot/src/main.c: Added a "Reload
+  All" to the system menu (does a SIGHUP to the main thread)   
+
+  * bot/src/plugins/mailbox.c, bot/src/plugins/rssfeed.c: Added "New Mailbox"
+  and "New Report" to the mailbox plugin   
+
+  * bot/src/plugins/rssfeed.c: Make rssfeed menu text use a %*d to indicate
+  width of the feed ID, making it sort "numerically" as " 9" < "10"   
+
+  * bot/include/protos.h, bot/include/structs.h, bot/src/curses.c,
+  bot/src/main.c, bot/src/mysql.c, bot/src/plugins/core.c,
+  bot/src/plugins/luascript.c, bot/src/plugins/mailbox.c,
+  bot/src/plugins/rssfeed.c, bot/src/plugins/trac.c, bot/src/plugins/url.c:
+  Added a "New RSS Feed" entry to rssfeed.  Changed the "term" version to be
+  "TERM".  Added passing in the insertid on mysql queries.   
+
+2007-07-16  Gavin Hurlbut <gjhurlbu@gmail.com>
+
+  * bot/src/curses.c: Tweaked the log scrollbars a bit.  Vertical scrollbar no
+  longer uses floating point math.   
+
+  * bot/include/structs.h, bot/src/curses.c, bot/src/main.c: Added the TERM
+  environment variable as a version string, added F1/F2 to scroll logs left and
+  right by half a screen (respectively)   
+
+2007-07-15  Gavin Hurlbut <gjhurlbu@gmail.com>
+
+  * bot/src/plugins/mailbox.c: Regenerate the mailbox report menutext if the
+  serverId changed   
+
+  * bot/include/protos.h, bot/src/bot.c, bot/src/plugins/mailbox.c: Added
+  FindServerWithChannel() to bot.c.  Removed the serverid field from
+  plugin_mailbox_report, if the nick is set, then channelId is actually the
+  serverId.   
+
+  * bot/src/plugins/mailbox.c: Argh.  Forgot to put the primary keys in the
+  default schema, only had them in the upgrade queries.   
+
+  * bot/src/plugins/trac.c: Removed the serverid field from plugin_trac as it's
+  pointless, that data's in channels   
+
+  * bot/src/plugins/mailbox.c: Add in the primary keys (oops, missed it)   
+
+  * bot/src/curses.c, bot/src/plugins/url.c: Added the menu to the URL plugin. 
+  Made the text items max out to window width.   
+
+2007-07-14  Gavin Hurlbut <gjhurlbu@gmail.com>
+
+  * bot/src/plugins/mailbox.c: Added server/channel disable callbacks for the
+  mailbox plugin   
+
+  * bot/include/balanced_btree.h, bot/src/balanced_btree.c, bot/src/bot.c,
+  bot/src/plugins/rssfeed.c: Made callbacks for the rssfeed plugin to stop
+  referencing disabled server or channel structures   
+
+2007-07-13  Gavin Hurlbut <gjhurlbu@gmail.com>
+
+  * bot/include/protos.h, bot/src/bot.c, bot/src/thread_api.c: Added functions
+  to call back into threads when channels/servers disabled   
+
+  * bot/include/protos.h, bot/include/structs.h, bot/src/authenticate.c,
+  bot/src/bot.c, bot/src/curses.c, bot/src/logging.c, bot/src/main.c,
+  bot/src/mysql.c, bot/src/notice.c, bot/src/plugins/dns.c,
+  bot/src/plugins/mailbox.c, bot/src/plugins/rssfeed.c, bot/src/plugins/trac.c,
+  bot/src/thread_api.c: Split out the thread callbacks into a new structure
+  which will also have in it new callbacks for when servers and channels are
+  disabled   
+
+  * bot/src/bot.c, bot/src/curses.c, bot/src/mysql.c, bot/src/transmit.c: Fixed
+  the save to db for servers.  Rssfeed and other users of server info will need
+  revisiting to deal with disabled server/channel   
+
+  * bot/src/botnet-1.6.4/makelib/botnet.c: Added more checks for closed
+  connection before the select and recv   
+
+  * bot/include/protos.h, bot/include/structs.h, bot/src/bot.c,
+  bot/src/mysql.c: Added save to db support for servers.  Disabling a server
+  currently is borked, kills the ncurses output thread.   
+
+  * bot/include/protos.h, bot/include/structs.h, bot/src/bot.c, bot/src/main.c,
+  bot/src/mysql.c, bot/src/plugins/mailbox.c, bot/src/plugins/trac.c: Added
+  save to db support for channels   
+
+  * bot/src/plugins/trac.c: Added save to db functionality to trac   
+
+  * bot/src/plugins/mailbox.c, bot/src/plugins/rssfeed.c: Added save to db
+  capability to rssfeed   
+
+2007-07-12  Gavin Hurlbut <gjhurlbu@gmail.com>
+
+  * bot/src/plugins/mailbox.c: Added save functionality for the mailbox reports
+    
+
+  * bot/src/curses.c: Fixed the removal of trailing spaces (stupid fence-posts)
+    
+
+  * bot/src/curses.c: Strip trailing spaces when saving strings   
+
+  * bot/src/plugins/mailbox.c: Added support to save the mailbox definition to
+  the db, and reload.  Still need to do so for mailbox reports   
+
+2007-07-08  Gavin Hurlbut <gjhurlbu@gmail.com>
+
+  * bot/src/plugins/trac.c: Added the form for Trac plugin   
+
+  * bot/include/structs.h, bot/src/curses.c, bot/src/plugins/rssfeed.c: Added
+  the RSSFeed form   
+
+  * bot/src/curses.c: Removed the calls to cursesAtExit in the
+  curses_output_thread as it's now being called from the main shutdown process.
+    
+
+  * bot/include/protos.h, bot/src/curses.c, bot/src/main.c,
+  bot/src/plugins/mailbox.c: Added a form for mailbox reports.  Attempt to call
+  cursesAtExit from the shutdown procedures.   
+
+  * bot/include/structs.h, bot/src/curses.c, bot/src/plugin_api.c,
+  bot/src/plugins/luascript.c, bot/src/plugins/mailbox.c: Added menus for
+  luascript and mailbox.  Seems to want to exit in the middle of the screen
+  again.  grrr.   
+
+  * bot/include/protos.h, bot/include/structs.h, bot/src/bot.c,
+  bot/src/curses.c, bot/src/mysql.c, bot/src/plugin_api.c: Factored out
+  cursesSaveOffset.  Added details for the plugin menu   
+
+  * bot/include/structs.h, bot/src/curses.c, bot/src/mysql.c: Removed the
+  Database main menu, put the db stuff into System.  Implemented the Database
+  Schema screen.   
+
+  * bot/include/environment.h, bot/include/structs.h, bot/src/bot.c,
+  bot/src/curses.c: Added the server number to the channel form.   
+
+2007-07-07  Gavin Hurlbut <gjhurlbu@gmail.com>
+
+  * bot/include/structs.h, bot/src/bot.c, bot/src/curses.c, bot/src/mysql.c:
+  Added beginning of the channels form, still need the serverID connection   
+
+  * bot/include/protos.h, bot/include/structs.h, bot/src/bot.c,
+  bot/src/curses.c: Put in hooks for saving data, still need to find a way to
+  actually RELOAD the new data, and save to SQL   
+
+  * bot/include/protos.h, bot/include/structs.h, bot/src/bot.c,
+  bot/src/curses.c: Further generalized the server form so other forms can use
+  the same code.  Still need to implement the save though.   
+
+  * bot/include/environment.h, bot/include/structs.h, bot/src/curses.c:
+  Generalized the server form stuff so it can be further generalized to support
+  other forms   
+
+  * bot/src/plugins/Makefile.in: Fix the include path for trac plugin   
+
+  * bot/src/Makefile.in, bot/src/plugin_api.c: Bah.  plugin_api.c won't compile
+  quietly on gcc4.1 as it's uber-picky about the type-punning on the dlsym
+  calls...  so disable that warning for that file.   
+
+  * bot/src/plugin_api.c: Attempt to shut gcc4.1 up   
+
+  * configure, configure.ac, configure.ac.in: Trying this in another order to
+  see if autoconf 2.61 is happier   
+
+  * bot/include/structs.h, bot/src/curses.c: Added a scrollbar to the logs   
+
+  * bot/src/curses.c: Fixed the pagination of forms to properly paginate at
+  buttons   
+
+  * bot/include/environment.h, bot/src/curses.c: Make details windows
+  (non-form) scrollable if necessary   
+
+2007-07-06  Gavin Hurlbut <gjhurlbu@gmail.com>
+
+  * bot/src/curses.c: Fixed a weird coredump when resizing massively (i.e.
+  while screen was detached and the screen size was changed, then screen
+  reattached).   
+
+  * bot/src/curses.c: Forms will now automatically spit into pages if needed   
+
+2007-07-05  Gavin Hurlbut <gjhurlbu@gmail.com>
+
+  * bot/include/protos.h, bot/include/structs.h, bot/src/curses.c: Added button
+  functionality to the forms.  Implemented a revert function for servers.   
+
+  * bot/include/protos.h, bot/include/structs.h, bot/src/curses.c: Added
+  checkbox support to the forms.  Added function callbacks when changes are
+  made, currently not using them.   
+
+  * bot/src/curses.c: Fixed refresh of forms jumping back to the first field. 
+  Added a field hook that would update the strings on refresh.  Still need a
+  callback into the core code for any changes.   
+
+  * bot/src/curses.c: Make it actually clean up forms when we exit them   
+
+2007-07-04  Gavin Hurlbut <gjhurlbu@gmail.com>
+
+  * bot/src/curses.c: Remove the cursor when leaving a form   
+
+  * bot/src/curses.c: Removed ugly 0 padding on numeric fields   
+
+  * bot/include/protos.h, bot/include/structs.h, bot/src/Makefile.in,
+  bot/src/curses.c, bot/src/main.c, bot/src/mysql.c: Added the first try at
+  using forms.  Added a form for server details.  Still need to do something
+  with changed values.   
+
+2007-07-03  Gavin Hurlbut <gjhurlbu@gmail.com>
+
+  * bot/src/main.c: Ooops, typo in the about screen   
+
+  * bot/src/curses.c, bot/src/main.c: Added more lines to make the screen look
+  nicer.  Filled in the tailer line   
+
+  * bot/src/curses.c, bot/src/logging.c, bot/src/thread_api.c: We do NOT want a
+  curses console when in detached daemon mode   
+
+  * bot/src/main.c: Added a check for pthreads being NPTL, and added it to the
+  versions menu   
+
+  * bot/include/protos.h, bot/src/bot.c,
+  bot/src/botnet-1.6.4/makelib/includes.h, bot/src/main.c, bot/src/mysql.c,
+  bot/src/plugins/dns.c, bot/src/plugins/luascript.c,
+  bot/src/plugins/rssfeed.c, bot/src/plugins/trac.c, bot/src/plugins/url.c,
+  bot/src/regexp.c: Added a pile of version strings in the "System->Versions"
+  menu item   
+
+  * bot/src/curses.c: Fixed the hyphenation to work with or without trailing
+  whitespace if the string needs it.   
+
+  * bot/src/curses.c, bot/src/main.c: Split the "About" page into "About" and
+  "Licensing".   
+
+  * bot/include/protos.h, bot/include/structs.h, bot/src/curses.c,
+  bot/src/main.c: Added several alignment choices for menu text.  Added an
+  about entry in the system menu   
+
+2007-07-01  Gavin Hurlbut <gjhurlbu@gmail.com>
+
+  * bot/src/curses.c, bot/src/plugins/trac.c, bot/src/plugins/url.c: Make the
+  menu revert to main menu if the current menu is removed.  Added skeleton
+  menus for trac and url   
+
+  * bot/src/plugins/rssfeed.c: Added rssfeed menu skeleton   
+
+  * bot/src/mysql.c, bot/src/plugin_api.c: Make the plugins menu have ALL the
+  plugins, not just the loaded ones   
+
+  * bot/src/mysql.c, bot/src/plugins/mailbox.c: Added the mailbox menu item
+  (still no actions)   
+
+  * bot/src/curses.c: Ooops!  Try recursing down left & right, not left & left 
+   
+
+  * bot/include/protos.h, bot/src/curses.c, bot/src/plugins/luascript.c: Added
+  skeleton menu to luascript plugin   
+
+  * bot/include/protos.h, bot/include/structs.h, bot/src/bot.c,
+  bot/src/curses.c, bot/src/mysql.c, bot/src/plugin_api.c: Populated the server
+  and channel menus.  Fixed reload.   
+
+  * bot/include/protos.h, bot/include/structs.h, bot/src/curses.c,
+  bot/src/main.c, bot/src/plugin_api.c, bot/src/thread_api.c: Menus functional,
+  added Ctrl-R for reload (still a bit funky), added plugin menu details   
+
+2007-06-30  Gavin Hurlbut <gjhurlbu@gmail.com>
+
+  * bot/include/protos.h, bot/include/structs.h, bot/src/curses.c,
+  bot/src/logging.c, bot/src/main.c: First crack at the ncurses menus.  Haven't
+  implemented the second-level menu stuff quite yet.  ncurses logging is
+  working (so far) complete with scrollback.   
+
+2007-06-29  Gavin Hurlbut <gjhurlbu@gmail.com>
+
+  * bot/src/Makefile.in, bot/src/curses.c: Beginnings of the ncurses console
+  code.  Still need to code the menus.   
+
+  * configure.ac, configure.ac.in: Release 0.3 tagging   
+
+  * bot/src/main.c: Superficial change.  Just needed to mark that this closes
+  #23   
+
+  * bot/src/plugins/core.c: Changed the symbol command to use uintptr_t so it
+  SHOULD work in either 64-bit or 32-bit platforms    
+
+  * bot/src/plugins/mailbox.c: Make mailbox close and reopen should the mailbox
+  serverSpec change during reload   
+
+  * bot/include/protos.h, bot/include/structs.h, bot/src/bot.c,
+  bot/src/bot_cmds.c, bot/src/main.c, bot/src/mysql.c, bot/src/transmit.c:
+  Added SIGHUP support for reloading servers/channels   
+
+2007-06-28  Gavin Hurlbut <gjhurlbu@gmail.com>
+
+  * bot/src/plugins/mailbox.c: Removed a log message   
+
+  * bot/src/mysql.c, bot/src/plugins/mailbox.c, bot/src/plugins/rssfeed.c,
+  bot/src/plugins/trac.c: Added SIGHUP support to the mailbox plugin.  Removed
+  potential memory leak in SIGHUP support functions.   
+
+2007-06-27  Gavin Hurlbut <gjhurlbu@gmail.com>
+
+  * bot/src/botnet-1.6.4/makelib/botnet.c, bot/src/plugins/burp.lua,
+  bot/src/plugins/fart.c, bot/src/plugins/rssfeed.c, bot/src/plugins/trac.c,
+  bot/src/regexp.c: Added /g functionality to regexp.  Added \B to regexps to
+  match beginning of words.  Added SIGHUP reloading for rssfeed.   
+
+  * bot/src/bot.c, bot/src/bot_cmds.c, bot/src/botnet-1.6.4/makelib/botnet.c,
+  bot/src/main.c, bot/src/plugins/core.c, bot/src/plugins/luascript.c,
+  bot/src/plugins/mailbox.c, bot/src/plugins/rssfeed.c: Plugged more memory
+  leaks.  Added the "symbol" command in core.   
+
+  * bot/include/protos.h, bot/include/structs.h, bot/src/bot.c, bot/src/main.c,
+  bot/src/mysql.c, bot/src/plugins/dns.c, bot/src/plugins/rssfeed.c,
+  bot/src/plugins/trac.c, bot/src/queue.c, bot/src/transmit.c: Changed from
+  ServerList to ServerTree.  Minor memory leak fixes.   
+
+  * bot/include/protos.h, bot/include/structs.h, bot/src/main.c,
+  bot/src/mysql.c, bot/src/plugin_api.c, bot/src/plugins/trac.c: Added the
+  SIGHUP reloading of plugins.  Added trimming out no-longer configured trac
+  setups.   
+
+  * bot/src/plugins/trac.c: Added reload functionality in the trac thread (for
+  SIGHUP)   
+
+2007-06-26  Gavin Hurlbut <gjhurlbu@gmail.com>
+
+  * bot/include/protos.h, bot/include/structs.h, bot/src/authenticate.c,
+  bot/src/bot.c, bot/src/main.c, bot/src/plugins/mailbox.c,
+  bot/src/plugins/rssfeed.c, bot/src/plugins/trac.c: Changed the handler
+  callbacks to have only one void * argument.  Made trac thread be persistent
+  so it can regenerate the channel regexp after SIGHUP   
+
+  * bot/include/protos.h, bot/include/structs.h, bot/src/authenticate.c,
+  bot/src/bot.c, bot/src/logging.c, bot/src/main.c, bot/src/mysql.c,
+  bot/src/notice.c, bot/src/plugins/dns.c, bot/src/plugins/mailbox.c,
+  bot/src/plugins/rssfeed.c, bot/src/plugins/trac.c, bot/src/thread_api.c:
+  Added starting sighup handlers to several tasks.  Added an "arg" to be passed
+  into the signal handlers to distinguish between threads that have the same
+  code footprint.   
+
+  * bot/src/Makefile.in, bot/src/main.c, bot/src/plugins/Makefile.in,
+  bot/src/plugins/trac.c, bot/src/plugins/url.c, bot/src/thread_api.c: Make
+  signal_interrupt deregister itself so a second Ctrl-C will instantly exit.
+  Added a thread_join to thread_deregister, tweaked some thread shutdowns. Use
+  curl_global_init() in main.c (yuck) as it's not thread-safe.   
+
+  * bot/src/bot.c, bot/src/logging.c, bot/src/main.c, bot/src/plugin_api.c,
+  bot/src/plugins/mailbox.c, bot/src/plugins/rssfeed.c, bot/src/queue.c,
+  bot/src/transmit.c: Attempting to clean up the occasional coredump on
+  shutdown.  Seems to happen now whenever the url plugin is enabled with
+  others, not sure why.   
+
+  * bot/include/protos.h, bot/src/logging.c, bot/src/main.c: Added a handler
+  for SIGSEGV, SIGILL, SIGFPE   
+
+  * bot/include/protos.h, bot/include/structs.h, bot/src/authenticate.c,
+  bot/src/bot.c, bot/src/logging.c, bot/src/main.c, bot/src/mysql.c,
+  bot/src/notice.c, bot/src/plugins/dns.c, bot/src/plugins/mailbox.c,
+  bot/src/plugins/rssfeed.c, bot/src/plugins/trac.c, bot/src/thread_api.c:
+  Added SIGUSR2 which will give a backtrace in each thread.  Added SIGHUP with
+  per-thread handling callbacks, set all current threads to no handler   
+
+2007-06-24  Gavin Hurlbut <gjhurlbu@gmail.com>
+
+  * bot/include/config.h.in, bot/src/plugins/plugin_list.h: ran autoheader to
+  recreate config.h.in.  Make the plugin definition table depend on the
+  PLUGIN_* defines in config.h   
+
+  * bot/include/db_schema.h, bot/include/structs.h, bot/src/bot.c,
+  bot/src/mysql.c, bot/src/mysql_upgrade.c, bot/src/plugins/mailbox.c,
+  bot/src/plugins/rssfeed.c, bot/src/plugins/trac.c, bot/src/plugins/url.c:
+  Added enabled fields to: channels, servers, plugin_mailbox,
+  plugin_mailbox_report, plugin_rssfeed, plugin_trac, plugin_url_keywords   
+
+2007-06-23  Gavin Hurlbut <gjhurlbu@gmail.com>
+
+  * bot/include/db_schema.h, bot/include/protos.h, bot/include/structs.h,
+  bot/src/main.c, bot/src/mysql_upgrade.c, bot/src/plugins/luascript.c,
+  bot/src/plugins/mailbox.c, bot/src/plugins/rssfeed.c, bot/src/plugins/trac.c,
+  bot/src/plugins/url.c: Factored out the db_check_schema and db_upgrade_schema
+  code so it's common code   
+
+  * bot/src/bot.c, bot/src/main.c, bot/src/plugin_api.c,
+  bot/src/plugins/Makefile.in, bot/src/plugins/dns.c, bot/src/plugins/trac.c,
+  bot/src/queue.c, bot/src/transmit.c: Make shutdown unload all plugins first. 
+  Close server sockets from the dying transmit thread to wake up server threads
+  so they can die.  Switched trac plugin to use -lapr-1 and -laprutil-1.   
+
+2007-06-22  Gavin Hurlbut <gjhurlbu@gmail.com>
+
+  * configure.ac: Release 0.2   
+
+  * bot/Makefile, bot/src/Makefile.in, bot/src/plugins/Makefile.in: Make it so
+  make distclean also removes the .d files   
+
+  * bot/Makefile, bot/src/Makefile.in, bot/src/plugins/Makefile.in,
+  web/Makefile.in: Implemented make distclean properly   
+
+  * configure, configure.ac, configure.ac.in: Added in the check for
+  libc-client by creating a new macro   
+
+  * configure, configure.ac, configure.ac.in, scripts/tagversion: Added library
+  checks for all but libc-client which won't behave. Changed tagversion to look
+  for configure.ac.in   
+
+  * bot/src/plugins/Makefile.in: Fixed a typo   
+
+  * configure, configure.ac, configure.ac.in: Renamed the plugin disables to
+  --disable-plugin-xxxx   
+
+2007-06-21  Gavin Hurlbut <gjhurlbu@gmail.com>
+
+  * Makefile.in, bot/include/config.h.in, bot/src/plugins/Makefile.in,
+  configure, configure.ac, configure.ac.in: Added the ability to disable
+  compilation of each plugin to ./configure   
+
+  * bot/src/plugins/url.c: Updated the help for url   
+
+  * bot/src/plugins/url.c: Added !url - list   
+
+  * bot/src/plugins/url.c: Added url logging, !url - search string and !url -
+  last   
+
+  * bot/src/plugins/Makefile.in, bot/src/plugins/plugin_list.h,
+  bot/src/plugins/url.c: Added the url plugin.  Closes #21   
+
+  * bot/src/plugins/rssfeed.c: Fixed a typo   
+
+  * bot/src/plugins/core.c: Fix bug in seen when used in privmsg   
+
+  * bot/src/plugins/Makefile.in, bot/src/plugins/datemsk.txt: Removed the now
+  not-used datemsk.txt file   
+
+  * bot/src/plugins/Makefile.in, bot/src/plugins/rssfeed.c: Changed from using
+  getdate_r to using strptime with the format set per feed in the db.   
+
+2007-06-20  Gavin Hurlbut <gjhurlbu@gmail.com>
+
+  * bot/src/plugins/trac.c: Added some error messages and the command help for
+  trac   
+
+  * bot/src/plugins/Makefile.in, bot/src/plugins/trac.c: trac plugin now gives
+  ticket details (gleaned from RSS and CSV pages)   
+
+2007-06-19  Gavin Hurlbut <gjhurlbu@gmail.com>
+
+  * bot/src/plugins/Makefile.in, bot/src/plugins/trac.c: Added the use of
+  libsvn (tested with 1.3) to get changeset details   
+
+  * bot/docs/README.userauth: Added a superficial change   
+
+  * bot/docs/README.userauth, bot/src/authenticate.c: Added documentation on
+  re-keying the auth, and fixed a crash bug in re-keying   
+
+2007-06-18  Gavin Hurlbut <gjhurlbu@gmail.com>
+
+  * bot/include/protos.h, bot/src/bot.c, bot/src/plugins/mailbox.c,
+  bot/src/plugins/rssfeed.c, bot/src/plugins/trac.c: Created FindServerNum() to
+  factor out some redundant code. Trac now uses the DB to indicate Trac URLs in
+  defined channels   
+
+  * bot/src/plugins/Makefile.in, bot/src/plugins/plugin_list.h,
+  bot/src/plugins/trac.c: Added the beginning of the trac module, need to
+  reference the DB still   
+
+  * bot/include/protos.h, bot/src/regexp.c: Added regexp_substring() to the
+  regexp core (results need to be freed)   
+
+2007-06-17  Gavin Hurlbut <gjhurlbu@gmail.com>
+
+  * bot/src/plugins/mailbox.c: Make the field parsing be non-destructive WRT
+  the format string.  Ooops   
+
+2007-06-15  Gavin Hurlbut <gjhurlbu@gmail.com>
+
+  * bot/src/plugins/rssfeed.c: Added support for RSS feeds with HTTP auth
+  required   
+
+  * bot/src/plugins/mailbox.c: Added the nulled row to the upgrade table   
+
+  * bot/src/libmrss-0.12/src/mrss.h, bot/src/libmrss-0.12/src/mrss_download.c,
+  bot/src/libmrss-0.12/src/mrss_internal.h,
+  bot/src/libmrss-0.12/src/mrss_parser.c: Added support for using HTTP auth
+  (both basic and digest) to the mrss_parse_url by making mrss_parse_url_auth  
+
+  * bot/src/plugins/mailbox.c: Added $TO$, $DATE$, $MESSAGEID$, $BODY$ parsing 
+   
+
+  * bot/src/bot.c: Make FindChannelNum actually abort gracefully if the servers
+  aren't loaded yet.   
+
+  * bot/src/plugins/mailbox.c: Actually set the lastCheck in memory, make
+  lastCheck, lastRead time_t instead of int.   
+
+  * bot/src/plugins/mailbox.c, bot/src/plugins/rssfeed.c: Added the mailbox
+  command, still needs to enable/disable/list a report   
+
+  * bot/src/plugins/mailbox.c: Only clear out the messageList if it exists! 
+  stooopid!   
+
+  * bot/src/plugins/mailbox.c: Cleaned up the logging for mailbox   
+
+  * bot/src/plugins/mailbox.c: Now mailbox will actually parse the messages. 
+  So far, $FROM$ and $SUBJECT$ are implemented   
+
+  * bot/src/plugins/mailbox.c: Added in the mailbox code to actually get the
+  UIDs of the new mail, report it to users/channels Need to add in the
+  substitution of $SUBJECT$, $FROM$, $BODY$ etc.   
+
+2007-06-14  Gavin Hurlbut <gjhurlbu@gmail.com>
+
+  * bot/src/plugins/rssfeed.c: Free the structures in the btree when removing
+  rssfeed plugin   
+
+2007-06-13  Gavin Hurlbut <gjhurlbu@gmail.com>
+
+  * bot/src/Makefile.in, bot/src/plugins/Makefile.in: Cleaned up the CFLAGS and
+  LIBS a bit   
+
+2007-06-13  Chris Petersen <xris@forevermore.net>
+
+  * beirdobot.spec: add a couple more requirements to the proto-spec 
+
+2007-06-12  Gavin Hurlbut <gjhurlbu@gmail.com>
+
+  * bot/src/plugins/plugin_list.h: Added mailbox to the plugin_list   
+
+  * bot/src/plugins/mailbox.c: Remove OP_HALFOPEN as pop3 will gack on it. 
+  Check that the mail_open didn't return NULL.   
+
+  * bot/src/plugins/mailbox.c, bot/src/plugins/rssfeed.c: Mailbox plugin now
+  polls email accounts, logs total/unread messages   
+
+  * bot/src/balanced_btree.c: Removed a stupid bug in rebalancing an unlocked
+  tree   
+
+  * bot/src/plugins/mailbox.c: Flesh out the mailbox plugin a bit before going
+  to bed.   
+
+  * bot/src/plugins/Makefile.in: Removed blah.lua from the install as it's not
+  in svn now   
+
+2007-06-11  Gavin Hurlbut <gjhurlbu@gmail.com>
+
+  * bot/src/bot.c, bot/src/botnet-1.6.4/makelib/botnet.h: Changed the socket
+  timeout to 450s (7.5min) to avoid race condition with 5min PINGs. Made
+  ProcOnError actually log the error message so we can debug disconnections   
+
+  * web/includes/irc_channels.php: Check if the server exists before
+  dereferencing it.  If a server was deleted without deleting the channels, the
+  web frontend got bent   
+
+2007-06-10  Gavin Hurlbut <gjhurlbu@gmail.com>
+
+  * bot/src/mysql.c: Ooops, typo   
+
+  * bot/src/mysql.c: Escape \ in SQL text too   
+
+2007-06-08  Gavin Hurlbut <gjhurlbu@gmail.com>
+
+  * bot/src/bot.c, bot/src/mysql.c: Add the query to the mysql error logging,
+  changed HISTORY_START to send "" as nick as NULL no workee   
+
+  * bot/src/mysql.c: Move a malloc into the loop since the mysql thread now
+  frees the old block   
+
+  * bot/src/mysql.c, bot/src/transmit.c: Added a couple frees...   Plugging
+  memory leaks.   
+
+2007-05-17  Gavin Hurlbut <gjhurlbu@gmail.com>
+
+  * bot/src/plugins/Makefile.in, bot/src/plugins/mailbox.c: Began the core of a
+  mailbox plugin that will use UW's c-client library   
+
+2007-05-16  Gavin Hurlbut <gjhurlbu@gmail.com>
+
+  * bot/src/plugin_api.c, bot/src/plugins/core.c, bot/src/plugins/dns.c,
+  bot/src/plugins/fart.c, bot/src/plugins/luascript.c,
+  bot/src/plugins/plugin_list.h, bot/src/plugins/rssfeed.c,
+  bot/src/plugins/trout.c: Relicensed the plugin API and all plugins to be
+  under LGPL.   
+
+  * COPYING, LICENSE.GPL, LICENSE.GPL2, LICENSE.LGPL: Added a new "COPYING"
+  file, and the LGPL license   
+
+  * COPYING, LICENSE.GPL2: Renamed COPYING to LICENSE.GPL2   
+
+2007-05-09  Gavin Hurlbut <gjhurlbu@gmail.com>
+
+  * bot/src/plugins/blah.lua: Removed the test script   
+
+  * bot/src/plugins/burp.lua, bot/src/plugins/luascript.c: Added the botCmd
+  linkage for lua   
+
+  * bot/src/plugins/Makefile.in, bot/src/plugins/blah.lua,
+  bot/src/plugins/burp.lua, bot/src/plugins/luascript.c: Completed the
+  regexp_add linkage, tested with burp.lua   
+
+  * bot/include/protos.h, bot/include/structs.h, bot/src/authenticate.c,
+  bot/src/bot_cmds.c, bot/src/plugin_api.c, bot/src/plugins/core.c,
+  bot/src/plugins/dns.c, bot/src/plugins/fart.c, bot/src/plugins/luascript.c,
+  bot/src/plugins/rssfeed.c, bot/src/plugins/trout.c, bot/src/regexp.c: changed
+  botCmd and regexp API to include a void *tag so the luascripts can share a
+  function   
+
+  * bot/src/plugins/luascript.c: Added some cleanup code, added regexp and
+  command linked list (per-script)   
+
+  * bot/src/plugins/blah.lua, bot/src/plugins/luascript.c: Added the beirdobot
+  LUA lib, created LogPrint and message sending wrappers   
+
+2007-05-07  Gavin Hurlbut <gjhurlbu@gmail.com>
+
+  * bot/src/plugins/Makefile.in, bot/src/plugins/blah.lua,
+  bot/src/plugins/luascript.c: Added a test LUA script, changed to use
+  "initialize" function at startup   
+
+  * bot/src/plugins/luascript.c, bot/src/plugins/plugin_list.h: Added the first
+  shell for running the LUA scripts.   
+
+  * bot/src/plugins/Makefile.in, bot/src/plugins/luascript.c: Added beginnings
+  of the luascript plugin   
+
+  * bot/src/plugins/datemsk.txt: Added the datemask used by my fantasy baseball
+  transaction RSS   
+
+2007-04-19  Gavin Hurlbut <gjhurlbu@gmail.com>
+
+  * bot/src/mysql.c: Now detects SQL server disappearing on each query,
+  reconnects   
+
+2007-04-17  Gavin Hurlbut <gjhurlbu@gmail.com>
+
+  * bot/src/mysql.c: Added a comment so I don't forget the SELECT statement I
+  need to add later.   
+
+  * bot/src/mysql.c, bot/src/plugins/datemsk.txt: Added code to do mysql_ping
+  if the session's been idle for >= 1h.  This should fix the reported problem
+  where the session disappears and doesn't want to reconnect properly.   
+
+2006-10-03  Gavin Hurlbut <gjhurlbu@gmail.com>
+
+  * Makefile.in, configure, configure.ac: Rebuilt configure and Makefile.in on
+  breezy-build   
+
+  * Makefile.local, bot/src/Makefile.in, configure.ac.in: Check mysql_config
+  for --libs_r or --libs for the Makefile   
+
+  * bot/include/protos.h, bot/src/mysql.c: Added a stub mysql_thread_init() if
+  it doesn't exist (currently set to < 40000 )   
+
+  * bot/include/structs.h: Changed the enum values to #define for the
+  MYSQL_TYPE_*   
+
+  * bot/include/protos.h, bot/src/mysql.c: Make a mysql_get_server_version for
+  < 4.1.0   
+
+  * bot/src/plugins/rssfeed.c: Fix the fullspec print in rssfeed   
+
+2006-09-29  Gavin Hurlbut <gjhurlbu@gmail.com>
+
+  * bot/src/plugins/rssfeed.c: OK, fixed that in a more sane way   
+
+  * bot/src/plugins/rssfeed.c: Put in another null check in an attempt to get
+  rid of a core dump situation   
+
+  * bot/src/bot.c: Start the transmit thread before the bot state machine to
+  avoid a race condition on the transmit queue startup   
+
+  * bot/include/config.h.in, bot/src/mysql.c, configure, configure.ac,
+  configure.ac.in: Changed libmysql check to libmysqlclient in configure
+  Removed query logging   
+
+  * bot/src/plugins/dns.c: Extended the timeout in the DNS thread on
+  pthread_cond_timewait to 1000ms to work around an apparent bug in glibc
+  2.3.5-1ubuntu1 (which debian may have fixed in 2.3.5-3)   
+
+2006-09-28  Gavin Hurlbut <gjhurlbu@gmail.com>
+
+  * bot/src/logging.c, bot/src/mysql.c, bot/src/plugins/core.c,
+  bot/src/plugins/dns.c, bot/src/plugins/rssfeed.c: Fixed the SQL stuff in
+  rssfeed and core pluging  Starting to debug DNS thread failure that may
+  somehow be caused by new SQL stuff   
+
+  * bot/include/db_schema.h, bot/include/protos.h, bot/include/structs.h,
+  bot/src/bot.c, bot/src/mysql.c, bot/src/mysql_upgrade.c,
+  bot/src/plugins/core.c, bot/src/plugins/rssfeed.c: Massive structure change
+  to allow for queuing SQL queries and dealing with the server in a separate
+  thread.  Also switching to a prepared statements format, although at this
+  point, the queries are still premade as will be necessary for MySQL < 4.1.2
+  anyways.  Fixed a small crash bug in thread shutdown when ServerList is still
+  NULL   
+
+2006-09-26  Gavin Hurlbut <gjhurlbu@gmail.com>
+
+  * bot/src/mysql.c: - fixed a table name in the db_check_plugins   
+
+  * bot/include/db_schema.h, bot/src/mysql_upgrade.c: - Removed trailing ; from
+  queries.  MySQL 3.23.x can't handle that.   
+
+2006-09-25  Gavin Hurlbut <gjhurlbu@gmail.com>
+
+  * bot/src/transmit.c: - strdup the channel string for transmits as well as
+  some are overwritten in the calling thread.  Ooops.   
+
+  * bot/src/mysql.c: - Added a mysql version number log message   
+
+  * bot/src/mysql.c: - Added a mysql_option( MYSQL_OPT_RECONNECT ) to force
+  MySQL 5.x to reconnect if disconnected. - Fixes #25 (I hope)   
+
+2006-08-04  Gavin Hurlbut <gjhurlbu@gmail.com>
+
+  * bot/src/plugins/rssfeed.c: Make rssfeeds strip carriage returns. They
+  should go to spaces.   
+
+2006-08-03  Gavin Hurlbut <gjhurlbu@gmail.com>
+
+  * bot/src/plugins/rssfeed.c: Changed the format of the RSS output in an
+  attempt to minimize freenode's stupid spam detection's false positives    
+
+  * bot/src/transmit.c: Once again, remove the added leading space on the
+  realname   
+
+  * bot/src/botnet-1.6.4/makelib/output.c: Make it NOT put a leading space in
+  the IRC realname   
+
+2006-07-26  Gavin Hurlbut <gjhurlbu@gmail.com>
+
+  * bot/src/bot.c: Removed possibility of NULL-pointer segfault in ProcOnWho   
+
+2006-07-21  Gavin Hurlbut <gjhurlbu@gmail.com>
+
+  * bot/include/structs.h, bot/src/mysql.c, bot/src/transmit.c: - Implemented
+  the flood protection buffer count.  Assume that the server will take stuff
+  out approximately at the rate we should be putting them in.   
+
+2006-07-20  Gavin Hurlbut <gjhurlbu@gmail.com>
+
+  * bot/include/db_schema.h, bot/include/structs.h: God I suck... forgot to
+  check in the header files AGAIN   
+
+  * bot/src/mysql.c, bot/src/mysql_upgrade.c, bot/src/plugins/rssfeed.c,
+  bot/src/transmit.c: Added more flood protection tweaking, allows for hyperion
+  oddness   
+
+  * bot/src/plugins/rssfeed.c: - make rssfeed log the message lengths too   
+
+  * bot/include/protos.h: - oops, forgot to checkin the prototype   
+
+  * bot/src/plugins/trout.c: - Added an adjective to the trout command - Closes
+  #22   
+
+  * bot/src/bot_cmds.c, bot/src/plugins/core.c, bot/src/plugins/dns.c,
+  bot/src/plugins/rssfeed.c, bot/src/plugins/trout.c: - Put command line
+  parsing into a function rather than maintaining the same code all over   
+
+  * bot/src/main.c: - testing new auth   
+
+2006-07-17  Gavin Hurlbut <gjhurlbu@gmail.com>
+
+  * Makefile.am, Makefile.in: Added the 'make release' support back   
+
+2006-07-14  Gavin Hurlbut <gjhurlbu@gmail.com>
+
+  * configure, configure.ac: Cleaned up the configure.ac   
+
+  * bot/include/protos.h, bot/include/structs.h, bot/src/Makefile.in,
+  bot/src/mysql.c, bot/src/plugin_api.c, bot/src/plugins/plugin_list.h: -
+  Prepopulate the plugins table with any new plugins as defined in
+  plugin_list.h   
+
+  * scripts/mkrelease, scripts/tagversion: Modified release and tag scripts   
+
+2006-07-13  Gavin Hurlbut <gjhurlbu@gmail.com>
+
+  * bot/src/main.c: - Make the child release the tty when running in daemon
+  mode - Closes #24   
+
+  * : Protect the empty lib dir   
+
+  * Makefile.in, bot/lib/datemsk.txt, bot/src/Makefile.in,
+  bot/src/plugins/Makefile.in, bot/src/plugins/datemsk.txt,
+  bot/src/plugins/rssfeed.c, configure, configure.ac, web/Makefile.in: Install
+  the datemsk.txt file to the plugins dir too   
+
+  * bot/src/Makefile.in, bot/src/plugins/Makefile.in, configure, configure.ac,
+  configure.ac.in, web/Makefile, web/Makefile.in: - added make install for web 
+   
+
+  * bot/src/Makefile, bot/src/plugins/Makefile: - Removed the now generated
+  Makefiles   
+
+  * INSTALL, Makefile, Makefile.am, Makefile.in, Makefile.local, README,
+  bot/Makefile, bot/include/config.h.in, bot/include/release.h.in,
+  bot/src/Makefile, bot/src/Makefile.in, bot/src/plugin_api.c,
+  bot/src/plugins/Makefile, bot/src/plugins/Makefile.in, configure,
+  configure.ac, configure.ac.in: - First run at an autoconf/automake system -
+  still need to add the libtool stuff (maybe) and also the make install in the
+  web dir   
+
+2006-07-12  Gavin Hurlbut <gjhurlbu@gmail.com>
+
+  * scripts/depcomp, scripts/missing: Added more autoconf scripts   
+
+  * scripts/acconfig.h, scripts/config.guess, scripts/config.sub,
+  scripts/install-sh, scripts/tagversion: Added more autoconf scripts   
+
+2006-07-11  Gavin Hurlbut <gjhurlbu@gmail.com>
+
+  * bot/docs/README.userauth: Added basic documentation for the user
+  authentication stuff   
+
+  * bot/docs/initialdata.sql: Updated the initial plugins data, to be used
+  AFTER running the bot once   
+
+2006-07-11  Chris Petersen <xris@forevermore.net>
+
+  * beirdobot.spec: another BR 
+
+2006-07-11  Gavin Hurlbut <gjhurlbu@gmail.com>
+
+  * bot/src/bot.c: Fix redefinition of __USE_BSD in some platforms   
+
+  * bot/include/environment.h: Keep _LARGEFILE_SOURCE from being redefined on
+  platforms that define it automatically   
+
+  * bot/Makefile, bot/src/Makefile, bot/src/opie-2.32/Makefile.gjh: - removed
+  no longer needed dummy files - make it compile libopie locally, removing the
+  need to use the package which is hard to find for some distros   
+
+  * bot/src/opie-2.32/BUG-REPORT, bot/src/opie-2.32/COPYRIGHT.NRL,
+  bot/src/opie-2.32/INSTALL, bot/src/opie-2.32/License.TIN,
+  bot/src/opie-2.32/Makefile.in, bot/src/opie-2.32/README,
+  bot/src/opie-2.32/acconfig.h, bot/src/opie-2.32/config.h.in,
+  bot/src/opie-2.32/config.testeflag, bot/src/opie-2.32/configure,
+  bot/src/opie-2.32/configure.in, bot/src/opie-2.32/configure.munger.in,
+  bot/src/opie-2.32/debian/README.Debian, bot/src/opie-2.32/debian/changelog,
+  bot/src/opie-2.32/debian/control, bot/src/opie-2.32/debian/copyright,
+  bot/src/opie-2.32/debian/libopie-dev.dirs,
+  bot/src/opie-2.32/debian/opie-client.dirs,
+  bot/src/opie-2.32/debian/opie-client.docs,
+  bot/src/opie-2.32/debian/opie-server.README.Debian,
+  bot/src/opie-2.32/debian/opie-server.conffiles,
+  bot/src/opie-2.32/debian/opie-server.dirs,
+  bot/src/opie-2.32/debian/opie-server.docs, bot/src/opie-2.32/debian/rules,
+  bot/src/opie-2.32/ftpcmd.y, bot/src/opie-2.32/glob.c,
+  bot/src/opie-2.32/install-sh, bot/src/opie-2.32/libmissing/Makefile.in,
+  bot/src/opie-2.32/libmissing/alloca.c, bot/src/opie-2.32/libmissing/atexit.c,
+  bot/src/opie-2.32/libmissing/bogus.c,
+  bot/src/opie-2.32/libmissing/endspent.c,
+  bot/src/opie-2.32/libmissing/endutent.c, bot/src/opie-2.32/libmissing/env.c,
+  bot/src/opie-2.32/libmissing/getcwd.c,
+  bot/src/opie-2.32/libmissing/getspnam.c,
+  bot/src/opie-2.32/libmissing/getusershell.c,
+  bot/src/opie-2.32/libmissing/getutline.c,
+  bot/src/opie-2.32/libmissing/initgroups.c,
+  bot/src/opie-2.32/libmissing/memcmp.c, bot/src/opie-2.32/libmissing/memcpy.c,
+  bot/src/opie-2.32/libmissing/memset.c,
+  bot/src/opie-2.32/libmissing/pututline.c,
+  bot/src/opie-2.32/libmissing/setegid.c,
+  bot/src/opie-2.32/libmissing/seteuid.c,
+  bot/src/opie-2.32/libmissing/setutent.c,
+  bot/src/opie-2.32/libmissing/sigaddset.c,
+  bot/src/opie-2.32/libmissing/sigemptyset.c,
+  bot/src/opie-2.32/libmissing/sigprocmask.c,
+  bot/src/opie-2.32/libmissing/strchr.c,
+  bot/src/opie-2.32/libmissing/strerror.c,
+  bot/src/opie-2.32/libmissing/strncasecmp.c,
+  bot/src/opie-2.32/libmissing/strrchr.c,
+  bot/src/opie-2.32/libmissing/strtoul.c,
+  bot/src/opie-2.32/libmissing/sysconf.c, bot/src/opie-2.32/libmissing/uname.c,
+  bot/src/opie-2.32/libopie/Makefile.in,
+  bot/src/opie-2.32/libopie/accessfile.c, bot/src/opie-2.32/libopie/atob8.c,
+  bot/src/opie-2.32/libopie/btoa8.c, bot/src/opie-2.32/libopie/btoe.c,
+  bot/src/opie-2.32/libopie/btoh.c, bot/src/opie-2.32/libopie/challenge.c,
+  bot/src/opie-2.32/libopie/generator.c,
+  bot/src/opie-2.32/libopie/getsequence.c,
+  bot/src/opie-2.32/libopie/getutmpentry.c, bot/src/opie-2.32/libopie/hash.c,
+  bot/src/opie-2.32/libopie/hashlen.c, bot/src/opie-2.32/libopie/insecure.c,
+  bot/src/opie-2.32/libopie/keycrunch.c, bot/src/opie-2.32/libopie/lock.c,
+  bot/src/opie-2.32/libopie/login.c, bot/src/opie-2.32/libopie/logwtmp.c,
+  bot/src/opie-2.32/libopie/lookup.c, bot/src/opie-2.32/libopie/md4c.c,
+  bot/src/opie-2.32/libopie/md5c.c, bot/src/opie-2.32/libopie/newseed.c,
+  bot/src/opie-2.32/libopie/open.c, bot/src/opie-2.32/libopie/parsechallenge.c,
+  bot/src/opie-2.32/libopie/passcheck.c, bot/src/opie-2.32/libopie/passwd.c,
+  bot/src/opie-2.32/libopie/randomchallenge.c,
+  bot/src/opie-2.32/libopie/readpass.c, bot/src/opie-2.32/libopie/readrec.c,
+  bot/src/opie-2.32/libopie/unlock.c, bot/src/opie-2.32/libopie/verify.c,
+  bot/src/opie-2.32/libopie/version.c, bot/src/opie-2.32/libopie/writerec.c,
+  bot/src/opie-2.32/opie.4, bot/src/opie-2.32/opie.h,
+  bot/src/opie-2.32/opie_cfg.h, bot/src/opie-2.32/opieaccess.5,
+  bot/src/opie-2.32/opieftpd.8, bot/src/opie-2.32/opieftpd.c,
+  bot/src/opie-2.32/opiegen.1, bot/src/opie-2.32/opiegen.c,
+  bot/src/opie-2.32/opieinfo.1, bot/src/opie-2.32/opieinfo.c,
+  bot/src/opie-2.32/opiekey.1, bot/src/opie-2.32/opiekey.c,
+  bot/src/opie-2.32/opiekeys.5, bot/src/opie-2.32/opielogin.1,
+  bot/src/opie-2.32/opielogin.c, bot/src/opie-2.32/opiepasswd.1,
+  bot/src/opie-2.32/opiepasswd.c, bot/src/opie-2.32/opieserv.1,
+  bot/src/opie-2.32/opieserv.c, bot/src/opie-2.32/opiesu.1,
+  bot/src/opie-2.32/opiesu.c, bot/src/opie-2.32/opietest.c,
+  bot/src/opie-2.32/permsfile.c, bot/src/opie-2.32/popen.c: Added the
+  debian-patched opie-2.32 code into the source tree   
+
+2006-07-11  Chris Petersen <xris@forevermore.net>
+
+  * beirdobot.spec: add preliminary specfile to start tracking build
+  requirements 
+
+2006-07-11  Gavin Hurlbut <gjhurlbu@gmail.com>
+
+  * Makefile, bot/Makefile, web/Makefile: - Make a root level makefile and a
+  dummy makefile in web   
+
+  * bot/Makefile: Make this work   
+
+  * bot/scripts/.users, bot/scripts/mkrelease, bot/scripts/svn2log.py,
+  bot/scripts/tagversion, scripts/.users, scripts/mkrelease,
+  scripts/svn2log.py, scripts/tagversion: Moved scripts to the root   
+
+  * bot/scripts/.users, bot/scripts/mkrelease: - Added xris to the .users -
+  minor cleanup to mkrelease   
+
+  * bot/src/libmrss-0.12/doxy.conf, bot/src/libnxml-0.11/doxy.conf: - Not
+  needed, these files are autogenerated   
+
+2006-07-09  Gavin Hurlbut <gjhurlbu@gmail.com>
+
+  * bot/src/notice.c: Fixed the notices crashing the bot   
+
+  * bot/src/transmit.c: Shortened to 8s window on transmit   
+
+  * bot/src/transmit.c: Messed with the delay a bit to see if it will work
+  right   
+
+  * bot/include/protos.h, bot/include/structs.h, bot/src/authenticate.c,
+  bot/src/bot.c, bot/src/bot_cmds.c, bot/src/notice.c, bot/src/plugin_api.c,
+  bot/src/plugins/core.c, bot/src/plugins/dns.c, bot/src/plugins/rssfeed.c,
+  bot/src/plugins/trout.c, bot/src/transmit.c: Switched everything to use the
+  new transmit threads to perform proper flood protection   
+
+2006-07-08  Gavin Hurlbut <gjhurlbu@gmail.com>
+
+  * bot/src/Makefile, bot/src/bot.c, bot/src/mysql.c, bot/src/transmit.c: -
+  created a new transmit thread so we can do our own proper flood protection   
+
+  * bot/src/libmrss-0.12/mrss.pc, bot/src/libnxml-0.11/nxml.pc: Don't need
+  these, they are autogenerated   
+
+  * bot/src/plugins/rssfeed.c: - Added a "rssfeed list timeout" that shows the
+  timeouts too, need to make channel specific   
+
+  * bot/src/balanced_btree.c: - Fixed the BalancedBTreeReplace function to not
+  mess up the tree   
+
+2006-06-23  Gavin Hurlbut <gjhurlbu@gmail.com>
+
+  * web/includes/irc_channels.php: Replaced a SELECT statement with two to make
+  it MUCH faster with > 1M rows and two channels   
+
+  * bot/docs/database.sql: Updated the SQL schema at xris' request   
+
+  * bot/src/plugins/rssfeed.c: Cosmetic   
+
+  * bot/src/plugins/rssfeed.c: Updated the help string   
+
+  * bot/src/plugins/rssfeed.c: Added a comment.  Closes #7   
+
+  * bot/include/protos.h, bot/src/plugins/dns.c, bot/src/plugins/rssfeed.c,
+  bot/src/queue.c, bot/src/thread_api.c: Unload the thread from the btree on
+  unload   
+
+  * bot/src/plugins/dns.c, bot/src/plugins/rssfeed.c: Fixed the unload of
+  rssfeed by waiting on a condition variable that can be signaled when changes
+  are made or we want to shut down to allow the thread to quit before we unload
+  the code.   
+
+  * bot/src/plugins/rssfeed.c: Added per-feed timestamp offsets as getdate only
+  seems to convert to local time   
+
+  * bot/src/plugins/rssfeed.c: Change the time output to use localtime_r rather
+  than gmtime_r as it seems to be applied twice   
+
+  * bot/src/plugins/rssfeed.c: Added the rssfeed command implementation plugin
+  unload/load still has issues   
+
+2006-06-22  Gavin Hurlbut <gjhurlbu@gmail.com>
+
+  * bot/src/plugins/rssfeed.c: Added thread aborting so we can try to unload
+  the module   
+
+  * bot/src/plugins/rssfeed.c: Fixed the over-use of the found variable which
+  caused funky startup behavior   
+
+  * bot/src/plugins/rssfeed.c: Fix the 1 posts   
+
+  * bot/src/plugins/rssfeed.c: Cleaned up some debugging prints   
+
+  * bot/lib/datemsk.txt: The initial date matching codes Note: %Z seems to not
+  work (argh!)   
+
+  * bot/src/plugins/rssfeed.c: Fixed the crashing   
+
+  * bot/src/plugins/rssfeed.c: Changed to using getdate_r.  It still won't deal
+  with dates in the form 2006-6-12T19:12:6-0400   
+
+  * bot/src/plugins/rssfeed.c: Fix the infinite loop.  Still is timing out for
+  the default time, something odd in there still   
+
+  * bot/Makefile, bot/src/plugins/Makefile, bot/src/plugins/rssfeed.c: Fixed
+  some bugs in the rssfeed plugin. Still need to implement the command and the
+  unloading   
+
+  * bot/src/balanced_btree.c: Added the key value to duplicate key warnings   
+
+  * bot/src/plugins/Makefile, bot/src/plugins/rssfeed.c: First run at an RSS
+  feed plugin.  Not tested yet. References #7   
+
+  * bot/src/libmrss-0.12/Makefile.gjh, bot/src/libnxml-0.11/Makefile.gjh: Make
+  the libraries always build with -fPIC even for statically linked, as then the
+  plugins (shared libs) can use them   
+
+  * bot/src/mysql_upgrade.c: Make the upgrade functions static   
+
+  * bot/include/db_schema.h: Make the schema variables static   
+
+  * bot/include/balanced_btree.h, bot/src/balanced_btree.c: Moved a couple
+  prototypes to be global   
+
+  * bot/src/plugins/dns.c: Added keywords propset   
+
+  * bot/Makefile, bot/src/Makefile, bot/src/botnet-1.6.4/Makefile.gjh,
+  bot/src/libmrss-0.12/Makefile.gjh, bot/src/libmrss-0.12/mrss.pc,
+  bot/src/libnxml-0.11/Makefile.gjh, bot/src/libnxml-0.11/nxml.pc: Make the
+  libnxml and libmrss compile, made botnet lib NOT build shared libs   
+
+  * bot/src/libmrss-0.12/AUTHORS, bot/src/libmrss-0.12/COPYING,
+  bot/src/libmrss-0.12/ChangeLog, bot/src/libmrss-0.12/INSTALL,
+  bot/src/libmrss-0.12/Makefile.am, bot/src/libmrss-0.12/Makefile.in,
+  bot/src/libmrss-0.12/NEWS, bot/src/libmrss-0.12/README,
+  bot/src/libmrss-0.12/aclocal.m4, bot/src/libmrss-0.12/config.guess,
+  bot/src/libmrss-0.12/config.h.in, bot/src/libmrss-0.12/config.sub,
+  bot/src/libmrss-0.12/configure.ac, bot/src/libmrss-0.12/debian/Makefile.am,
+  bot/src/libmrss-0.12/debian/Makefile.in,
+  bot/src/libmrss-0.12/debian/changelog, bot/src/libmrss-0.12/debian/compat,
+  bot/src/libmrss-0.12/debian/control, bot/src/libmrss-0.12/debian/copyright,
+  bot/src/libmrss-0.12/debian/docs, bot/src/libmrss-0.12/debian/files,
+  bot/src/libmrss-0.12/debian/rules, bot/src/libmrss-0.12/doc/Makefile.am,
+  bot/src/libmrss-0.12/doc/Makefile.in, bot/src/libmrss-0.12/doc/main.doxy,
+  bot/src/libmrss-0.12/doxy.conf, bot/src/libmrss-0.12/doxy.conf.in,
+  bot/src/libmrss-0.12/install-sh, bot/src/libmrss-0.12/ltmain.sh,
+  bot/src/libmrss-0.12/missing, bot/src/libmrss-0.12/mkinstalldirs,
+  bot/src/libmrss-0.12/mrss.pc, bot/src/libmrss-0.12/mrss.pc.in,
+  bot/src/libmrss-0.12/phpmrss/Makefile.am,
+  bot/src/libmrss-0.12/phpmrss/Makefile.in,
+  bot/src/libmrss-0.12/phpmrss/README, bot/src/libmrss-0.12/phpmrss/all.php,
+  bot/src/libmrss-0.12/phpmrss/config.m4, bot/src/libmrss-0.12/phpmrss/php.c,
+  bot/src/libmrss-0.12/phpmrss/phpmrss_install.sh,
+  bot/src/libmrss-0.12/src/Makefile.am, bot/src/libmrss-0.12/src/Makefile.in,
+  bot/src/libmrss-0.12/src/mrss.h, bot/src/libmrss-0.12/src/mrss_download.c,
+  bot/src/libmrss-0.12/src/mrss_edit.c, bot/src/libmrss-0.12/src/mrss_free.c,
+  bot/src/libmrss-0.12/src/mrss_generic.c,
+  bot/src/libmrss-0.12/src/mrss_internal.h,
+  bot/src/libmrss-0.12/src/mrss_parser.c,
+  bot/src/libmrss-0.12/src/mrss_write.c, bot/src/libmrss-0.12/stamp-h.in,
+  bot/src/libmrss-0.12/test/Makefile.am, bot/src/libmrss-0.12/test/Makefile.in,
+  bot/src/libmrss-0.12/test/new.c, bot/src/libmrss-0.12/test/parser.c,
+  bot/src/libmrss-0.12/test/time.c, bot/src/libmrss-0.12/test/write.c,
+  bot/src/libnxml-0.11/AUTHORS, bot/src/libnxml-0.11/COPYING,
+  bot/src/libnxml-0.11/ChangeLog, bot/src/libnxml-0.11/INSTALL,
+  bot/src/libnxml-0.11/Makefile.am, bot/src/libnxml-0.11/Makefile.in,
+  bot/src/libnxml-0.11/NEWS, bot/src/libnxml-0.11/README,
+  bot/src/libnxml-0.11/aclocal.m4, bot/src/libnxml-0.11/config.guess,
+  bot/src/libnxml-0.11/config.h.in, bot/src/libnxml-0.11/config.sub,
+  bot/src/libnxml-0.11/configure.ac, bot/src/libnxml-0.11/debian/Makefile.am,
+  bot/src/libnxml-0.11/debian/Makefile.in,
+  bot/src/libnxml-0.11/debian/changelog, bot/src/libnxml-0.11/debian/compat,
+  bot/src/libnxml-0.11/debian/control, bot/src/libnxml-0.11/debian/copyright,
+  bot/src/libnxml-0.11/debian/docs, bot/src/libnxml-0.11/debian/files,
+  bot/src/libnxml-0.11/debian/rules, bot/src/libnxml-0.11/doc/Makefile.am,
+  bot/src/libnxml-0.11/doc/Makefile.in, bot/src/libnxml-0.11/doc/main.doxy,
+  bot/src/libnxml-0.11/doxy.conf, bot/src/libnxml-0.11/doxy.conf.in,
+  bot/src/libnxml-0.11/install-sh, bot/src/libnxml-0.11/ltmain.sh,
+  bot/src/libnxml-0.11/missing, bot/src/libnxml-0.11/mkinstalldirs,
+  bot/src/libnxml-0.11/nxml.pc, bot/src/libnxml-0.11/nxml.pc.in,
+  bot/src/libnxml-0.11/src/Makefile.am, bot/src/libnxml-0.11/src/Makefile.in,
+  bot/src/libnxml-0.11/src/nxml.h, bot/src/libnxml-0.11/src/nxml_download.c,
+  bot/src/libnxml-0.11/src/nxml_dtd.c, bot/src/libnxml-0.11/src/nxml_easy.c,
+  bot/src/libnxml-0.11/src/nxml_edit.c, bot/src/libnxml-0.11/src/nxml_entity.c,
+  bot/src/libnxml-0.11/src/nxml_error.c, bot/src/libnxml-0.11/src/nxml_free.c,
+  bot/src/libnxml-0.11/src/nxml_init.c,
+  bot/src/libnxml-0.11/src/nxml_internal.h,
+  bot/src/libnxml-0.11/src/nxml_namespace.c,
+  bot/src/libnxml-0.11/src/nxml_parser.c,
+  bot/src/libnxml-0.11/src/nxml_string.c,
+  bot/src/libnxml-0.11/src/nxml_tools.c, bot/src/libnxml-0.11/src/nxml_utf.c,
+  bot/src/libnxml-0.11/src/nxml_write.c, bot/src/libnxml-0.11/stamp-h.in,
+  bot/src/libnxml-0.11/test/Makefile.am, bot/src/libnxml-0.11/test/Makefile.in,
+  bot/src/libnxml-0.11/test/dtd.c, bot/src/libnxml-0.11/test/easy.c,
+  bot/src/libnxml-0.11/test/namespace.c, bot/src/libnxml-0.11/test/new.c,
+  bot/src/libnxml-0.11/test/parser.c, bot/src/libnxml-0.11/test/write.c: Added
+  libnxml-0.11 and libmrss-0.12, both from http://www2.autistici.org/bakunin/
+  (LGPL)   
+
+  * bot/src/plugins/dns.c: Fixed the @server part, added -x reverse support
+  Closes #5   
+
+2006-06-21  Gavin Hurlbut <gjhurlbu@gmail.com>
+
+  * bot/src/plugins/dns.c: Fixed comment typo   
+
+  * bot/src/plugins/dns.c: Implemented more DNS RR type handling Still no
+  support for @server   
+
+  * bot/src/Makefile, bot/src/plugins/Makefile, bot/src/plugins/dns.c: Added
+  beginning of DNS plugin Refers to #5   
+
+  * bot/src/balanced_btree.c, bot/src/bot_cmds.c: Added BalancedBTreePrune
+  Added the balanced_btree.h to bot_cmds.c   
+
+  * bot/src/bot.c: Implement a join when invited to a configured channel. 
+  Closes #19   
+
+2006-04-20  Gavin Hurlbut <gjhurlbu@gmail.com>
+
+  * bot/src/plugins/trout.c: Fixed the "trout #channel" bug bendy24 found   
+
+  * bot/include/logging.h: Make it compile with GCC4   
+
+  * web/.htaccess: put the comment back (oops)   
+
+  * web/.htaccess: Added comment   
+
+  * bot/src/plugins/core.c, bot/src/plugins/trout.c: Fixed several null
+  messages not being handled...  Thanks to ivor from #mythtv-users for
+  stumbling across this   
+
+2006-03-16  Gavin Hurlbut <gjhurlbu@gmail.com>
+
+  * bot/include/balanced_btree.h, bot/include/protos.h, bot/include/structs.h,
+  bot/src/Makefile, bot/src/authenticate.c, bot/src/balanced_btree.c,
+  bot/src/bot.c, bot/src/logging.c, bot/src/main.c, bot/src/mysql.c,
+  bot/src/notice.c, bot/src/thread_api.c: Added thread names to the debug log
+  Required added BTREE_KEY_PTHREAD   
+
+  * bot/src/plugins/core.c: Made the "Searching..." line indicate channel and
+  search terms   
+
+  * bot/src/main.c: Make daemon mode actually detach   
+
+  * bot/include/protos.h, bot/src/bot.c, bot/src/logging.c, bot/src/main.c:
+  Finally got the SIGINT stuff to shutdown nicely and quickly.   
+
+  * bot/src/authenticate.c, bot/src/bot.c, bot/src/main.c, bot/src/notice.c:
+  Make log notices for every thread quitting Lower exit delay from 5s to 2s   
+
+  * bot/src/notice.c: Boosted the inter-notice time to 1s   
+
+  * bot/src/bot.c: Added a hook for when we hit excess flood   
+
+2006-03-15  Gavin Hurlbut <gjhurlbu@gmail.com>
+
+  * bot/include/protos.h, bot/include/queue.h, bot/include/structs.h,
+  bot/src/authenticate.c, bot/src/bot.c, bot/src/main.c, bot/src/mysql.c,
+  bot/src/notice.c, bot/src/queue.c: Now handles SIGINT and shuts down "nicely"
+    
+
+  * bot/include/protos.h, bot/src/logging.c, bot/src/main.c: Added SIGUSR1 to
+  toggle debug logging   
+
+  * bot/include/protos.h, bot/src/logging.c, bot/src/main.c: Added a debug log
+  file to be used when running with -g (--debug) Currently hardcoded to
+  /var/log/beirdobot/debug.log   
+
+  * bot/src/authenticate.c, bot/src/plugins/core.c: Added some more logging
+  detail to authentication and searches   
+
+2006-03-14  Gavin Hurlbut <gjhurlbu@gmail.com>
+
+  * bot/src/logging.c: Fix the logging level check on incoming log messages    
+
+  * bot/include/environment.h, bot/include/logging.h, bot/include/protos.h,
+  bot/include/structs.h, bot/src/logging.c: Added syslog logging and tidied the
+  console logging   
+
+2006-03-13  Gavin Hurlbut <gjhurlbu@gmail.com>
+
+  * bot/src/notice.c: Missed removing a \n in the LogPrint conversion   
+
+  * bot/src/authenticate.c, bot/src/balanced_btree.c, bot/src/bot.c,
+  bot/src/bot_cmds.c, bot/src/linked_list.c, bot/src/main.c, bot/src/mysql.c,
+  bot/src/mysql_upgrade.c, bot/src/notice.c, bot/src/plugin_api.c,
+  bot/src/plugins/core.c, bot/src/plugins/fart.c, bot/src/plugins/trout.c,
+  bot/src/protected_data.c, bot/src/queue.c, bot/src/regexp.c: Converted all
+  printf and fprintf to using logging.  EXCEPT for the --help output   
+
+  * bot/include/logging.h, bot/include/protos.h, bot/include/structs.h,
+  bot/src/Makefile, bot/src/logging.c, bot/src/main.c: Added support for proper
+  logging, still need to use it, and to add syslog support.   
+
+2006-03-11  Gavin Hurlbut <gjhurlbu@gmail.com>
+
+  * bot/src/plugins/core.c: Applied fix to the search command too before it
+  starts to crash   
+
+  * bot/src/mysql.c, bot/src/plugins/core.c: Fixed (I hope) a crash bug on
+  receiving seen messages in privmsg   
+
+  * bot/include/db_schema.h, bot/include/structs.h, bot/src/bot.c,
+  bot/src/mysql.c, bot/src/mysql_upgrade.c: Added support for IRC server
+  passwords Closes #16   
+
+  * bot/include/protos.h, bot/include/structs.h, bot/src/authenticate.c,
+  bot/src/bot_cmds.c, bot/src/plugin_api.c: Create a "plugin" command with
+  subcommands "list", "load", "unload". Must be authenticated, must be in
+  privmsg Closes #9   
+
+  * bot/src/plugins/fart.c: Removed the log output from fart.c   
+
+2006-03-10  Gavin Hurlbut <gjhurlbu@gmail.com>
+
+  * bot/include/db_schema.h, bot/src/mysql_upgrade.c: Added the plugin_trac
+  table to mysql for use by the trac plugin.   
+
+  * bot/src/authenticate.c: Check that the server also matches when looking for
+  authentication state   
+
+  * bot/include/protos.h, bot/include/structs.h, bot/src/authenticate.c,
+  bot/src/main.c, bot/src/mysql.c: Finished implementing an authenticate
+  command using OPIE-style one-time passwords.  Still needs a command help.
+  Closes #8   
+
+  * bot/include/db_schema.h, bot/include/protos.h, bot/include/structs.h,
+  bot/src/Makefile, bot/src/authenticate.c, bot/src/mysql.c,
+  bot/src/mysql_upgrade.c: Added the beginnings of user authentication using
+  one-time-passwords.   
+
+2006-03-09  Gavin Hurlbut <gjhurlbu@gmail.com>
+
+  * bot/src/bot_cmds.c: Make it respond to Bot[:,]?\s+ rather than \s*   
+
+  * bot/include/protos.h, bot/src/bot_cmds.c, bot/src/mysql.c: Bot will now
+  respond to messages directed to it in channel with Bot: blah Closes #10   
+
+  * bot/src/bot.c: Use the notify thread when someone joins too   
+
+  * bot/include/protos.h, bot/include/queue.h, bot/include/structs.h,
+  bot/src/Makefile, bot/src/bot.c, bot/src/main.c, bot/src/notice.c,
+  bot/src/queue.c: Moved notifications into a new thread so we can send max
+  2/sec Added queuing   
+
+  * bot/src/plugins/core.c: Limit searches to 3 matches   
+
+  * bot/src/plugins/core.c: Fix the time display on searches   
+
+2006-03-09  Chris Petersen <xris@forevermore.net>
+
+  * web/modules/search.php: search link returns exact time period, not fuzzy 
+
+  * web/modules/search.php: round 
+
+  * web/modules/search.php: oops, stop using the old timer format 
+
+2006-03-09  Gavin Hurlbut <gjhurlbu@gmail.com>
+
+  * bot/include/protos.h, bot/src/mysql.c, bot/src/plugins/core.c: Make
+  searches always return via privmsg   
+
+  * bot/include/protos.h: Ooops, forgot the prototypes in [101]   
+
+  * bot/src/mysql.c, bot/src/plugins/core.c: First pass at the search command
+  with the SQL query taken from the web frontend   
+
+2006-03-08  Gavin Hurlbut <gjhurlbu@gmail.com>
+
+  * bot/src/bot_cmds.c, bot/src/plugins/Makefile, bot/src/plugins/core.c: Moved
+  notice, search, seen into a new plugin_core.so   
+
+  * bot/src/plugins/trout.c: Allow trout with no nick in privmsg   
+
+  * bot/src/bot_cmds.c, bot/src/plugins/trout.c: Allow trouting and notice in
+  privmsg   
+
+  * bot/include/protos.h, bot/src/bot.c, bot/src/bot_cmds.c, bot/src/mysql.c:
+  Made seen work in privmsg Fixed privmsg responses   
+
+2006-03-08  Chris Petersen <xris@forevermore.net>
+
+  * web/skins/default/channel.css, web/templates/channel.php,
+  web/templates/channel/history.php: rearrange some of the layout 
+
+  * web/includes/irc_messages.php: whitespace 
+
+  * web/modules/channel/history.php: show the history page with the newest
+  stuff first 
+
+  * web/includes/utils.php, web/templates/channel.php: smarter/better timer
+  routine 
+
+  * web/includes/irc_channels.php: oops in [91] 
+
+  * web/includes/irc_channels.php: better handling of logged-in user detection 
+
+2006-03-08  Gavin Hurlbut <gjhurlbu@gmail.com>
+
+  * bot/include/structs.h, bot/src/bot.c, bot/src/mysql.c: Make it so the bot
+  will put in a histType of -1 before the type=0 entries   
+
+2006-03-08  Chris Petersen <xris@forevermore.net>
+
+  * web/includes/irc_channels.php, web/includes/irc_messages.php: * hopefully
+  don't insert spaces in the middle of display URL's. * gzip the cache data,
+  and use gzreadfile to output it, which turns out to be faster than using
+  include() -- go figure, not being parsed. 
+
+2006-03-07  Gavin Hurlbut <gjhurlbu@gmail.com>
+
+  * web/.htaccess: Added comments to the index.php redirects   
+
+2006-03-07  Chris Petersen <xris@forevermore.net>
+
+  * web/includes/init.php, web/includes/irc_channels.php,
+  web/modules/channel.php, web/templates/channel.php,
+  web/templates/log/table_empty.php, web/templates/log/table_foot.php,
+  web/templates/log/table_head.php, web/templates/log/table_message.php,
+  web/templates/log/table_newday.php: historical logs are now cached
+  fully-rendered, for at least 25x speedup 
+
+  * web/.htaccess, web/includes/init.php, web/modules/channel.php: create data
+  directory, redirect to root when an invalid channel is requested, fix
+  rewriterule to not deal with stuff we don't use in this program 
+
+2006-03-06  Gavin Hurlbut <gjhurlbu@gmail.com>
+
+  * bot/src/mysql_upgrade.c: Fix a stupid typo    
+
+  * bot/src/plugins/fart.c: Fixed the regexp to be case insensitive, and allow
+  trailing .   
+
+2006-03-05  Chris Petersen <xris@forevermore.net>
+
+  * web/templates/channel.php: change the nick-change text 
+
+  * web/includes/irc_messages.php: Split up strings >= 80 chars 
+
+  * web/includes/irc_messages.php: break up long URL's 
+
+2006-03-05  Gavin Hurlbut <gjhurlbu@gmail.com>
+
+  * bot/include/db_schema.h, bot/src/mysql_upgrade.c: Changed indexes on ircLog
+  for faster searches.  schema 5   
+
+  * bot/src/botnet-1.6.4/Makefile.gjh: Make it so the botnet library doesn't
+  reconfigure, etc if the libbotnet.a exists already   
+
+  * bot/include/protos.h, bot/src/bot.c, bot/src/bot_cmds.c, bot/src/mysql.c,
+  bot/src/plugins/fart.c, bot/src/plugins/trout.c: Made the bot log its own
+  output too. Closes #4   
+
+  * bot/include/db_schema.h, bot/src/bot_cmds.c, bot/src/mysql_upgrade.c: Added
+  the "notice" command Closes #17   
+
+2006-03-04  Chris Petersen <xris@forevermore.net>
+
+  * web/modules/search.php: round the search timer because PHP uses like 11
+  digits for floats 
+
+  * web/includes/utils.php, web/modules/search.php: proper use of microtime() 
+
+  * web/templates/search.php: link from search results to each channel 
+
+  * web/skins/default/search.css: score column needed a separator 
+
+  * web/includes/utils.php, web/js/ajax.js, web/js/browser.js, web/js/debug.js,
+  web/js/utils.js, web/js/visibility.js, web/modules/channel.php,
+  web/modules/search.php, web/skins/default/log.css,
+  web/skins/default/search.css, web/templates/channel.php,
+  web/templates/header.php, web/templates/search.php: bunch of js additions so
+  debug() works properly, and rudimentary search now works 
+
+  * web/modules/channel.php, web/templates/channel.php: show the timezone for
+  the initial date 
+
+  * web/skins/default/global.css: color adjustment 
+
+  * web/skins/default/log.css, web/templates/channel.php: actions are now
+  colored with the nick color 
+
+  * web/.htaccess, web/includes/irc_messages.php, web/includes/utils.php,
+  web/modules/channel.php, web/skins/default/global.css,
+  web/skins/default/log.css, web/templates/channel.php,
+  web/templates/channel/history.php, web/templates/footer.php,
+  web/templates/header.php: * fix url's with & in them * colorize nicks based
+  on mod-formula * html verification fixes 
+
+2006-03-03  Gavin Hurlbut <gjhurlbu@gmail.com>
+
+  * bot/src/bot.c: Changed the topic change text   
+
+2006-03-03  Chris Petersen <xris@forevermore.net>
+
+  * web/includes/irc_channels.php, web/includes/irc_messages.php,
+  web/includes/utils.php, web/modules/channel.php,
+  web/modules/channel/history.php, web/skins/default/global.css,
+  web/skins/default/log.css, web/templates/channel.php,
+  web/templates/channel/history.php, web/templates/header.php: w00t, colors!
+  also, can now access channel date ranges with a human-readable date string,
+  and without the GET vars 
+
+2006-03-02  Gavin Hurlbut <gjhurlbu@gmail.com>
+
+  * web/templates/channel.php: Changed the output of the MSG_NICK type to make
+  more sense   
+
+2006-03-02  Chris Petersen <xris@forevermore.net>
+
+  * web/templates/channel.php: nicer formatting when displaying timestamps in
+  chat logs 
+
+  * web/modules/channel/history.php: properly adjusted for timezones 
+
+  * web/modules/channel/history.php, web/templates/channel.php: properly sort
+  by date in history 
+
+2006-03-01  Chris Petersen <xris@forevermore.net>
+
+  * web/includes/irc_channels.php, web/includes/irc_messages.php,
+  web/modules/channel.php, web/modules/channel/history.php,
+  web/templates/channel.php, web/templates/channel/history.php,
+  web/templates/welcome.php: daily chat history for each channel now seems to
+  work properly 
+
+2006-03-01  Gavin Hurlbut <gjhurlbu@gmail.com>
+
+  * bot/include/db_schema.h, bot/src/Makefile, bot/src/balanced_btree.c,
+  bot/src/bot.c, bot/src/bot_cmds.c, bot/src/linked_list.c, bot/src/main.c,
+  bot/src/mysql.c, bot/src/mysql_upgrade.c, bot/src/plugins/Makefile: Enabled
+  -std=c99 -pedantic as CFLAGS Made compile as C99 code Added make depend
+  support Modified the index on the nickhistory table (db schema 3)   
+
+2006-02-28  Gavin Hurlbut <gjhurlbu@gmail.com>
+
+  * bot/include/protos.h, bot/include/structs.h, bot/src/bot.c,
+  bot/src/mysql.c: Made it so the nickhistory table will get updated so the web
+  frontend can do historical nick tracking easier   
+
+  * bot/src/mysql_upgrade.c: Modified the startup prints a bit for schema
+  upgrades   
+
+  * bot/include/db_schema.h, bot/include/protos.h, bot/src/Makefile,
+  bot/src/main.c, bot/src/mysql.c, bot/src/mysql_upgrade.c: Make it
+  auto-upgrade the schema, and create the database if no schema version exists
+  (i.e. new install)   
+
+2006-02-27  Gavin Hurlbut <gjhurlbu@gmail.com>
+
+  * bot/include/protected_data.h, bot/include/protos.h, bot/src/Makefile,
+  bot/src/bot.c, bot/src/mysql.c, bot/src/protected_data.c: Made the SQL
+  connections thread-safe by protecting the connection and the buffer with a
+  mutex (in protected_data.c)   
+
+2006-02-27  Chris Petersen <xris@forevermore.net>
+
+  * web/includes/irc_channels.php, web/includes/irc_messages.php,
+  web/modules/search.php: rudimentary search code in place, but not hooked up
+  to anything.  early code for detecting which users are or are not logged into
+  a channel at any given moment in time. 
+
+2006-02-27  Gavin Hurlbut <gjhurlbu@gmail.com>
+
+  * bot/docs/README: Fix a typo   
+
+  * bot/docs/README: added "create temporary tables" to the perms to give to
+  the user   
+
+  * bot/docs/README, bot/docs/database.sql, bot/docs/initialdata.sql: Added
+  settings table Added initialdata.sql which contains plugins table and
+  settings table defaults   
+
+  * bot/docs/database.sql: Added an index to irclog on (chanid, msgtype,
+  timestamp)   
+
+2006-02-27  Chris Petersen <xris@forevermore.net>
+
+  * web/includes/init.php, web/includes/irc_channels.php,
+  web/includes/irc_messages.php, web/includes/utils.php,
+  web/modules/channel.php, web/templates/channel.php: objectified message
+  handling, and rudimentary url/email detection 
+
+  * web/includes/irc_channels.php, web/modules/channel.php,
+  web/templates/channel.php, web/templates/footer.php,
+  web/templates/header.php, web/templates/welcome.php: rudimentary channel
+  details 
+
+2006-02-26  Chris Petersen <xris@forevermore.net>
+
+  * web/beirdobot.php, web/includes/db.php, web/includes/errordisplay.php,
+  web/includes/errors.php, web/includes/init.php,
+  web/includes/irc_channels.php, web/includes/irc_servers.php,
+  web/includes/utils.php, web/modules/search.php, web/modules/welcome.php,
+  web/templates/_error.php, web/templates/footer.php, web/templates/header.php,
+  web/templates/welcome.php: a bunch more setup things 
+
+2006-02-19  Chris Petersen <xris@forevermore.net>
+
+  * web/.htaccess: initial setup 
+
+2006-02-18  Gavin Hurlbut <gjhurlbu@gmail.com>
+
+  * bot/docs/database.sql, bot/include/protos.h, bot/src/bot_cmds.c,
+  bot/src/mysql.c: Implemented the seen command The bot sometimes doesn't see
+  itself join (?) Changed lastseen and lastnotified to UNIX timestamps in
+  schema Closes #14   
+
+  * bot/src/bot.c: Clears the channel joined flags before reconnecting. Fixes
+  #15   
+
+  * bot/include/protos.h, bot/include/structs.h, bot/src/bot_cmds.c,
+  bot/src/plugins/trout.c: Implemented command help for help, list, trout
+  Others will be added as the command is implemented Closes #11   
+
+  * bot/include/structs.h, bot/src/mysql.c, bot/src/regexp.c: Regexp now checks
+  nick@server:port/channel instead of only channel Closes #12   
+
+  * bot/include/protos.h, bot/include/structs.h, bot/src/bot.c,
+  bot/src/plugins/fart.c, bot/src/regexp.c: Made the regexp matches pass in
+  which IRC message type triggered the match Closes #2   
+
+  * bot/include/protos.h, bot/src/bot.c, bot/src/bot_cmds.c: Make a command
+  match prevent checking regexp matching Closes #3   
+
+2006-02-17  Gavin Hurlbut <gjhurlbu@gmail.com>
+
+  * bot/include/protos.h, bot/include/structs.h, bot/src/bot.c,
+  bot/src/bot_cmds.c, bot/src/main.c, bot/src/plugins/Makefile,
+  bot/src/plugins/fart.c, bot/src/regexp.c: Link in the regexp handling Added
+  plugin_fart.so (yeah, immature, I know!)   
+
+  * bot/include/structs.h, bot/src/Makefile, bot/src/regexp.c: Added beginning
+  of regexp handling, yet to be hooked into message reception   
+
+2006-02-16  Gavin Hurlbut <gjhurlbu@gmail.com>
+
+  * bot/src/bot.c, bot/src/bot_cmds.c, bot/src/main.c: Make it not coredump on
+  a who...  the FindChannel routines were slightly borked Make botCmd_parse
+  feed the commands only the nick portion of the who   
+
+  * bot/include/protos.h, bot/src/balanced_btree.c, bot/src/main.c,
+  bot/src/plugin_api.c, bot/src/plugins/trout.c: Added a pluginLoad() and
+  pluginUnload()   
+
+2006-02-15  Gavin Hurlbut <gjhurlbu@gmail.com>
+
+  * bot/docs/database.sql, bot/include/protos.h, bot/include/structs.h,
+  bot/src/Makefile, bot/src/bot_cmds.c, bot/src/main.c, bot/src/mysql.c,
+  bot/src/plugin_api.c, bot/src/plugins/trout.c: Added the code to load up the
+  plugins as defined in the database Updated the SQL schema Changed botCmd_add
+  to require char **command so it will work correctly.   
+
+  * bot/include/protos.h, bot/src/Makefile, bot/src/bot_cmds.c,
+  bot/src/plugins/Makefile, bot/src/plugins/trout.c: Created a plugins
+  directory Moved the trout command to a plugin Created botCmd_remove   
+
+2006-02-14  Gavin Hurlbut <gjhurlbu@gmail.com>
+
+  * bot/src/bot_cmds.c: Added a prototype for botCmdDepthFirst   
+
+  * bot/docs/database.sql: Added the cmdChar field to channels table   
+
+  * bot/src/bot_cmds.c, bot/src/main.c: Added a list command - shows an
+  alphabetical list of all supported commands   
+
+  * bot/include/protos.h, bot/include/structs.h, bot/src/bot.c,
+  bot/src/bot_cmds.c: Fleshed out the trout command Pass in the server info as
+  well as channel so private messages work   
+
+  * bot/include/protos.h, bot/include/structs.h, bot/src/balanced_btree.c,
+  bot/src/bot.c, bot/src/bot_cmds.c, bot/src/main.c, bot/src/mysql.c: Added
+  some skeleton commands and linkage for bot commands   
+
+2006-02-13  Gavin Hurlbut <gjhurlbu@gmail.com>
+
+  * bot/src/Makefile, bot/src/bot_cmds.c: Enabled the svn:keyword Id Added
+  bot_cmds.c to deal with commands the bot will respond to   
+
+2006-02-08  Gavin Hurlbut <gjhurlbu@gmail.com>
+
+  * bot/docs/database.sql, bot/src/mysql.c: Changed the timestamp in irclog
+  table to a UNIX timestamp at xris' request   
+
+  * bot/src/balanced_btree.c: Fixed the BalancedBTreeRebalance   
+
+2006-02-07  Gavin Hurlbut <gjhurlbu@gmail.com>
+
+  * bot/src/balanced_btree.c: Fixed a couple silly crash-causing errors in the
+  BalancedBTree code   
+
+  * bot/include/balanced_btree.h, bot/include/environment.h,
+  bot/include/linked_list.h, bot/include/protos.h, bot/include/structs.h,
+  bot/src/balanced_btree.c, bot/src/bot.c, bot/src/linked_list.c,
+  bot/src/mysql.c: Changed channel searching to use two balanced binary trees
+  for performance on reads.  The linked list remains for joining channels.   
+
+  * bot/include/balanced_btree.h, bot/include/environment.h,
+  bot/include/linked_list.h, bot/include/protos.h, bot/include/structs.h,
+  bot/src/Makefile, bot/src/balanced_btree.c, bot/src/bot.c,
+  bot/src/linked_list.c, bot/src/main.c, bot/src/mysql.c: Created Balanced
+  Binary Tree support, not tested yet Changed copyrights to say beirdobot
+  rather than havokmud/nuvtools   
+
+2006-02-06  Gavin Hurlbut <gjhurlbu@gmail.com>
+
+  * bot/docs/README, bot/docs/database.sql: Added the database schema to SVN   
+
+  * bot/include/protos.h, bot/include/structs.h, bot/src/bot.c,
+  bot/src/mysql.c: Added channel notifications with a window.  If a URL is
+  defined, and the user hasn't been notified in X hours, a notice is sent to
+  them when they join, and to any user in the channel when the bot joins.   
+
+  * bot/src/botnet-1.6.4/makelib/botnet.c: Fix the CTCP handling in botnet to
+  handle CTCP PING properly.   
+
+2006-02-05  Gavin Hurlbut <gjhurlbu@gmail.com>
+
+  * bot/include/protos.h, bot/src/Makefile, bot/src/bot.c, bot/src/main.c,
+  bot/src/mysql.c: Added nick tracking per channel Added support for /nick and
+  /quit logging Renamed output binary to beirdobot Added --verbose and --daemon
+  (although --daemon doesn't detach yet)   
+
+  * bot/Makefile: Added make release   
+
+  * bot/include/protos.h, bot/include/structs.h, bot/src/bot.c,
+  bot/src/mysql.c: It now logs to the database NICK and QUIT commands will need
+  a method of determining which channel for the server makes us care   
+
+  * bot/include/protos.h, bot/src/bot.c: Implemented CTCP VERSION   
+
+  * bot/include/structs.h, bot/src/bot.c, bot/src/mysql.c: Will now join
+  channels too   
+
+  * bot/src/bot.c, bot/src/main.c, bot/src/mysql.c: No longer segfaults (oops)
+  Will connect to multiple servers, but not yet join channels   
+
+  * bot/src/Makefile: Make main.o depend on release.h   
+
+  * bot/include/environment.h, bot/include/linked_list.h, bot/include/protos.h,
+  bot/include/structs.h, bot/src/Makefile, bot/src/bot.c,
+  bot/src/linked_list.c, bot/src/mysql.c: Added reading server/channel info
+  from database Added bot startup -- shutdown may need some tweaking   
+
+2006-02-04  Gavin Hurlbut <gjhurlbu@gmail.com>
+
+  * bot/include/environment.h, bot/include/protos.h, bot/src/Makefile,
+  bot/src/main.c, bot/src/mysql.c: Added beginning of the mysql support   
+
+  * bot/Makefile, bot/include/environment.h, bot/include/protos.h,
+  bot/include/release.h.in, bot/scripts/.users, bot/scripts/mkrelease,
+  bot/scripts/svn2log.py, bot/scripts/tagversion, bot/src/Makefile,
+  bot/src/bot.c, bot/src/main.c: Added release scripts, beginning of mainline  
+
+  * bot/src/botnet-1.6.4/Makefile.gjh: make clean in botnet will now uninstall
+  too   
+
+  * bot/src/Makefile: make the mysql lines use mysql_config   
+
+  * bot/Makefile: Make main Makefile make the bot too   
+
+  * bot/src/Makefile, bot/src/bot.c: Added the sample bot.c from botnet lib,
+  and a Makefile to compile it   
+
+  * bot/Makefile, bot/src/botnet-1.6.4/AUTHORS, bot/src/botnet-1.6.4/COPYING,
+  bot/src/botnet-1.6.4/ChangeLog, bot/src/botnet-1.6.4/INSTALL,
+  bot/src/botnet-1.6.4/License.txt, bot/src/botnet-1.6.4/Makefile.am,
+  bot/src/botnet-1.6.4/Makefile.gjh, bot/src/botnet-1.6.4/Makefile.in,
+  bot/src/botnet-1.6.4/NEWS, bot/src/botnet-1.6.4/README,
+  bot/src/botnet-1.6.4/acconfig.h, bot/src/botnet-1.6.4/aclocal.m4,
+  bot/src/botnet-1.6.4/botnet-config.in, bot/src/botnet-1.6.4/botnet.txt,
+  bot/src/botnet-1.6.4/config.guess, bot/src/botnet-1.6.4/config.h.in,
+  bot/src/botnet-1.6.4/config.sub, bot/src/botnet-1.6.4/configure.in,
+  bot/src/botnet-1.6.4/depcomp, bot/src/botnet-1.6.4/example/Makefile.am,
+  bot/src/botnet-1.6.4/example/Makefile.in,
+  .../example/Windows/Example/Example.dsp,
+  .../example/Windows/Example/Example.dsw,
+  .../example/Windows/Example/Example.plg,
+  .../example/Windows/Example/Makefile.am,
+  .../example/Windows/Example/Makefile.in,
+  bot/src/botnet-1.6.4/example/Windows/Makefile.am,
+  bot/src/botnet-1.6.4/example/Windows/Makefile.in,
+  bot/src/botnet-1.6.4/example/bot.c, bot/src/botnet-1.6.4/example/serv.c,
+  bot/src/botnet-1.6.4/file_id.diz, bot/src/botnet-1.6.4/install-sh,
+  bot/src/botnet-1.6.4/ltconfig, bot/src/botnet-1.6.4/ltmain.sh,
+  bot/src/botnet-1.6.4/makelib/Makefile.am,
+  bot/src/botnet-1.6.4/makelib/Makefile.in,
+  .../botnet-1.6.4/makelib/Windows/Botnet/Botnet.dsp,
+  .../botnet-1.6.4/makelib/Windows/Botnet/Botnet.dsw,
+  .../makelib/Windows/Botnet/Makefile.am,
+  .../makelib/Windows/Botnet/Makefile.in,
+  bot/src/botnet-1.6.4/makelib/Windows/Makefile.am,
+  bot/src/botnet-1.6.4/makelib/Windows/Makefile.in,
+  bot/src/botnet-1.6.4/makelib/botnet.c, bot/src/botnet-1.6.4/makelib/botnet.h,
+  bot/src/botnet-1.6.4/makelib/dcc_chat.c,
+  bot/src/botnet-1.6.4/makelib/dcc_send.c,
+  bot/src/botnet-1.6.4/makelib/includes.h,
+  bot/src/botnet-1.6.4/makelib/output.c, bot/src/botnet-1.6.4/makelib/server.c,
+  bot/src/botnet-1.6.4/makelib/utils.c, bot/src/botnet-1.6.4/missing,
+  bot/src/botnet-1.6.4/mkinstalldirs, bot/src/botnet-1.6.4/todo.txt: initial
+  import of botnet-1.6.4 library   
+
+2006-02-03  Gavin Hurlbut <gjhurlbu@gmail.com>
+
+  * COPYING, README: Added a directory for the bot source, README, COPYING   
