@@ -50,7 +50,7 @@ if [ ${RELEASE} -eq 0 ] ; then
 
 	# This is an SVN build
 	RELEASENUM=`git describe`
-	VERSION="GIT Version ${RELEASENUM}"
+	VERSION="${RELEASENUM}"
 else
 	# This is building a release
 	VERSION="Release ${RELEASENUM}"

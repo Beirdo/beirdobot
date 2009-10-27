@@ -252,10 +252,10 @@ int main ( int argc, char **argv )
 void LogBanner( void )
 {
     LogPrintNoArg( LOG_CRIT, "beirdobot  (c) 2007 Gavin Hurlbut" );
-    LogPrint( LOG_CRIT, "%s", svn_version() );
+    LogPrint( LOG_CRIT, "%s", git_version() );
 
     cursesTextAdd( WINDOW_HEADER, ALIGN_LEFT, 1, 0, "beirdobot" );
-    cursesTextAdd( WINDOW_HEADER, ALIGN_LEFT, 11, 0, (char *)svn_version() );
+    cursesTextAdd( WINDOW_HEADER, ALIGN_LEFT, 11, 0, (char *)git_version() );
     cursesTextAdd( WINDOW_HEADER, ALIGN_FROM_CENTER, 1, 0, 
                    "(c) 2007 Gavin Hurlbut" );
     cursesTextAdd( WINDOW_TAILER, ALIGN_RIGHT, 1, 0, "Ctrl-C to exit" );
@@ -264,7 +264,7 @@ void LogBanner( void )
     cursesTextAdd( WINDOW_TAILER, ALIGN_CENTER, 0, 0, 
                    "PgUp/PgDn to scroll logs" );
 
-    versionAdd( "beirdobot", (char *)svn_version() );
+    versionAdd( "beirdobot", (char *)git_version() );
 }
 
 

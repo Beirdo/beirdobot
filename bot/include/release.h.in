@@ -20,10 +20,10 @@
 #ifndef _release_h
 #define _release_h
 
-const char *svn_version(void) {
-    const char *SVN_Version = "@VERSION@";
+const char *git_version(void) {
+    const char *GIT_Version = "@VERSION@";
 
-    return( SVN_Version );
+    return( GIT_Version );
 }
 
 #endif

@@ -224,7 +224,7 @@ char *ProcOnCTCP(BN_PInfo I, const char Who[], const char Whom[],
 
     if( !strcasecmp(Type, "version") ) {
         S = (char *)malloc(MAX_STRING_LENGTH);
-        sprintf( S, "beirdobot -- %s", svn_version() );
+        sprintf( S, "beirdobot -- %s", git_version() );
     }
     return S;
 }
