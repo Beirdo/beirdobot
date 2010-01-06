@@ -25,13 +25,27 @@
 *
 */
 
+#ifndef balanced_btree_h_
+#define balanced_btree_h_
+
 #include "environment.h"
-#include "clucene.h"
 
-
-static char ident[] _UNUSED_= 
+/* CVS generated ID string (optional for h files) */
+static char balanced_btree_h_ident[] _UNUSED_ = 
     "$Id$";
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+
+
+
+#ifdef __cplusplus
+}
+#endif
+
+#endif
 
 /*
  * vim:ts=4:sw=4:ai:et:si:sts=4
