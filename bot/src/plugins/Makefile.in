@@ -13,7 +13,8 @@ DESTDIR		=
 prefix		= @prefix@
 datarootdir	= @datarootdir@
 datadir		= @datadir@
-pkglibdir	= ${datadir}/beirdobot/plugins
+pkglibdir	= ${datadir}/beirdobot
+plugindir	= ${pkglibdir}/plugins
 
 CFLAGS	= -O6 -g -Wall -Werror -I../../include -std=c99 -pedantic
 # -DDEBUG
@@ -41,7 +42,7 @@ PLUGIN_LUASCRIPT = @PLUGIN_LUASCRIPT@
 ifeq (${PLUGIN_LUASCRIPT},yes)
  SRCS  += luascript.c
  CFLAGS_luascript  = $(shell ${LUACFG} --include)
- CFLAGS_luascript += -DPLUGIN_PATH=\"${pkglibdir}\"
+ CFLAGS_luascript += -DPLUGIN_PATH=\"${plugindir}\"
  DLLIBS_luascript  = $(shell ${LUACFG} --libs)
  LUASCRIPTS = burp.lua
 endif
@@ -122,19 +123,19 @@ install:	install-data install-exec
 install-exec:
 	-[ "${OBJS}" != "" ] && \
 	for i in ${OBJS} ; do \
-		@INSTALL@ -D -m 755 $$i ${DESTDIR}${pkglibdir}/$$i ; \
+		@INSTALL@ -D -m 755 $$i ${DESTDIR}${plugindir}/$$i ; \
 	done
 
 install-data:
 	-[ "${LUASCRIPTS} ${EXTRAS}" != " " ] && \
 	for i in ${LUASCRIPTS} ${EXTRAS} ; do \
-		@INSTALL@ -D -m 644 $$i ${DESTDIR}${pkglibdir}/$$i ; \
+		@INSTALL@ -D -m 644 $$i ${DESTDIR}${plugindir}/$$i ; \
 	done
 
 uninstall:
 	-[ "${OBJS} ${LUASCRIPTS} ${EXTRAS}" != "  " ] && \
 	for i in ${OBJS} ${LUASCRIPTS} ${EXTRAS} ; do \
-		${RM} ${DESTDIR}${pkglibdir}/$$i ; \
+		${RM} ${DESTDIR}${plugindir}/$$i ; \
 	done
 
 ${EMPTY_AUTOMAKE_TARGETS}:

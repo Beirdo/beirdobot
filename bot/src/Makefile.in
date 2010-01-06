@@ -16,11 +16,12 @@ CFLAGS  += $(shell ${BOTNETCFG} --cflags)
 CFLAGS  += $(shell ${MYSQLCFG} --cflags)
 
 CFLAGS_regexp = $(shell ${PCRECFG} --cflags)
-CFLAGS_plugin_api = -DPLUGIN_PATH=\"${pkglibdir}\" -Wno-strict-aliasing
+CFLAGS_plugin_api = -DPLUGIN_PATH=\"${plugindir}\" -Wno-strict-aliasing
 CFLAGS_main  = $(shell ${CURLCFG} --cflags) -DCFLAGS="\"${CFLAGS}\""
 CFLAGS_main += -DLDFLAGS="\"${LDFLAGS}\""
 
 CXXFLAGS = -O6 -g -Wall -Werror -I../include -pedantic -Wno-long-long
+CXXFLAGS_clucene = -DCLUCENE_INDEX_DIR=\"${indexdir}\"
 
 LDFLAGS = -g -rdynamic
 
@@ -44,7 +45,9 @@ exec_prefix	= @exec_prefix@
 bindir  	= @bindir@
 datarootdir	= @datarootdir@
 datadir		= @datadir@
-pkglibdir	= ${datadir}/beirdobot/plugins
+pkglibdir	= ${datadir}/beirdobot
+plugindir	= ${pkglibdir}/plugins
+indexdir	= ${pkglibdir}/clucene
 
 .PHONY:	plugins clean cleanall ${EMPTY_AUTOMAKE_TARGETS}
 
@@ -96,6 +99,7 @@ install-exec:	all
 
 install-data:	all
 	${MAKE} -C plugins install-data
+	${MKDIR} -p ${DESTDIR}/${indexdir}
 
 uninstall:
 	${RM} ${DESTDIR}${bindir}/${EXE}

@@ -27,11 +27,29 @@
 
 #include "environment.h"
 #include "clucene.h"
+#include <CLucene.h>
 
 
 static char ident[] _UNUSED_= 
     "$Id$";
 
+/* The C interface portion */
+extern "C" {
+    void clucene_init(void)
+    {
+    }
+
+    void clucene_shutdown(void)
+    {
+    }
+
+    void clucene_add( unsigned long id, int chanid, char *nick, 
+                      int msgType, char *text, unsigned long timestamp )
+    {
+    }
+}
+
+/* C++ internals */
 
 /*
  * vim:ts=4:sw=4:ai:et:si:sts=4

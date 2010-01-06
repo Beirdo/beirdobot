@@ -25,24 +25,30 @@
 *
 */
 
-#ifndef balanced_btree_h_
-#define balanced_btree_h_
+#ifndef clucene_h_
+#define clucene_h_
 
 #include "environment.h"
 
 /* CVS generated ID string (optional for h files) */
-static char balanced_btree_h_ident[] _UNUSED_ = 
+static char clucene_h_ident[] _UNUSED_ = 
     "$Id$";
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-
-
+/* C interface portion */
+void clucene_init(void);
+void clucene_shutdown(void);
+void clucene_add( unsigned long id, int chanid, char *nick, int msgType, 
+                  char *text, unsigned long timestamp );
 
 #ifdef __cplusplus
 }
+
+/* C++ internals portion */
+
 #endif
 
 #endif

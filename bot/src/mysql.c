@@ -1,6 +1,6 @@
 /*
  *  This file is part of the beirdobot package
- *  Copyright (C) 2006 Gavin Hurlbut
+ *  Copyright (C) 2006, 2010 Gavin Hurlbut
  *
  *  beirdobot is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -20,7 +20,7 @@
 /*HEADER---------------------------------------------------
  * $Id$
  *
- * Copyright 2006 Gavin Hurlbut
+ * Copyright 2006, 2010 Gavin Hurlbut
  * All rights reserved
  *
  * Handles MySQL database connections
@@ -43,6 +43,7 @@
 #include "protected_data.h"
 #include "logging.h"
 #include "queue.h"
+#include "clucene.h"
 
 static char ident[] _UNUSED_ =
     "$Id$";
@@ -77,6 +78,8 @@ void chain_flush_nick( MYSQL_RES *res, QueryItem_t *item );
 void chain_set_setting( MYSQL_RES *res, QueryItem_t *item );
 void chain_set_auth( MYSQL_RES *res, QueryItem_t *item );
 
+void result_add_logentry( MYSQL_RES *res, MYSQL_BIND *input, void *arg,
+                          long insertid );
 void result_load_servers( MYSQL_RES *res, MYSQL_BIND *input, void *arg,
                           long insertid );
 void result_load_channels( MYSQL_RES *res, MYSQL_BIND *input, void *arg,
@@ -808,7 +811,7 @@ void db_add_logentry( IRCChannel_t *channel, char *nick, IRCMsgType_t msgType,
         free( nickOnly );
     }
 
-    db_queue_query( 2, QueryTable, data, 5, NULL, NULL, NULL );
+    db_queue_query( 2, QueryTable, data, 5, result_add_logentry, NULL, NULL );
 }
 
 
@@ -1180,6 +1183,7 @@ void db_check_plugins( PluginDef_t *plugins, int count )
  * Query chaining functions
  */
 
+
 void chain_update_nick( MYSQL_RES *res, QueryItem_t *item )
 {
     int             count;
@@ -1407,6 +1411,24 @@ void db_update_server( IRCServer_t *server )
 /*
  * Query result callbacks
  */
+
+void result_add_logentry( MYSQL_RES *res, MYSQL_BIND *input, void *arg,
+                          long insertid )
+{
+    int                 chanid;
+    unsigned long       timestamp;
+    char               *nick;
+    int                 type; 
+    char               *text;
+
+    chanid = *(int *)input[0].buffer;
+    timestamp = *(unsigned long *)input[1].buffer;
+    nick = (char *)input[2].buffer;
+    type = *(int *)input[3].buffer;
+    text = (char *)input[4].buffer;
+
+    clucene_add( insertid, chanid, nick, type, text, timestamp );
+}
 
 /* Assumes that ServerTree is already locked */
 void result_load_servers( MYSQL_RES *res, MYSQL_BIND *input, void *arg,
