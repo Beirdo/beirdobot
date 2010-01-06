@@ -11,6 +11,7 @@ CC	= @CC@
 
 DESTDIR		=
 prefix		= @prefix@
+datarootdir	= @datarootdir@
 datadir		= @datadir@
 pkglibdir	= ${datadir}/beirdobot/plugins
 

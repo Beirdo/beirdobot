@@ -19,6 +19,7 @@ INSTALL_FILES += templates/_error.php templates/channel.php
 
 DESTDIR		=
 prefix		= @prefix@
+datarootdir	= @datarootdir@
 datadir		= @datadir@
 pkgwebdir	= ${datadir}/beirdobot/web
 

@@ -48,7 +48,7 @@ if [ ${RELEASE} -eq 0 ] ; then
 		exit 0
 	fi
 
-	# This is an SVN build
+	# This is a GIT build
 	RELEASENUM=`git describe`
 	VERSION="${RELEASENUM}"
 else

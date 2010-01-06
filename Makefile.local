@@ -3,4 +3,4 @@ release:
 	scripts/mkrelease
 
 configure.ac:	configure.ac.in
-	scripts/tagversion -R SVN
+	scripts/tagversion -R GIT

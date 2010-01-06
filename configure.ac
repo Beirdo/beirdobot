@@ -1,13 +1,13 @@
 # Process this file with autoconf to produce a configure script.
-AC_PREREQ(2.59)
+AC_PREREQ(2.63)
 
-AC_INIT(beirdobot, [0.4+GIT], [gjhurlbu@gmail.com])
+AC_INIT([beirdobot],[GIT],[gjhurlbu@gmail.com])
 AC_CONFIG_AUX_DIR(scripts)
 AC_CONFIG_SRCDIR(bot/src/main.c)
 AM_CONFIG_HEADER(bot/include/config.h)
-AC_CANONICAL_SYSTEM
+AC_CANONICAL_TARGET
 
-AM_INIT_AUTOMAKE(beirdobot, "0.4+GIT")
+AM_INIT_AUTOMAKE(beirdobot, "GIT")
 
 
 
@@ -21,10 +21,11 @@ AC_MSG_RESULT(${VERSION})
 
 AC_SUBST(VERSION)
 
-AC_GNU_SOURCE
+AC_USE_SYSTEM_EXTENSIONS
 
 # Checks for programs.
 AC_PROG_CC
+AC_PROG_CXX
 
 # Checks for header files.
 #AC_HEADER_DIRENT
@@ -46,7 +47,18 @@ AC_STRUCT_TM
 AC_FUNC_MALLOC
 AC_FUNC_REALLOC
 AC_FUNC_SELECT_ARGTYPES
-AC_TYPE_SIGNAL
+AC_DIAGNOSE([obsolete],[your code may safely assume C89 semantics that RETSIGTYPE is void.
+Remove this warning and the `AC_CACHE_CHECK' when you adjust the code.])dnl
+AC_CACHE_CHECK([return type of signal handlers],[ac_cv_type_signal],[AC_COMPILE_IFELSE(
+[AC_LANG_PROGRAM([#include <sys/types.h>
+#include <signal.h>
+],
+		 [return *(signal (0, 0)) (0) == 1;])],
+		   [ac_cv_type_signal=int],
+		   [ac_cv_type_signal=void])])
+AC_DEFINE_UNQUOTED([RETSIGTYPE],[$ac_cv_type_signal],[Define as the return type of signal handlers
+		    (`int' or `void').])
+
 AC_FUNC_STRNLEN
 #AC_FUNC_STRTOD
 AC_FUNC_VPRINTF
