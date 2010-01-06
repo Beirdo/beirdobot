@@ -7187,6 +7187,13 @@ done
 
 #AC_CHECK_FUNCS([bzero gethostbyaddr gethostbyname gethostname getpagesize gettimeofday inet_ntoa isascii memset select socket strcasecmp strchr strdup strncasecmp strstr strsep])
 
+
+# AC_CHECK_LIB
+
+# AC_CHECK_LIB
+
+
+
 # Check for C++ libraries
 ac_ext=cpp
 ac_cpp='$CXXCPP $CPPFLAGS'
@@ -7194,9 +7201,15 @@ ac_compile='$CXX -c $CXXFLAGS $CPPFLAGS conftest.$ac_ext >&5'
 ac_link='$CXX -o conftest$ac_exeext $CXXFLAGS $CPPFLAGS $LDFLAGS conftest.$ac_ext $LIBS >&5'
 ac_compiler_gnu=$ac_cv_cxx_compiler_gnu
 
-SAVED_LDFLAGS=$LDFLAGS
-LDFLAGS="$LDFLAGS -lclucene"
 
+
+{ $as_echo "$as_me:$LINENO: checking for _lucene_shutdown(); in -lclucene" >&5
+$as_echo_n "checking for _lucene_shutdown(); in -lclucene... " >&6; }
+if test "${ac_cv_lib_clucene__lucene_shutdown___+set}" = set; then
+  $as_echo_n "(cached) " >&6
+else
+  ac_check_lib_save_LIBS=$LIBS
+LIBS="-lclucene  $LIBS"
 cat >conftest.$ac_ext <<_ACEOF
 /* confdefs.h.  */
 _ACEOF
@@ -7233,21 +7246,35 @@ $as_echo "$ac_try_echo") >&5
 	 test "$cross_compiling" = yes ||
 	 $as_test_x conftest$ac_exeext
        }; then
-  TEST_LIBS="$TEST_LIBS -lclucene"
-HAVE_CLUCENE=1
+  ac_cv_lib_clucene__lucene_shutdown___=yes
 else
   $as_echo "$as_me: failed program was:" >&5
 sed 's/^/| /' conftest.$ac_ext >&5
 
-	{ { $as_echo "$as_me:$LINENO: error: libclucene is not installed." >&5
-$as_echo "$as_me: error: libclucene is not installed." >&2;}
-   { (exit 1); exit 1; }; }
+	ac_cv_lib_clucene__lucene_shutdown___=no
 fi
 
 rm -rf conftest.dSYM
 rm -f core conftest.err conftest.$ac_objext conftest_ipa8_conftest.oo \
       conftest$ac_exeext conftest.$ac_ext
-LDFLAGS=$SAVED_LDFLAGS
+LIBS=$ac_check_lib_save_LIBS
+fi
+{ $as_echo "$as_me:$LINENO: result: $ac_cv_lib_clucene__lucene_shutdown___" >&5
+$as_echo "$ac_cv_lib_clucene__lucene_shutdown___" >&6; }
+if test $ac_cv_lib_clucene__lucene_shutdown___ = yes; then
+  cat >>confdefs.h <<_ACEOF
+#define HAVE_LIBCLUCENE 1
+_ACEOF
+
+  LIBS="-lclucene $LIBS"
+
+else
+  { { $as_echo "$as_me:$LINENO: error: libclucene not installed" >&5
+$as_echo "$as_me: error: libclucene not installed" >&2;}
+   { (exit 1); exit 1; }; }
+fi
+LIBS=$ac_check_lib_save_LIBS
+
 
 # Checks for libraries.
 ac_ext=c
@@ -7426,9 +7453,6 @@ MYSQL_LIBS=${ac_cv_mysql_libs}
 
 
 
-
-
-# AC_CHECK_LIB
 
 
 # Check whether --enable-plugin-dns was given.
