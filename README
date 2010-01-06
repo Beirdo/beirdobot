@@ -3,3 +3,7 @@ This project is under GPL (see COPYING)
 The bot/ dir contains the source of the IRC bot (C)
 The web/ dir contains the source of the web frontend (PHP)
 The scripts/ dir contains script files used for packaging
+
+NOTE: in Ubuntu, you will need to (as root) do 
+"ln -s /usr/lib/CLucene/clucene-config.h /usr/include/CLucene"
+or ./configure will fail.  This will be true until the packaging bug is fixed.

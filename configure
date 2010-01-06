@@ -2524,7 +2524,7 @@ fi
 { $as_echo "$as_me:$LINENO: checking version of the package" >&5
 $as_echo_n "checking version of the package... " >&6; }
 
-VERSION=`cat bot/include/release.h | grep "SVN_Version =" | $CUT -d '"' -f 2`
+VERSION=`cat bot/include/release.h | grep "GIT_Version =" | $CUT -d '"' -f 2`
 { $as_echo "$as_me:$LINENO: result: ${VERSION}" >&5
 $as_echo "${VERSION}" >&6; }
 
@@ -7187,8 +7187,75 @@ done
 
 #AC_CHECK_FUNCS([bzero gethostbyaddr gethostbyname gethostname getpagesize gettimeofday inet_ntoa isascii memset select socket strcasecmp strchr strdup strncasecmp strstr strsep])
 
+# Check for C++ libraries
+ac_ext=cpp
+ac_cpp='$CXXCPP $CPPFLAGS'
+ac_compile='$CXX -c $CXXFLAGS $CPPFLAGS conftest.$ac_ext >&5'
+ac_link='$CXX -o conftest$ac_exeext $CXXFLAGS $CPPFLAGS $LDFLAGS conftest.$ac_ext $LIBS >&5'
+ac_compiler_gnu=$ac_cv_cxx_compiler_gnu
+
+SAVED_LDFLAGS=$LDFLAGS
+LDFLAGS="$LDFLAGS -lclucene"
+
+cat >conftest.$ac_ext <<_ACEOF
+/* confdefs.h.  */
+_ACEOF
+cat confdefs.h >>conftest.$ac_ext
+cat >>conftest.$ac_ext <<_ACEOF
+/* end confdefs.h.  */
+#include <CLucene.h>
+int
+main ()
+{
+_lucene_shutdown();
+  ;
+  return 0;
+}
+_ACEOF
+rm -f conftest.$ac_objext conftest$ac_exeext
+if { (ac_try="$ac_link"
+case "(($ac_try" in
+  *\"* | *\`* | *\\*) ac_try_echo=\$ac_try;;
+  *) ac_try_echo=$ac_try;;
+esac
+eval ac_try_echo="\"\$as_me:$LINENO: $ac_try_echo\""
+$as_echo "$ac_try_echo") >&5
+  (eval "$ac_link") 2>conftest.er1
+  ac_status=$?
+  grep -v '^ *+' conftest.er1 >conftest.err
+  rm -f conftest.er1
+  cat conftest.err >&5
+  $as_echo "$as_me:$LINENO: \$? = $ac_status" >&5
+  (exit $ac_status); } && {
+	 test -z "$ac_cxx_werror_flag" ||
+	 test ! -s conftest.err
+       } && test -s conftest$ac_exeext && {
+	 test "$cross_compiling" = yes ||
+	 $as_test_x conftest$ac_exeext
+       }; then
+  TEST_LIBS="$TEST_LIBS -lclucene"
+HAVE_CLUCENE=1
+else
+  $as_echo "$as_me: failed program was:" >&5
+sed 's/^/| /' conftest.$ac_ext >&5
+
+	{ { $as_echo "$as_me:$LINENO: error: libclucene is not installed." >&5
+$as_echo "$as_me: error: libclucene is not installed." >&2;}
+   { (exit 1); exit 1; }; }
+fi
+
+rm -rf conftest.dSYM
+rm -f core conftest.err conftest.$ac_objext conftest_ipa8_conftest.oo \
+      conftest$ac_exeext conftest.$ac_ext
+LDFLAGS=$SAVED_LDFLAGS
 
 # Checks for libraries.
+ac_ext=c
+ac_cpp='$CPP $CPPFLAGS'
+ac_compile='$CC -c $CFLAGS $CPPFLAGS conftest.$ac_ext >&5'
+ac_link='$CC -o conftest$ac_exeext $CFLAGS $CPPFLAGS $LDFLAGS conftest.$ac_ext $LIBS >&5'
+ac_compiler_gnu=$ac_cv_c_compiler_gnu
+
 
 { $as_echo "$as_me:$LINENO: checking for pcre_config in -lpcre" >&5
 $as_echo_n "checking for pcre_config in -lpcre... " >&6; }

@@ -1,11 +1,11 @@
 # Process this file with autoconf to produce a configure script.
-AC_PREREQ(2.63)
+AC_PREREQ(2.59)
 
-AC_INIT([beirdobot],[GIT],[gjhurlbu@gmail.com])
+AC_INIT(beirdobot, [GIT], [gjhurlbu@gmail.com])
 AC_CONFIG_AUX_DIR(scripts)
 AC_CONFIG_SRCDIR(bot/src/main.c)
 AM_CONFIG_HEADER(bot/include/config.h)
-AC_CANONICAL_TARGET
+AC_CANONICAL_SYSTEM
 
 AM_INIT_AUTOMAKE(beirdobot, "GIT")
 
@@ -16,12 +16,12 @@ AC_PATH_PROG(CUT, cut)
 
 AC_MSG_CHECKING(version of the package)
 
-VERSION=`cat bot/include/release.h | grep "SVN_Version =" | $CUT -d '"' -f 2`
+VERSION=`cat bot/include/release.h | grep "GIT_Version =" | $CUT -d '"' -f 2`
 AC_MSG_RESULT(${VERSION})
 
 AC_SUBST(VERSION)
 
-AC_USE_SYSTEM_EXTENSIONS
+AC_GNU_SOURCE
 
 # Checks for programs.
 AC_PROG_CC
@@ -47,25 +47,26 @@ AC_STRUCT_TM
 AC_FUNC_MALLOC
 AC_FUNC_REALLOC
 AC_FUNC_SELECT_ARGTYPES
-AC_DIAGNOSE([obsolete],[your code may safely assume C89 semantics that RETSIGTYPE is void.
-Remove this warning and the `AC_CACHE_CHECK' when you adjust the code.])dnl
-AC_CACHE_CHECK([return type of signal handlers],[ac_cv_type_signal],[AC_COMPILE_IFELSE(
-[AC_LANG_PROGRAM([#include <sys/types.h>
-#include <signal.h>
-],
-		 [return *(signal (0, 0)) (0) == 1;])],
-		   [ac_cv_type_signal=int],
-		   [ac_cv_type_signal=void])])
-AC_DEFINE_UNQUOTED([RETSIGTYPE],[$ac_cv_type_signal],[Define as the return type of signal handlers
-		    (`int' or `void').])
-
+AC_TYPE_SIGNAL
 AC_FUNC_STRNLEN
 #AC_FUNC_STRTOD
 AC_FUNC_VPRINTF
 #AC_CHECK_FUNCS([bzero gethostbyaddr gethostbyname gethostname getpagesize gettimeofday inet_ntoa isascii memset select socket strcasecmp strchr strdup strncasecmp strstr strsep])
 
+# Check for C++ libraries
+AC_LANG_CPLUSPLUS
+SAVED_LDFLAGS=$LDFLAGS
+LDFLAGS="$LDFLAGS -lclucene"
+AC_LINK_IFELSE(
+  [AC_LANG_PROGRAM([#include <CLucene.h>],
+                   [_lucene_shutdown();])],
+  [TEST_LIBS="$TEST_LIBS -lclucene"]
+[HAVE_CLUCENE=1],
+  [AC_MSG_ERROR([libclucene is not installed.])])
+LDFLAGS=$SAVED_LDFLAGS
 
 # Checks for libraries.
+AC_LANG_C
 AC_CHECK_LIB([pcre], [pcre_config],,[AC_MSG_ERROR(libpcre not installed)])
 AC_CHECK_LIB([mysqlclient], [mysql_query],,
              [AC_MSG_ERROR(libmysqlclient not intalled)])

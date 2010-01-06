@@ -16,7 +16,7 @@ AC_PATH_PROG(CUT, cut)
 
 AC_MSG_CHECKING(version of the package)
 
-VERSION=`cat bot/include/release.h | grep "SVN_Version =" | $CUT -d '"' -f 2`
+VERSION=`cat bot/include/release.h | grep "GIT_Version =" | $CUT -d '"' -f 2`
 AC_MSG_RESULT(${VERSION})
 
 AC_SUBST(VERSION)
@@ -53,8 +53,20 @@ AC_FUNC_STRNLEN
 AC_FUNC_VPRINTF
 #AC_CHECK_FUNCS([bzero gethostbyaddr gethostbyname gethostname getpagesize gettimeofday inet_ntoa isascii memset select socket strcasecmp strchr strdup strncasecmp strstr strsep])
 
+# Check for C++ libraries
+AC_LANG_CPLUSPLUS
+SAVED_LDFLAGS=$LDFLAGS
+LDFLAGS="$LDFLAGS -lclucene"
+AC_LINK_IFELSE(
+  [AC_LANG_PROGRAM([#include <CLucene.h>],
+                   [_lucene_shutdown();])],
+  [TEST_LIBS="$TEST_LIBS -lclucene"]
+[HAVE_CLUCENE=1],
+  [AC_MSG_ERROR([libclucene is not installed.])])
+LDFLAGS=$SAVED_LDFLAGS
 
 # Checks for libraries.
+AC_LANG_C
 AC_CHECK_LIB([pcre], [pcre_config],,[AC_MSG_ERROR(libpcre not installed)])
 AC_CHECK_LIB([mysqlclient], [mysql_query],,
              [AC_MSG_ERROR(libmysqlclient not intalled)])
