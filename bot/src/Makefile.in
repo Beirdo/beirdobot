@@ -8,6 +8,7 @@ CURLCFG		= curl-config
 PKGCONFIGPATH	= ../lib/pkgconfig
 
 CC	= @CC@
+CXX	= @CXX@
 
 CFLAGS	= -O6 -g -Wall -Werror -I../include -std=c99 -pedantic -Wno-long-long
 # -DDEBUG
@@ -18,6 +19,8 @@ CFLAGS_regexp = $(shell ${PCRECFG} --cflags)
 CFLAGS_plugin_api = -DPLUGIN_PATH=\"${pkglibdir}\" -Wno-strict-aliasing
 CFLAGS_main  = $(shell ${CURLCFG} --cflags) -DCFLAGS="\"${CFLAGS}\""
 CFLAGS_main += -DLDFLAGS="\"${LDFLAGS}\""
+
+CXXFLAGS = -O6 -g -Wall -Werror -I../include -pedantic -Wno-long-long
 
 LDFLAGS = -g -rdynamic
 
@@ -30,8 +33,9 @@ LIBS   += -ldl -L../lib -lopie -lmenu -lform -lncurses
 SRCS	= main.c plugin_api.c bot.c bot_cmds.c mysql.c linked_list.c regexp.c
 SRCS   += balanced_btree.c protected_data.c mysql_upgrade.c queue.c notice.c
 SRCS   += authenticate.c logging.c thread_api.c transmit.c curses.c
-OBJS	= ${SRCS:.c=.o}
-DEPS	= ${SRCS:.c=.d}
+SRCCS   = clucene.cc
+OBJS	= ${SRCS:.c=.o} ${SRCCS:.cc=.o}
+DEPS	= ${SRCS:.c=.d} ${SRCCS:.cc=.d}
 EXE	= beirdobot${EXEEXT}
 
 DESTDIR		=
@@ -59,9 +63,18 @@ ${DEPS}:	Makefile
 	@echo "Compiling $@"
 	${CC} ${CFLAGS} ${CFLAGS_${<:%.c=%}} -c -o $@ $<
 
+%.o:	%.cc
+	@echo "Compiling $@"
+	${CXX} ${CXXFLAGS} ${CXXFLAGS_${<:%.cc=%}} -c -o $@ $<
+
 %.d:	%.c
 	@echo "Making $@ (dependencies for $<)"
 	@${CC} -MM ${CFLAGS} ${CFLAGS_${<:%.c=%}} $< | \
+	 sed 's,\($*\)\.o[ :]*,\1.o $@ : ,g'  > $@
+
+%.d:	%.cc
+	@echo "Making $@ (dependencies for $<)"
+	@${CXX} -MM ${CXXFLAGS} ${CXXFLAGS_${<:%.cc=%}} $< | \
 	 sed 's,\($*\)\.o[ :]*,\1.o $@ : ,g'  > $@
 
 distclean:	clean

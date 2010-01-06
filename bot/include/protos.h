@@ -52,7 +52,7 @@ extern bool ChannelsLoaded;
 
 
 /* Prototypes */
-const char *svn_version(void);
+const char *git_version(void);
 void bot_start(void);
 void *bot_shutdown(void *arg);
 

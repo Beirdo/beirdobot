@@ -1,0 +1,7 @@
+config.h
+config.log
+config.status
+doxy.conf
+libtool
+nxml.pc
+stamp-h
