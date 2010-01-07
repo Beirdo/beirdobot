@@ -41,8 +41,8 @@ extern "C" {
 /* C interface portion */
 void clucene_init(void);
 void clucene_shutdown(void);
-void clucene_add( unsigned long id, int chanid, char *nick, int msgType, 
-                  char *text, unsigned long timestamp );
+void clucene_add( int chanid, char *nick, char *text, 
+                  unsigned long timestamp );
 
 #ifdef __cplusplus
 }

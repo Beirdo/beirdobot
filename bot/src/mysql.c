@@ -78,8 +78,6 @@ void chain_flush_nick( MYSQL_RES *res, QueryItem_t *item );
 void chain_set_setting( MYSQL_RES *res, QueryItem_t *item );
 void chain_set_auth( MYSQL_RES *res, QueryItem_t *item );
 
-void result_add_logentry( MYSQL_RES *res, MYSQL_BIND *input, void *arg,
-                          long insertid );
 void result_load_servers( MYSQL_RES *res, MYSQL_BIND *input, void *arg,
                           long insertid );
 void result_load_channels( MYSQL_RES *res, MYSQL_BIND *input, void *arg,
@@ -811,7 +809,11 @@ void db_add_logentry( IRCChannel_t *channel, char *nick, IRCMsgType_t msgType,
         free( nickOnly );
     }
 
-    db_queue_query( 2, QueryTable, data, 5, result_add_logentry, NULL, NULL );
+    db_queue_query( 2, QueryTable, data, 5, NULL, NULL, NULL );
+
+    if( msgType == TYPE_MESSAGE || msgType == TYPE_ACTION ) {
+        clucene_add( channel->channelId, nickOnly, text, tv.tv_sec );
+    }
 }
 
 
@@ -1412,25 +1414,8 @@ void db_update_server( IRCServer_t *server )
  * Query result callbacks
  */
 
-void result_add_logentry( MYSQL_RES *res, MYSQL_BIND *input, void *arg,
-                          long insertid )
-{
-    int                 chanid;
-    unsigned long       timestamp;
-    char               *nick;
-    int                 type; 
-    char               *text;
-
-    chanid = *(int *)input[0].buffer;
-    timestamp = *(unsigned long *)input[1].buffer;
-    nick = (char *)input[2].buffer;
-    type = *(int *)input[3].buffer;
-    text = (char *)input[4].buffer;
-
-    clucene_add( insertid, chanid, nick, type, text, timestamp );
-}
-
 /* Assumes that ServerTree is already locked */
+
 void result_load_servers( MYSQL_RES *res, MYSQL_BIND *input, void *arg,
                           long insertid )
 {

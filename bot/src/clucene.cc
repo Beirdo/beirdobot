@@ -30,6 +30,7 @@
 #include <CLucene.h>
 #include <CLucene/config/repl_tchar.h>
 #include <string.h>
+#include <stdlib.h>
 #include "protos.h"
 #include "logging.h"
 #include "queue.h"
@@ -39,18 +40,20 @@ using namespace lucene::index;
 using namespace lucene::analysis;
 using namespace lucene::util;
 using namespace lucene::store;
+using namespace lucene::queryParser;
 using namespace lucene::document;
+using namespace lucene::search;
 
 static char ident[] _UNUSED_= 
     "$Id$";
 
 #define CLUCENE_INDEX_FILE CLUCENE_INDEX_DIR "/indexFile"
+#define SEARCH_WINDOW (15*60)
 
 typedef struct {
     unsigned long   id;
     int             chanid;
     char           *nick;
-    int             msgType;
     char           *text;
     unsigned long   timestamp;
 } IndexItem_t;
@@ -58,7 +61,9 @@ typedef struct {
 QueueObject_t  *IndexQ;
 pthread_t       cluceneThreadId;
 
-void addLogentry( IndexWriter *writer, IndexItem_t *item );
+void addLogentry( Document *doc, unsigned long *tb, IndexWriter *writer, 
+                  IndexItem_t *item );
+int loadLogentry( Document *doc, unsigned long tb );
 void *clucene_thread( void *arg );
 
 /* The C interface portion */
@@ -80,20 +85,18 @@ extern "C" {
         _lucene_shutdown();
     }
 
-    void clucene_add( unsigned long id, int chanid, char *nick, 
-                      int msgType, char *text, unsigned long timestamp )
+    void clucene_add( int chanid, char *nick, char *text, 
+                      unsigned long timestamp )
     {
         IndexItem_t        *item;
 
         item = (IndexItem_t *)malloc(sizeof(IndexItem_t));
         memset( item, 0, sizeof(IndexItem_t) );
 
-        item->id        = id;
         item->chanid    = chanid;
         item->nick      = strdup(nick);
-        item->msgType   = msgType;
         item->text      = strdup(text);
-        item->timestamp = timestamp;
+        item->timestamp = (timestamp / SEARCH_WINDOW);
 
         QueueEnqueueItem( IndexQ, item );
     }
@@ -103,38 +106,60 @@ extern "C" {
 
 #define MAX_STRING_LEN 1024
 
-void addLogentry( IndexWriter *writer, IndexItem_t *item )
+void addLogentry( Document *doc, unsigned long *tb, IndexWriter *writer, 
+                  IndexItem_t *item )
 {
-    static Document     doc;
-    static TCHAR        buf[MAX_STRING_LEN];
+    static TCHAR            buf[MAX_STRING_LEN];
 
-    doc.clear();
+    if( *tb != item->timestamp && *tb != 0 ) {
+        writer->addDocument( doc );
+        doc->clear();
 
-    _sntprintf( buf, MAX_STRING_LEN, _T("%ld"), item->id );
-    doc.add( *_CLNEW Field( _T("id"), buf, 
-             Field::STORE_YES | Field::INDEX_UNTOKENIZED ) );
+        if( !loadLogentry( doc, item->timestamp ) ) {
+            _sntprintf( buf, MAX_STRING_LEN, _T("%ld"), item->timestamp );
+            doc->add( *_CLNEW Field( _T("timestamp"), buf, 
+                      Field::STORE_YES | Field::INDEX_TOKENIZED ) );
 
-    _sntprintf( buf, MAX_STRING_LEN, _T("%ld"), item->chanid );
-    doc.add( *_CLNEW Field( _T("chanid"), buf, 
-             Field::STORE_YES | Field::INDEX_TOKENIZED ) );
+            _sntprintf( buf, MAX_STRING_LEN, _T("%ld"), item->chanid );
+            doc->add( *_CLNEW Field( _T("chanid"), buf, 
+                    Field::STORE_YES | Field::INDEX_TOKENIZED ) );
+        }
+        *tb = item->timestamp;
+    }
 
     STRCPY_AtoT(buf, item->nick, MAX_STRING_LEN);
-    doc.add( *_CLNEW Field( _T("nick"), buf, 
-             Field::STORE_YES | Field::INDEX_TOKENIZED ) );
-
-    _sntprintf( buf, MAX_STRING_LEN, _T("%ld"), item->msgType );
-    doc.add( *_CLNEW Field( _T("msgtype"), buf, 
-             Field::STORE_YES | Field::INDEX_TOKENIZED ) );
+    doc->add( *_CLNEW Field( _T("nick"), buf, 
+              Field::STORE_YES | Field::INDEX_TOKENIZED ) );
 
     STRCPY_AtoT(buf, item->text, MAX_STRING_LEN);
-    doc.add( *_CLNEW Field( _T("text"), buf, 
-             Field::STORE_YES | Field::INDEX_TOKENIZED ) );
+    doc->add( *_CLNEW Field( _T("text"), buf, 
+              Field::STORE_YES | Field::INDEX_TOKENIZED ) );
+}
 
-    DateField::timeToString(item->timestamp, buf);
-    doc.add( *_CLNEW Field( _T("timestamp"), buf, 
-             Field::STORE_YES | Field::INDEX_TOKENIZED ) );
+int loadLogentry( Document *doc, unsigned long tb )
+{
+    IndexReader            *reader = IndexReader::open(CLUCENE_INDEX_FILE);
+    WhitespaceAnalyzer      an;
+    IndexSearcher           s(reader);
+    Query                  *q;
+    Hits                   *h;
+    Document               *d;
+    static TCHAR            query[80];
 
-    writer->addDocument( &doc );
+    _sntprintf( query, 80, _T("%ld"), tb );
+    q = QueryParser::parse(query, _T("timestamp"), &an);
+    h = s.search(q);
+    if( h->length() == 0 ) {
+        _CLDELETE(h);
+        _CLDELETE(q);
+        return( 0 );
+    }
+    d = &h->doc(0);
+    memcpy(doc, d, sizeof(Document));
+    _CLDELETE(h);
+    _CLDELETE(q);
+
+    return( 1 );
 }
 
 
@@ -142,7 +167,11 @@ void *clucene_thread( void *arg )
 {
     IndexItem_t        *item;
     IndexWriter        *writer = NULL;
-    lucene::analysis::WhitespaceAnalyzer an;
+    WhitespaceAnalyzer  an;
+    Document           *doc = NULL;
+    unsigned long      *lasttb = NULL;
+    int                 docmax = 0;
+    int                 i;
 
     LogPrintNoArg( LOG_NOTICE, "Starting CLucene thread" );
     LogPrint( LOG_INFO, "Using CLucene v%s index in %s", _CL_VERSION,
@@ -171,7 +200,19 @@ void *clucene_thread( void *arg )
             continue;
         }
 
-        addLogentry( writer, item );
+        if( item->chanid > docmax ) {
+            doc    = (Document *)realloc(doc, item->chanid * sizeof(Document));
+            lasttb = (unsigned long *)realloc(lasttb, 
+                                        item->chanid * sizeof(unsigned long ));
+            for( i = docmax; i < item->chanid; i++ ) {
+                doc[i].clear();
+                lasttb[i] = 0;
+            }
+            docmax = item->chanid;
+        }
+
+        addLogentry( &doc[item->chanid - 1], &lasttb[item->chanid - 1], writer, 
+                     item );
 
         free( item->nick );
         free( item->text );
@@ -179,6 +220,11 @@ void *clucene_thread( void *arg )
     }
 
     LogPrintNoArg( LOG_NOTICE, "Ending CLucene thread" );
+    for( i = 0; i < docmax; i++ ) {
+        if( lasttb[i] != 0 ) {
+            writer->addDocument( &doc[i] );
+        }
+    }
     writer->close();
     _CLDELETE(writer);
     return(NULL);
