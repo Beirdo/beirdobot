@@ -20,7 +20,9 @@ CFLAGS_plugin_api = -DPLUGIN_PATH=\"${plugindir}\" -Wno-strict-aliasing
 CFLAGS_main  = $(shell ${CURLCFG} --cflags) -DCFLAGS="\"${CFLAGS}\""
 CFLAGS_main += -DLDFLAGS="\"${LDFLAGS}\""
 
-CXXFLAGS = -O6 -g -Wall -Werror -I../include -pedantic -Wno-long-long
+CXXFLAGS  = -O6 -g -Wall -Werror -I../include -pedantic -Wno-long-long
+CXXFLAGS += -Wno-variadic-macros
+CXXFLAGS += $(shell ${MYSQLCFG} --cflags)
 CXXFLAGS_clucene = -DCLUCENE_INDEX_DIR=\"${indexdir}\"
 
 LDFLAGS = -g -rdynamic

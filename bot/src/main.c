@@ -45,6 +45,7 @@
 #include "queue.h"
 #include "logging.h"
 #include "balanced_btree.h"
+#include "clucene.h"
 
 
 static char ident[] _UNUSED_= 
@@ -216,6 +217,9 @@ int main ( int argc, char **argv )
     LogPrint( LOG_INFO, "CFLAGS: %s", CFLAGS );
     LogPrint( LOG_INFO, "LDFLAGS: %s", LDFLAGS );
 
+    /* Setup the CLucene indexer */
+    clucene_init();
+
     /* Setup the MySQL connection */
     db_setup();
     db_check_schema_main();
@@ -251,13 +255,13 @@ int main ( int argc, char **argv )
 
 void LogBanner( void )
 {
-    LogPrintNoArg( LOG_CRIT, "beirdobot  (c) 2007 Gavin Hurlbut" );
+    LogPrintNoArg( LOG_CRIT, "beirdobot  (c) 2010 Gavin Hurlbut" );
     LogPrint( LOG_CRIT, "%s", git_version() );
 
     cursesTextAdd( WINDOW_HEADER, ALIGN_LEFT, 1, 0, "beirdobot" );
     cursesTextAdd( WINDOW_HEADER, ALIGN_LEFT, 11, 0, (char *)git_version() );
     cursesTextAdd( WINDOW_HEADER, ALIGN_FROM_CENTER, 1, 0, 
-                   "(c) 2007 Gavin Hurlbut" );
+                   "(c) 2010 Gavin Hurlbut" );
     cursesTextAdd( WINDOW_TAILER, ALIGN_RIGHT, 1, 0, "Ctrl-C to exit" );
     cursesTextAdd( WINDOW_TAILER, ALIGN_LEFT, 1, 0, 
                    "Use arrow keys for menus" );

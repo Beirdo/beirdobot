@@ -36,6 +36,10 @@
 static char protos_h_ident[] _UNUSED_ = 
     "$Id$";
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 /* Externals */
 extern char   *mysql_host;
 extern uint16  mysql_portnum;
@@ -231,6 +235,10 @@ void mainSighup( int signum, void *arg );
 void ThreadAllNotifyChannel( IRCChannel_t *channel );
 void ThreadAllNotifyServer( IRCServer_t *server );
 int FindServerWithChannel( int channelId );
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif
 
