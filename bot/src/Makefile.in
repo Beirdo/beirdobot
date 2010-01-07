@@ -101,7 +101,7 @@ install-exec:	all
 
 install-data:	all
 	${MAKE} -C plugins install-data
-	${MKDIR} -p ${DESTDIR}/${indexdir}
+	mkdir -p ${DESTDIR}/${indexdir}
 
 uninstall:
 	${RM} ${DESTDIR}${bindir}/${EXE}
