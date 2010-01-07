@@ -48,7 +48,7 @@ static char ident[] _UNUSED_=
     "$Id$";
 
 #define CLUCENE_INDEX_FILE CLUCENE_INDEX_DIR "/indexFile"
-#define SEARCH_WINDOW (15*60)
+#define MAX_STRING_LEN 1024
 
 typedef struct {
     unsigned long   id;
@@ -65,6 +65,7 @@ void addLogentry( Document *doc, unsigned long *tb, IndexWriter *writer,
                   IndexItem_t *item );
 int loadLogentry( Document *doc, unsigned long tb );
 void *clucene_thread( void *arg );
+TCHAR *clucene_escape( char *text );
 
 /* The C interface portion */
 extern "C" {
@@ -100,11 +101,70 @@ extern "C" {
 
         QueueEnqueueItem( IndexQ, item );
     }
+
+    SearchResults_t *clucene_search( int chanid, char *text, int *count )
+    {
+        IndexReader            *reader = IndexReader::open(CLUCENE_INDEX_FILE);
+        WhitespaceAnalyzer      an;
+        IndexSearcher           s(reader);
+        Query                  *q;
+        Hits                   *h;
+        Document               *d;
+        static TCHAR            query[MAX_STRING_LEN];
+        TCHAR                  *esctext;
+        SearchResults_t        *results;
+        int                     i;
+        char                   *ts;
+
+        esctext = clucene_escape(text);
+        _sntprintf( query, MAX_STRING_LEN, 
+                    _T("chanid:%ld AND (text:%s OR nick:%s)"), chanid, esctext,
+                    esctext );
+        q = QueryParser::parse(query, _T("text"), &an);
+        h = s.search(q);
+        if( h->length() == 0 ) {
+            *count = 0;
+            _CLDELETE(h);
+            _CLDELETE(q);
+            return( NULL );
+        }
+        *count = (h->length() > 3 ? 3 : h->length());
+        results = (SearchResults_t *)malloc(*count * sizeof(SearchResults_t));
+        for( i = 0; i < *count; i++ ) {
+            d = &h->doc(i);
+            ts = STRDUP_TtoA(d->get(_T("timestamp")));
+            results[i].timestamp = atoi(ts) * SEARCH_WINDOW;
+            results[i].score = h->score(i);
+            free( ts );
+        }
+
+        _CLDELETE(h);
+        _CLDELETE(q);
+
+        return( results );
+    }
 }
 
 /* C++ internals */
 
-#define MAX_STRING_LEN 1024
+TCHAR *clucene_escape( char *text )
+{
+    static TCHAR        buf[MAX_STRING_LEN];
+    static const char   chars[] = "+-&|!(){}[]^\"~*?:\\";
+    int                 len;
+    int                 i;
+    int                 j;
+
+    len = strlen(text);
+    for( i = 0, j = 0; i < len && j < MAX_STRING_LEN - 1; i++ ) {
+        if( strchr( chars, (int)text[i] ) ) {
+            buf[j++] = '\\';
+        }
+        buf[j++] = text[i];
+    }
+    buf[j] = '\0';
+    return( buf );
+}
 
 void addLogentry( Document *doc, unsigned long *tb, IndexWriter *writer, 
                   IndexItem_t *item )

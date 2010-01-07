@@ -1,6 +1,6 @@
 /*
  *  This file is part of the beirdobot package
- *  Copyright (C) 2006 Gavin Hurlbut
+ *  Copyright (C) 2006, 2010 Gavin Hurlbut
  *
  *  This plugin is free software; you can redistribute it and/or
  *  modify it under the terms of the GNU Lesser General Public
@@ -22,7 +22,7 @@
 /*HEADER---------------------------------------------------
 * $Id$
 *
-* Copyright 2006 Gavin Hurlbut
+* Copyright 2006, 2010 Gavin Hurlbut
 * All rights reserved
 */
 
@@ -41,6 +41,7 @@
 #include "structs.h"
 #include "protos.h"
 #include "logging.h"
+#include "clucene.h"
 
 /* INTERNAL FUNCTION PROTOTYPES */
 void botCmdSearch( IRCServer_t *server, IRCChannel_t *channel, char *who,
@@ -55,24 +56,14 @@ char *botHelpSearch( void *tag );
 char *botHelpSeen( void *tag );
 char *botHelpNotice( void *tag );
 char *botHelpSymbol( void *tag );
-void db_search_text( IRCServer_t *server, IRCChannel_t *channel, char *who, 
-                     char *text );
 void result_search_text( MYSQL_RES *res, MYSQL_BIND *input, void *args, 
                          long insertid );
+void lucene_search_text( IRCServer_t *server, IRCChannel_t *channel, char *who, 
+                         char *text );
 
 /* CVS generated ID string */
 static char ident[] _UNUSED_ = 
     "$Id$";
-
-static QueryTable_t coreQueryTable[] = {
-    /* 0 */
-    { "SELECT ? * FLOOR(MIN(`timestamp`) / ?) AS starttime, "
-      "SUM(MATCH(`nick`, `message`) AGAINST (?)) AS score "
-      "FROM `irclog` WHERE `msgtype` IN (0, 1) "
-      "AND MATCH(`nick`, `message`) AGAINST (?) > 0 AND `chanid` = ? "
-      "GROUP BY ? * FLOOR(`timestamp` / ?) "
-      "ORDER BY score DESC, `msgid` ASC LIMIT 3", NULL, NULL, FALSE }
-};
 
 void plugin_initialize( char *args )
 {
@@ -149,7 +140,7 @@ void botCmdSearch( IRCServer_t *server, IRCChannel_t *channel, char *who,
     transmitMsg( server, TX_PRIVMSG, who, message );
 
     gettimeofday( &start, NULL );
-    db_search_text( server, channel, who, search );
+    lucene_search_text( server, channel, who, search );
     gettimeofday( &end, NULL );
 
     end.tv_sec  -= start.tv_sec;
@@ -330,57 +321,27 @@ char *botHelpSymbol( void *tag )
     return( help );
 }
 
-#define SEARCH_WINDOW (15*60)
-void db_search_text( IRCServer_t *server, IRCChannel_t *channel, char *who, 
-                     char *text )
+void lucene_search_text( IRCServer_t *server, IRCChannel_t *channel, char *who, 
+                         char *text )
 {
-    MYSQL_BIND     *data;
+    SearchResults_t    *results;
+    int                 count;
+    int                 i;
+    int                 len;
+    char               *value = NULL;
+    static char        *none = "No matches found";
+    time_t              time_start, time_end;
+    struct tm           tm_start, tm_end;
+    char                start[20], stop[20];
+    float               score;
 
     if( !text || !channel || !server ) {
         return;
     }
 
-    data = (MYSQL_BIND *)malloc(10 * sizeof(MYSQL_BIND));
-    memset( data, 0, 10 * sizeof(MYSQL_BIND) );
+    results = clucene_search( channel->channelId, text, &count );
 
-    bind_numeric( &data[0], SEARCH_WINDOW, MYSQL_TYPE_LONG );
-    bind_numeric( &data[1], SEARCH_WINDOW, MYSQL_TYPE_LONG );
-    bind_string( &data[2], text, MYSQL_TYPE_BLOB );
-    bind_string( &data[3], text, MYSQL_TYPE_BLOB );
-    bind_numeric( &data[4], channel->channelId, MYSQL_TYPE_LONG );
-    bind_numeric( &data[5], SEARCH_WINDOW, MYSQL_TYPE_LONG );
-    bind_numeric( &data[6], SEARCH_WINDOW, MYSQL_TYPE_LONG );
-    bind_null_blob( &data[7], server );
-    bind_null_blob( &data[8], channel );
-    bind_null_blob( &data[9], who );
-
-    db_queue_query( 0, coreQueryTable, data, 10, result_search_text,
-                    NULL, NULL );
-}
-
-void result_search_text( MYSQL_RES *res, MYSQL_BIND *input, void *args, 
-                         long insertid )
-{
-    IRCServer_t    *server; 
-    IRCChannel_t   *channel;
-    char           *who;
-
-    int             count = 0;
-    int             i;
-    int             len;
-    MYSQL_ROW       row;
-    char           *value = NULL;
-    static char    *none = "No matches found";
-    time_t          time_start, time_end;
-    struct tm       tm_start, tm_end;
-    char            start[20], stop[20];
-    float           score;
-
-    server = (IRCServer_t *)input[7].buffer;
-    channel = (IRCChannel_t *)input[8].buffer;
-    who = (char *)input[9].buffer;
-
-    if( !res || !(count = mysql_num_rows(res)) ) {
+    if( !results ) {
         transmitMsg( server, TX_PRIVMSG, who, none );
         return;
     }
@@ -391,15 +352,13 @@ void result_search_text( MYSQL_RES *res, MYSQL_BIND *input, void *args,
     transmitMsg( server, TX_PRIVMSG, who, value );
 
     for( i = 0; i < count; i++ ) {
-        row = mysql_fetch_row(res);
-
-        time_start = atoi(row[0]);
+        time_start = results[i].timestamp;
         time_end   = time_start + SEARCH_WINDOW;
         localtime_r(&time_start, &tm_start);
         localtime_r(&time_end, &tm_end);
         strftime( start, 20, "%Y-%m-%d:%H:%M", &tm_start );
         strftime( stop, 20, "%Y-%m-%d:%H:%M", &tm_end );
-        score = atof(row[1]);
+        score = results[i].score;
 
         len = strlen(channel->url) + 70;
         value = (char *)realloc(value, len + 1);
@@ -408,7 +367,6 @@ void result_search_text( MYSQL_RES *res, MYSQL_BIND *input, void *args,
         transmitMsg( server, TX_PRIVMSG, who, value);
     }
 }
-
 
 /*
  * vim:ts=4:sw=4:ai:et:si:sts=4

@@ -435,6 +435,11 @@ typedef struct {
 
 typedef void (*CursesSaveFunc_t)(void *, int, char *);
 
+typedef struct {
+    unsigned long   timestamp;
+    float           score;
+} SearchResults_t;
+
 #endif
 
 /*
