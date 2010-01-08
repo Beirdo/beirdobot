@@ -805,14 +805,14 @@ void db_add_logentry( IRCChannel_t *channel, char *nick, IRCMsgType_t msgType,
     bind_numeric( &data[3], msgType, MYSQL_TYPE_LONG );
     bind_string( &data[4], text, MYSQL_TYPE_BLOB );
 
-    if( nickOnly != nick ) {
-        free( nickOnly );
-    }
-
     db_queue_query( 2, QueryTable, data, 5, NULL, NULL, NULL );
 
     if( msgType == TYPE_MESSAGE || msgType == TYPE_ACTION ) {
         clucene_add( channel->channelId, nickOnly, text, tv.tv_sec );
+    }
+
+    if( nickOnly != nick ) {
+        free( nickOnly );
     }
 }
 
@@ -906,7 +906,7 @@ bool db_check_nick_notify( IRCChannel_t *channel, char *nick, int hours )
     struct timeval      tv;
     long long int       since;
 
-    if( !channel || !nick ) {
+    if( !channel || !nick || hours < 0 ) {
         return( false );
     }
 

@@ -47,7 +47,6 @@ using namespace lucene::search;
 static char ident[] _UNUSED_= 
     "$Id$";
 
-#define CLUCENE_INDEX_FILE CLUCENE_INDEX_DIR "/indexFile"
 #define MAX_STRING_LEN 1024
 
 typedef struct {
@@ -65,7 +64,7 @@ void addLogentry( Document *doc, unsigned long *tb, IndexWriter *writer,
                   IndexItem_t *item );
 int loadLogentry( Document *doc, unsigned long tb );
 void *clucene_thread( void *arg );
-TCHAR *clucene_escape( char *text );
+char *clucene_escape( char *text );
 
 /* The C interface portion */
 extern "C" {
@@ -104,22 +103,23 @@ extern "C" {
 
     SearchResults_t *clucene_search( int chanid, char *text, int *count )
     {
-        IndexReader            *reader = IndexReader::open(CLUCENE_INDEX_FILE);
+        IndexReader            *reader = IndexReader::open(CLUCENE_INDEX_DIR);
         WhitespaceAnalyzer      an;
         IndexSearcher           s(reader);
         Query                  *q;
         Hits                   *h;
         Document               *d;
         static TCHAR            query[MAX_STRING_LEN];
-        TCHAR                  *esctext;
+        char                   *esctext;
         SearchResults_t        *results;
         int                     i;
         char                   *ts;
 
         esctext = clucene_escape(text);
         _sntprintf( query, MAX_STRING_LEN, 
-                    _T("chanid:%ld AND (text:%s OR nick:%s)"), chanid, esctext,
-                    esctext );
+                    _T("chanid:%ld AND (text:\"%s\" OR nick:\"%s\")"), chanid, 
+                    esctext, esctext );
+        LogPrint(LOG_INFO, "Query: %ls", query);
         q = QueryParser::parse(query, _T("text"), &an);
         h = s.search(q);
         if( h->length() == 0 ) {
@@ -147,9 +147,9 @@ extern "C" {
 
 /* C++ internals */
 
-TCHAR *clucene_escape( char *text )
+char *clucene_escape( char *text )
 {
-    static TCHAR        buf[MAX_STRING_LEN];
+    static char         buf[MAX_STRING_LEN];
     static const char   chars[] = "+-&|!(){}[]^\"~*?:\\";
     int                 len;
     int                 i;
@@ -171,9 +171,13 @@ void addLogentry( Document *doc, unsigned long *tb, IndexWriter *writer,
 {
     static TCHAR            buf[MAX_STRING_LEN];
 
-    if( *tb != item->timestamp && *tb != 0 ) {
-        writer->addDocument( doc );
-        doc->clear();
+    LogPrint( LOG_INFO, "TB: %ld, TS: %ld", *tb, item->timestamp );
+    if( *tb != item->timestamp ) {
+        if( *tb != 0 ) {
+            LogPrint(LOG_INFO, "Writing %ld", *tb);
+            writer->addDocument( doc );
+            doc->clear();
+        }
 
         if( !loadLogentry( doc, item->timestamp ) ) {
             _sntprintf( buf, MAX_STRING_LEN, _T("%ld"), item->timestamp );
@@ -198,7 +202,7 @@ void addLogentry( Document *doc, unsigned long *tb, IndexWriter *writer,
 
 int loadLogentry( Document *doc, unsigned long tb )
 {
-    IndexReader            *reader = IndexReader::open(CLUCENE_INDEX_FILE);
+    IndexReader            *reader = IndexReader::open(CLUCENE_INDEX_DIR);
     WhitespaceAnalyzer      an;
     IndexSearcher           s(reader);
     Query                  *q;
@@ -209,6 +213,7 @@ int loadLogentry( Document *doc, unsigned long tb )
     _sntprintf( query, 80, _T("%ld"), tb );
     q = QueryParser::parse(query, _T("timestamp"), &an);
     h = s.search(q);
+    LogPrint( LOG_INFO, "Q: %ls  len: %ld", q->toString(), h->length() );
     if( h->length() == 0 ) {
         _CLDELETE(h);
         _CLDELETE(q);
@@ -228,7 +233,7 @@ void *clucene_thread( void *arg )
     IndexItem_t        *item;
     IndexWriter        *writer = NULL;
     WhitespaceAnalyzer  an;
-    Document           *doc = NULL;
+    Document          **doc = NULL;
     unsigned long      *lasttb = NULL;
     int                 docmax = 0;
     int                 i;
@@ -237,15 +242,15 @@ void *clucene_thread( void *arg )
     LogPrint( LOG_INFO, "Using CLucene v%s index in %s", _CL_VERSION,
               CLUCENE_INDEX_DIR );
 
-    if ( IndexReader::indexExists(CLUCENE_INDEX_FILE) ){
-        if ( IndexReader::isLocked(CLUCENE_INDEX_FILE) ){
+    if ( IndexReader::indexExists(CLUCENE_INDEX_DIR) ){
+        if ( IndexReader::isLocked(CLUCENE_INDEX_DIR) ){
             LogPrintNoArg( LOG_INFO, "Index was locked... unlocking it.");
-            IndexReader::unlock(CLUCENE_INDEX_FILE);
+            IndexReader::unlock(CLUCENE_INDEX_DIR);
         }
 
-        writer = _CLNEW IndexWriter( CLUCENE_INDEX_FILE, &an, false);
+        writer = _CLNEW IndexWriter( CLUCENE_INDEX_DIR, &an, false);
     } else {
-        writer = _CLNEW IndexWriter( CLUCENE_INDEX_FILE ,&an, true);
+        writer = _CLNEW IndexWriter( CLUCENE_INDEX_DIR ,&an, true);
     }
 
     writer->setMaxFieldLength(MAX_STRING_LEN);
@@ -261,17 +266,18 @@ void *clucene_thread( void *arg )
         }
 
         if( item->chanid > docmax ) {
-            doc    = (Document *)realloc(doc, item->chanid * sizeof(Document));
+            doc    = (Document **)realloc(doc, item->chanid * sizeof(Document *));
             lasttb = (unsigned long *)realloc(lasttb, 
                                         item->chanid * sizeof(unsigned long ));
             for( i = docmax; i < item->chanid; i++ ) {
-                doc[i].clear();
+                doc[i] = new Document;
+                doc[i]->clear();
                 lasttb[i] = 0;
             }
             docmax = item->chanid;
         }
 
-        addLogentry( &doc[item->chanid - 1], &lasttb[item->chanid - 1], writer, 
+        addLogentry( doc[item->chanid - 1], &lasttb[item->chanid - 1], writer, 
                      item );
 
         free( item->nick );
@@ -282,7 +288,7 @@ void *clucene_thread( void *arg )
     LogPrintNoArg( LOG_NOTICE, "Ending CLucene thread" );
     for( i = 0; i < docmax; i++ ) {
         if( lasttb[i] != 0 ) {
-            writer->addDocument( &doc[i] );
+            writer->addDocument( doc[i] );
         }
     }
     writer->close();

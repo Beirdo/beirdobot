@@ -56,8 +56,6 @@ char *botHelpSearch( void *tag );
 char *botHelpSeen( void *tag );
 char *botHelpNotice( void *tag );
 char *botHelpSymbol( void *tag );
-void result_search_text( MYSQL_RES *res, MYSQL_BIND *input, void *args, 
-                         long insertid );
 void lucene_search_text( IRCServer_t *server, IRCChannel_t *channel, char *who, 
                          char *text );
 
@@ -339,7 +337,9 @@ void lucene_search_text( IRCServer_t *server, IRCChannel_t *channel, char *who,
         return;
     }
 
+    LogPrintNoArg( LOG_INFO, "about to call clucene_search" );
     results = clucene_search( channel->channelId, text, &count );
+    LogPrintNoArg( LOG_INFO, "returned from clucene_search" );
 
     if( !results ) {
         transmitMsg( server, TX_PRIVMSG, who, none );

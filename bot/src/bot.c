@@ -1277,7 +1277,7 @@ static CursesFormItem_t     channelFormItems[] = {
     { FIELD_LABEL, 0, 4, 0, 0, "Notify Window:", -1, FA_NONE, 0, FT_NONE, { 0 },
       NULL, NULL },
     { FIELD_FIELD, 16, 4, 20, 1, "%d", OFFSETOF(notifywindow,IRCChannel_t),
-      FA_INTEGER, 20, FT_INTEGER, { .integerArgs = { 0, 0, 168 } }, NULL, 
+      FA_INTEGER, 20, FT_INTEGER, { .integerArgs = { 0, -1, 168 } }, NULL, 
       NULL },
     { FIELD_LABEL, 0, 5, 0, 0, "Command Char:", -1, FA_NONE, 0, FT_NONE, { 0 },
       NULL, NULL },
