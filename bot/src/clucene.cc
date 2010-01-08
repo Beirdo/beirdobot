@@ -185,11 +185,12 @@ void addLogentry( Document *doc, unsigned long *tb, IndexItem_t *item )
             writer->close();
             _CLDELETE(writer);
             doc->clear();
-            if( item->text == NULL ) {
-                /* Keepalive */
-                *tb = 0;
-                return;
-            }
+        }
+
+        if( item->text == NULL ) {
+            /* Keepalive */
+            *tb = 0;
+            return;
         }
 
         if( !loadLogentry( doc, item->timestamp ) ) {
