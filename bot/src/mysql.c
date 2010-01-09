@@ -102,6 +102,8 @@ void result_MySQL_Schema( MYSQL_RES *res, MYSQL_BIND *input, void *arg,
                           long insertid );
 void result_rebuild_clucene( MYSQL_RES *res, MYSQL_BIND *input, void *arg,
                              long insertid );
+void result_rebuild_clucene2( MYSQL_RES *res, MYSQL_BIND *input, void *arg,
+                              long insertid );
 
 void cursesMySQLSchema( void *arg );
 
@@ -201,9 +203,11 @@ QueryTable_t    QueryTable[] = {
       "`floodMaxTime`, `floodBuffer`, `floodMaxLine`, `enabled` ) "
       "VALUES ( ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ? )", NULL, NULL, FALSE },
     /* 28 */
+    { "SELECT COUNT(msgid) FROM `irclog`", NULL, NULL, FALSE }, 
+    /* 29 */
     { "SELECT `chanid`, `nick`, `message`, `timestamp` FROM `irclog` "
-      "WHERE `msgType` = 0 OR `msgType` = 1 ORDER BY `timestamp` ASC", NULL,
-      NULL, FALSE }
+      "WHERE `msgType` = 0 OR `msgType` = 1 ORDER BY `timestamp` ASC "
+      "LIMIT ?, 10000" , NULL, NULL, FALSE }
 };
 
 QueueObject_t   *QueryQ;
@@ -1190,14 +1194,31 @@ void db_check_plugins( PluginDef_t *plugins, int count )
 void db_rebuild_clucene( void )
 {
     pthread_mutex_t    *mutex;
+    int                 reccount;
+    int                 i;
+    MYSQL_BIND         *data;
 
     mutex = (pthread_mutex_t *)malloc(sizeof(pthread_mutex_t));
     pthread_mutex_init( mutex, NULL );
 
-    db_queue_query( 28, QueryTable, NULL, 0, result_rebuild_clucene, NULL, 
+    db_queue_query( 28, QueryTable, NULL, 0, result_rebuild_clucene, &reccount, 
                     mutex);
 
     pthread_mutex_unlock( mutex );
+
+    for( i = 0; i < reccount; i += 10000 ) {
+        LogPrint( LOG_INFO, "Batch starting at %d", i );
+
+        data = (MYSQL_BIND *)malloc(1 * sizeof(MYSQL_BIND));
+        memset( data, 0, 1 * sizeof(MYSQL_BIND) );
+
+        bind_numeric( &data[0], i, MYSQL_TYPE_LONG );
+        
+        db_queue_query( 29, QueryTable, data, 1, result_rebuild_clucene2, NULL, 
+                        mutex );
+        pthread_mutex_unlock( mutex );
+    }
+
     pthread_mutex_destroy( mutex );
     free( mutex );
 }
@@ -2148,6 +2169,26 @@ void result_MySQL_Schema( MYSQL_RES *res, MYSQL_BIND *input, void *arg,
 
 void result_rebuild_clucene( MYSQL_RES *res, MYSQL_BIND *input, void *arg,
                              long insertid )
+{
+    int             count;
+    MYSQL_ROW       row;
+    int            *reccount;
+
+    reccount = (int *)arg;
+
+    if( !res || !(count = mysql_num_rows(res)) ) {
+        *reccount = 0;
+        return;
+    }
+
+    row = mysql_fetch_row(res);
+    *reccount = atoi(row[0]);
+
+    LogPrint( LOG_INFO, "%d entries total", *reccount );
+}
+
+void result_rebuild_clucene2( MYSQL_RES *res, MYSQL_BIND *input, void *arg,
+                              long insertid )
 {
     int             count;
     MYSQL_ROW       row;
