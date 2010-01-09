@@ -42,7 +42,7 @@ extern "C" {
 #define SEARCH_WINDOW (15*60)
 
 /* C interface portion */
-void clucene_init(void);
+void clucene_init(int clear);
 void clucene_shutdown(void);
 void clucene_add( int chanid, char *nick, char *text, 
                   unsigned long timestamp );

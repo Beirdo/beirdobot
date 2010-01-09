@@ -135,17 +135,17 @@ void LogPrintLine( LogLevel_t level, char *file, int line, char *function,
     QueueEnqueueItem( LoggingQ, item );
 }
 
-void logging_initialize( void )
+void logging_initialize( bool ncurses )
 {
 
     LoggingQ = QueueCreate(1024);
     LogList = LinkedListCreate();
 
-#if 0
-    LogStdoutAdd();
-#else
-    LogNcursesAdd();
-#endif
+    if( !ncurses ) {
+        LogStdoutAdd();
+    } else {
+        LogNcursesAdd();
+    }
     LogSyslogAdd( LOG_LOCAL7 );
     if( Debug ) {
         LogFileAdd( DEBUG_FILE );

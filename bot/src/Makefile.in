@@ -41,6 +41,15 @@ OBJS	= ${SRCS:.c=.o} ${SRCCS:.cc=.o}
 DEPS	= ${SRCS:.c=.d} ${SRCCS:.cc=.d}
 EXE	= beirdobot${EXEEXT}
 
+IMPORTERSRCS  = import.c thread_api.c balanced_btree.c queue.c logging.c 
+IMPORTERSRCS += linked_list.c mysql.c mysql_upgrade.c protected_data.c
+IMPORTERSRCCS = clucene.cc
+IMPORTEROBJS  = ${IMPORTERSRCS:.c=.o} ${IMPORTERSRCCS:.cc=.o}
+DEPS         += import.d
+IMPORTER      = importdb${EXEEXT}
+IMPORTERLIBS  = $(shell ${MYSQLCFG} @MYSQL_LIBS@)
+IMPORTERLIBS += -lclucene
+
 DESTDIR		=
 prefix		= @prefix@
 exec_prefix	= @exec_prefix@
@@ -53,13 +62,16 @@ indexdir	= ${pkglibdir}/clucene
 
 .PHONY:	plugins clean cleanall ${EMPTY_AUTOMAKE_TARGETS}
 
-all:	${EXE} plugins
+all:	${EXE} ${IMPORTER} plugins
 
 plugins:
 	${MAKE} -C plugins all
 
 ${EXE}:	${OBJS}
 	${CC} ${LDFLAGS} -o $@ $+ ${LIBS}
+
+${IMPORTER}:	${IMPORTEROBJS}
+	${CC} ${LDFLAGS} -o $@ $+ ${IMPORTERLIBS}
 
 depend:		${DEPS}
 ${DEPS}:	Makefile

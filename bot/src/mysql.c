@@ -100,6 +100,8 @@ void result_check_plugins( MYSQL_RES *res, MYSQL_BIND *input, void *arg,
                           long insertid );
 void result_MySQL_Schema( MYSQL_RES *res, MYSQL_BIND *input, void *arg,
                           long insertid );
+void result_rebuild_clucene( MYSQL_RES *res, MYSQL_BIND *input, void *arg,
+                             long insertid );
 
 void cursesMySQLSchema( void *arg );
 
@@ -197,7 +199,11 @@ QueryTable_t    QueryTable[] = {
     { "INSERT INTO `servers` ( `server`, `port`, `password`, `nick`, "
       "`username`, `realname`, `nickserv`, `nickservmsg`, `floodInterval`, "
       "`floodMaxTime`, `floodBuffer`, `floodMaxLine`, `enabled` ) "
-      "VALUES ( ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ? )", NULL, NULL, FALSE }
+      "VALUES ( ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ? )", NULL, NULL, FALSE },
+    /* 28 */
+    { "SELECT `chanid`, `nick`, `message`, `timestamp` FROM `irclog` "
+      "WHERE `msgType` = 0 OR `msgType` = 1 ORDER BY `timestamp` ASC", NULL,
+      NULL, FALSE }
 };
 
 QueueObject_t   *QueryQ;
@@ -1181,6 +1187,21 @@ void db_check_plugins( PluginDef_t *plugins, int count )
     free( mutex );
 }
 
+void db_rebuild_clucene( void )
+{
+    pthread_mutex_t    *mutex;
+
+    mutex = (pthread_mutex_t *)malloc(sizeof(pthread_mutex_t));
+    pthread_mutex_init( mutex, NULL );
+
+    db_queue_query( 28, QueryTable, NULL, 0, result_rebuild_clucene, NULL, 
+                    mutex);
+
+    pthread_mutex_unlock( mutex );
+    pthread_mutex_destroy( mutex );
+    free( mutex );
+}
+
 /*
  * Query chaining functions
  */
@@ -2125,6 +2146,33 @@ void result_MySQL_Schema( MYSQL_RES *res, MYSQL_BIND *input, void *arg,
     cursesKeyhandleRegister( cursesDetailsKeyhandle );
 }
 
+void result_rebuild_clucene( MYSQL_RES *res, MYSQL_BIND *input, void *arg,
+                             long insertid )
+{
+    int             count;
+    MYSQL_ROW       row;
+    int             i;
+    int             span;
+
+    if( !res || !(count = mysql_num_rows(res)) ) {
+        return;
+    }
+
+    LogPrint( LOG_INFO, "%d entries to import", count );
+
+    span = (count >= 4000 ? 1000 : count / 4);
+
+    for( i = 0; i < count; i++ ) {
+        row = mysql_fetch_row(res);
+
+        if( i % span == 0 && i != 0 ) {
+            LogPrint( LOG_INFO, "imported %d", i );
+        }
+
+        clucene_add( atoi(row[0]), row[1], row[2], 
+                     (unsigned long)atol(row[3]) );
+    }
+}
 
 /*
  * Helper functions to duplicate what's in newer versions of libmysqlclient

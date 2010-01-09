@@ -1,6 +1,6 @@
 /*
  *  This file is part of the beirdobot package
- *  Copyright (C) 2006 Gavin Hurlbut
+ *  Copyright (C) 2010 Gavin Hurlbut
  *
  *  beirdobot is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -20,7 +20,7 @@
 /*HEADER---------------------------------------------------
 * $Id$
 *
-* Copyright 2006 Gavin Hurlbut
+* Copyright 2010 Gavin Hurlbut
 * All rights reserved
 *
 */
@@ -56,14 +56,14 @@ uint16              mysql_portnum;
 char               *mysql_user;
 char               *mysql_password;
 char               *mysql_db;
-bool                verbose;
-bool                Daemon;
-bool                Debug;
+bool                Daemon = FALSE;
+bool                Debug = FALSE;
 bool                GlobalAbort = FALSE;
 bool                BotDone = FALSE;
 pthread_t           mainThreadId;
 BalancedBTree_t    *versionTree;
 char               *pthreadsVersion = NULL;
+
 
 void LogBanner( void );
 void MainParseArgs( int argc, char **argv );
@@ -73,72 +73,20 @@ void signal_everyone( int signum, siginfo_t *info, void *secret );
 void signal_death( int signum, siginfo_t *info, void *secret );
 void MainDelayExit( void );
 void do_symbol( void *ptr );
-void serverUnvisit( BalancedBTreeItem_t *node );
-bool serverFlushUnvisited( BalancedBTreeItem_t *node );
-void mainAbout( void *arg );
-void mainLicensing( void *arg );
-void mainVersions( void *arg );
-void mainReloadAll( void *arg );
-int versionShowRecurse( BalancedBTreeItem_t *node, int line );
 
 typedef void (*sigAction_t)(int, siginfo_t *, void *);
 
-typedef struct {
-    char       *what;
-    char       *version;
-    int         count;
-} Version_t;
-
-
 int main ( int argc, char **argv )
 {
-    pthread_mutex_t     spinLockMutex;
-    pid_t               childPid;
-    struct sigaction    sa;
-    sigset_t            sigmsk;
-    size_t              len;
-    ThreadCallback_t    callbacks;
+    extern QueueObject_t   *IndexQ;
+    struct sigaction        sa;
+    sigset_t                sigmsk;
+    uint32                  count;
 
     GlobalAbort = false;
 
     /* Parse the command line options */
     MainParseArgs( argc, argv );
-
-    len = confstr( _CS_GNU_LIBPTHREAD_VERSION, NULL, 0 );
-    if( len ) {
-        pthreadsVersion = (char *)malloc(len);
-        confstr( _CS_GNU_LIBPTHREAD_VERSION, pthreadsVersion, len );
-    }
-
-    if( !pthreadsVersion || strstr( pthreadsVersion, "linuxthreads" ) ) {
-        fprintf( stderr, "beirdobot requires NPTL to operate correctly.\n\n"
-                         "The signal handling in linuxthreads is just too "
-                         "broken to use.\n\n" );
-        exit( 1 );
-    }
-
-    /* Do we need to detach? */
-    if( Daemon ) {
-        childPid = fork();
-        if( childPid < 0 ) {
-            perror( "Couldn't detach in daemon mode" );
-            _exit( 1 );
-        }
-
-        if( childPid != 0 ) {
-            /* This is still the parent, report the child's pid and exit */
-            printf( "[Detached as PID %d]\n", childPid );
-            /* And exit the parent */
-            _exit( 0 );
-        }
-
-        /* After this is in the detached child */
-
-        /* Close stdin, stdout, stderr to release the tty */
-        close(0);
-        close(1);
-        close(2);
-    }
 
     mainThreadId = pthread_self();
 
@@ -149,23 +97,16 @@ int main ( int argc, char **argv )
     sigfillset( &sigmsk );
     sigdelset( &sigmsk, SIGUSR1 );
     sigdelset( &sigmsk, SIGUSR2 );
-    sigdelset( &sigmsk, SIGHUP );
-    sigdelset( &sigmsk, SIGWINCH );
     sigdelset( &sigmsk, SIGINT );
     sigdelset( &sigmsk, SIGSEGV );
     sigdelset( &sigmsk, SIGILL );
     sigdelset( &sigmsk, SIGFPE );
     pthread_sigmask( SIG_SETMASK, &sigmsk, NULL );
 
-    /* Initialize the non-threadsafe CURL library functionality */
-    curl_global_init( CURL_GLOBAL_ALL );
-
     /* Start up the Logging thread */
-    logging_initialize(TRUE);
+    logging_initialize(FALSE);
 
-    memset( &callbacks, 0, sizeof(ThreadCallback_t) );
-    callbacks.sighupFunc = mainSighup;
-    thread_register( &mainThreadId, "thread_main", &callbacks );
+    thread_register( &mainThreadId, "thread_main", NULL );
 
     /* Setup signal handler for SIGUSR1 (toggles Debug) */
     sa.sa_sigaction = (sigAction_t)logging_toggle_debug;
@@ -187,8 +128,6 @@ int main ( int argc, char **argv )
     sigemptyset( &sa.sa_mask );
     sa.sa_flags = SA_RESTART | SA_SIGINFO;
     sigaction( SIGUSR2, &sa, NULL );
-    sigaction( SIGHUP, &sa, NULL );
-    sigaction( SIGWINCH, &sa, NULL );
 
     /* Setup signal handlers for SEGV, ILL, FPE */
     sa.sa_sigaction = signal_death;
@@ -198,77 +137,34 @@ int main ( int argc, char **argv )
     sigaction( SIGILL, &sa, NULL );
     sigaction( SIGFPE, &sa, NULL );
 
-    versionTree = BalancedBTreeCreate( BTREE_KEY_STRING );
-
-    versionAdd( "pthreads", pthreadsVersion );
-
-    curses_start();
-    cursesMenuItemAdd( 2, MENU_SYSTEM, "About", mainAbout, NULL );
-    cursesMenuItemAdd( 2, MENU_SYSTEM, "Licensing", mainLicensing, NULL );
-    cursesMenuItemAdd( 2, MENU_SYSTEM, "Versions", mainVersions, NULL );
-    cursesMenuItemAdd( 2, MENU_SYSTEM, "Reload All", mainReloadAll, NULL );
-
-    /* Add the terminal setting as a version */
-    versionAdd( "TERM", getenv("TERM") );
-
     /* Print the startup log messages */
     LogBanner();
 
-    LogPrint( LOG_INFO, "CFLAGS: %s", CFLAGS );
-    LogPrint( LOG_INFO, "LDFLAGS: %s", LDFLAGS );
-
     /* Setup the CLucene indexer */
-    clucene_init(0);
+    clucene_init(1);
 
     /* Setup the MySQL connection */
     db_setup();
     db_check_schema_main();
 
-    /* Setup the bot commands */
-    botCmd_initialize();
+    db_rebuild_clucene();
 
-    /* Setup the regexp support */
-    regexp_initialize();
+    /* Wait for the clucene thread to finish emptying its queue */
+    while( (count = QueueUsed( IndexQ )) > 0 ) {
+        LogPrint( LOG_INFO, "%d left", count );
+        sleep( 1 );
+    }
 
-    /* Setup the plugins */
-    plugins_initialize();
-
-    /* Start the notifier thread */
-    notify_start();
-
-    /* Start the authenticate thread */
-    authenticate_start();
-
-    /* Start the bot */
-    bot_start();
-
-    /* Sit on this and rotate - this causes an intentional deadlock, this
-     * thread should stop dead in its tracks
-     */
-    pthread_mutex_init( &spinLockMutex, NULL );
-    pthread_mutex_lock( &spinLockMutex );
-    pthread_mutex_lock( &spinLockMutex );
+    GlobalAbort = TRUE;
 
     return(0);
 }
 
-
 void LogBanner( void )
 {
-    LogPrintNoArg( LOG_CRIT, "beirdobot  (c) 2010 Gavin Hurlbut" );
+    LogPrintNoArg( LOG_CRIT, "importdb from beirdobot  "
+                             "(c) 2010 Gavin Hurlbut" );
     LogPrint( LOG_CRIT, "%s", git_version() );
-
-    cursesTextAdd( WINDOW_HEADER, ALIGN_LEFT, 1, 0, "beirdobot" );
-    cursesTextAdd( WINDOW_HEADER, ALIGN_LEFT, 11, 0, (char *)git_version() );
-    cursesTextAdd( WINDOW_HEADER, ALIGN_FROM_CENTER, 1, 0, 
-                   "(c) 2010 Gavin Hurlbut" );
-    cursesTextAdd( WINDOW_TAILER, ALIGN_RIGHT, 1, 0, "Ctrl-C to exit" );
-    cursesTextAdd( WINDOW_TAILER, ALIGN_LEFT, 1, 0, 
-                   "Use arrow keys for menus" );
-    cursesTextAdd( WINDOW_TAILER, ALIGN_CENTER, 0, 0, 
-                   "PgUp/PgDn to scroll logs" );
-
-    versionAdd( "beirdobot", (char *)git_version() );
 }
 
 
@@ -286,9 +182,6 @@ void MainParseArgs( int argc, char **argv )
         {"password", 1, 0, 'p'},
         {"port", 1, 0, 'P'},
         {"database", 1, 0, 'd'},
-        {"daemon", 0, 0, 'D'},
-        {"verbose", 0, 0, 'v'},
-        {"debug", 0, 0, 'g'},
         {0, 0, 0, 0}
     };
 
@@ -297,11 +190,8 @@ void MainParseArgs( int argc, char **argv )
     mysql_user = NULL;
     mysql_password = NULL;
     mysql_db = NULL;
-    verbose = false;
-    Debug = false;
-    Daemon = false;
 
-    while( (opt = getopt_long( argc, argv, "hVH:P:u:p:d:Dgv", longOpts, 
+    while( (opt = getopt_long( argc, argv, "hVH:P:u:p:d:", longOpts, 
                                &optIndex )) != -1 )
     {
         switch( opt )
@@ -309,15 +199,6 @@ void MainParseArgs( int argc, char **argv )
             case 'h':
                 MainDisplayUsage( argv[0], NULL );
                 exit( 0 );
-                break;
-            case 'D':
-                Daemon = true;
-                break;
-            case 'g':
-                Debug = true;
-                break;
-            case 'v':
-                verbose = true;
                 break;
             case 'H':
                 if( mysql_host != NULL )
@@ -387,10 +268,6 @@ void MainParseArgs( int argc, char **argv )
     {
         mysql_db = strdup("beirdobot");
     }
-
-    if( Daemon ) {
-        verbose = false;
-    }
 }
 
 void MainDisplayUsage( char *program, char *errorMsg )
@@ -418,9 +295,6 @@ void MainDisplayUsage( char *program, char *errorMsg )
                "\t-u or --user\tMySQL user to connect as (default beirdobot)\n"
                "\t-p or --password\tMySQL password to use (default beirdobot)\n"
                "\t-d or --database\tMySQL database to use (default beirdobot)\n"
-               "\t-D or --daemon\tRun solely in daemon mode, detached\n"
-               "\t-v or --verbose\tShow verbose information while running\n"
-               "\t-g or --debug\tWrite a debugging logfile\n"
                "\t-V or --version\tshow the version number and quit\n"
                "\t-h or --help\tshow this help text\n\n" );
 }
@@ -517,8 +391,6 @@ void signal_death( int signum, siginfo_t *info, void *secret )
     /* Spew all remaining messages */
     LogFlushOutput();
 
-    cursesAtExit();
-
     /* Kill this thing HARD! */
     abort();
 }
@@ -581,7 +453,6 @@ void do_backtrace( int signum, void *ip )
 void MainDelayExit( void )
 {
     int         i;
-    pthread_t   shutdownThreadId;
 
     LogPrintNoArg( LOG_CRIT, "Shutting down" );
 
@@ -590,230 +461,113 @@ void MainDelayExit( void )
 
     GlobalAbort = true;
 
-    /* Unload all plugins (which should kill all associated threads) */
-    pluginUnloadAll();
-
     /* Send out signals from all queues waking up anything waiting on them so
      * the listeners can unblock and die
      */
     QueueKillAll();
 
-    /* Shut down IRC connections */
-    thread_create( &shutdownThreadId, bot_shutdown, NULL, "thread_shutdown",
-                   NULL );
-
     /* Delay to allow all the other tasks to finish (esp. logging!) */
-    for( i = 15; i && !BotDone; i-- ) {
+    for( i = 2; i && !BotDone; i-- ) {
         sleep(1);
     }
 
     LogPrintNoArg(LOG_DEBUG, "Shutdown complete!" );
     LogFlushOutput();
 
-    cursesAtExit();
-
     /* And finally... die */
     _exit( 0 );
 }
 
-void mainSighup( int signum, void *arg )
+/* Stubbed */
+pthread_t           cursesOutThreadId;
+BalancedBTree_t    *ServerTree = NULL;
+IRCChannel_t       *newChannel;
+
+void cursesSigwinch( int signum, void *ip )
 {
-    /*
-     * Need to rescan the plugins
-     */
-    LogPrintNoArg( LOG_INFO, "Reloading plugins..." );
-    plugins_sighup();
-
-    /*
-     * Reload server & channel info -- NOTE: this happens before the bot
-     * threads get signalled
-     */
-    LogPrintNoArg( LOG_INFO, "Reloading servers & channels..." );
-    BalancedBTreeLock( ServerTree );
-    serverUnvisit( ServerTree->root );
-
-    db_load_servers();
-    db_load_channels();
-
-    while( serverFlushUnvisited( ServerTree->root ) ) {
-        /*
-         * If an unvisited entry is found, we need to loop as removing it can
-         * mess up the recursion
-         */
-    }
-
-    BalancedBTreeAdd( ServerTree, NULL, LOCKED, TRUE );
-    BalancedBTreeUnlock( ServerTree );
 }
 
-void serverUnvisit( BalancedBTreeItem_t *node )
+void cursesLogWrite( char *line )
 {
-    IRCServer_t        *server;
-    IRCChannel_t       *channel;
-    LinkedListItem_t   *item;
-
-    if( !node ) {
-        return;
-    }
-
-    serverUnvisit( node->left );
-
-    server = (IRCServer_t *)node->item;
-    server->visited = FALSE;
-
-    if( server->channels ) {
-        LinkedListLock( server->channels );
-
-        for( item = server->channels->head; item; item = item->next ) {
-            channel = (IRCChannel_t *)item;
-            channel->visited = FALSE;
-        }
-        LinkedListUnlock( server->channels );
-    }
-
-    serverUnvisit( node->right );
 }
 
-bool serverFlushUnvisited( BalancedBTreeItem_t *node )
+void cursesTextAdd( CursesWindow_t window, CursesTextAlign_t align, int x, 
+                    int y, char *string )
 {
-    IRCServer_t        *server;
-
-    if( !node ) {
-        return( FALSE );
-    }
-
-    if( serverFlushUnvisited( node->left ) ) {
-        return( TRUE );
-    }
-
-    server = (IRCServer_t *)node->item;
-    if( !server->visited ) {
-        /* This server's a goner! */
-        serverKill( node, server, TRUE );
-        return( TRUE );
-    }
-
-    if( server->newServer && server->enabled ) {
-        serverStart( server );
-    }
-
-    if( serverFlushUnvisited( node->right ) ) {
-        return( TRUE );
-    }
-
-    return( FALSE );
 }
 
-static char        *aboutNotice = 
-    "The beirdobot project is open source software.  See the System->Licensing "
-    "page for license details.\n\n"
-    "Bug reports should be emailed to gjhurlbu@gmail.com, or preferrably "
-    "reported at http://trac.beirdo.ca/projects/beirdobot\n\n"
-    "Note: the URL doesn't have a - in it, if one shows, it's due to your "
-    "window size.\n";
-
-static char        *copyrightNotice = 
-    "All of beirdobot except the plugin interface is licensed under the terms "
-    "of the GNU General Public License (GPL) version 2 or later.\n\n"
-    "The plugin interface and included plugins are licensed under the terms of "
-    "the GNU Lesser General Public License (LGPL) version 2.1 or later.\n\n"
-    "The reason that the plugin interface is licensed differently is to allow "
-    "plugins to be linked against libraries that are not GPL-compatible, but "
-    "are LGPL-compatible.";
-
-void mainAbout( void *arg )
+void cursesKeyhandleRegister( CursesKeyhandleFunc_t func )
 {
-    cursesTextAdd( WINDOW_DETAILS, ALIGN_WRAP, 0, 0, aboutNotice );
-    cursesKeyhandleRegister( cursesDetailsKeyhandle );
 }
 
-void mainLicensing( void *arg )
+int cursesDetailsKeyhandle( int ch )
 {
-    cursesTextAdd( WINDOW_DETAILS, ALIGN_WRAP, 0, 0, copyrightNotice );
-    cursesKeyhandleRegister( cursesDetailsKeyhandle );
+    return( 0 );
+}
+
+void cursesMenuItemRemove( int level, int menuId, char *string )
+{
+}
+
+void cursesPluginDisplay( void *arg )
+{
+}
+
+int cursesMenuItemAdd( int level, int menuId, char *string, 
+                       CursesMenuFunc_t menuFunc, void *menuFuncArg )
+{
+    return 0;
+}
+
+void cursesChannelDisplay( void *arg )
+{
+}
+
+void channelLeave( IRCServer_t *server, IRCChannel_t *channel, 
+                   char *oldChannel )
+{
+}
+
+int cursesMenuItemFind( int level, int menuId, char *string )
+{
+    return 0;
+}
+
+void cursesMenuSetIndex( int menuId, int index )
+{
+}
+
+void cursesServerDisplay( void *arg )
+{
+}
+
+void cursesCancel( void *arg, char *string )
+{
+}
+
+void serverKill( BalancedBTreeItem_t *node, IRCServer_t *server, bool unalloc )
+{
+}
+
+void regexpBotCmdAdd( IRCServer_t *server, IRCChannel_t *channel )
+{
 }
 
 void versionAdd( char *what, char *version )
 {
-    BalancedBTreeItem_t    *item;
-    Version_t              *vItem;
-
-    item = BalancedBTreeFind( versionTree, &what, UNLOCKED );
-    if( item ) {
-        vItem = (Version_t *)item->item;
-        vItem->count++;
-        return;
-    }
-
-    vItem = (Version_t *)malloc(sizeof(Version_t));
-    item = (BalancedBTreeItem_t *)malloc(sizeof(BalancedBTreeItem_t));
-
-    vItem->what    = strdup( what );
-    vItem->version = strdup( version );
-    vItem->count   = 1;
-
-    item->item     = (void *)vItem;
-    item->key      = (void *)&vItem->what;
-
-    BalancedBTreeAdd( versionTree, item, UNLOCKED, TRUE );
 }
 
 void versionRemove( char *what )
 {
-    BalancedBTreeItem_t    *item;
-    Version_t              *vItem;
-    
-    item = BalancedBTreeFind( versionTree, &what, UNLOCKED );
-    if( !item ) {
-        return;
-    }
-
-    vItem = (Version_t *)item->item;
-    vItem->count--;
-
-    if( !vItem->count ) {
-        BalancedBTreeRemove( versionTree, item, UNLOCKED, TRUE );
-
-        free( vItem->what );
-        free( vItem->version );
-        free( vItem );
-        free( item );
-    }
 }
 
-void mainVersions( void *arg )
+void BN_ExtractNick(const char *blah, char blah2[], int blah3)
 {
-    BalancedBTreeLock( versionTree );
-    versionShowRecurse( versionTree->root, 0 );
-    BalancedBTreeUnlock( versionTree );
-    cursesKeyhandleRegister( cursesDetailsKeyhandle );
 }
 
-int versionShowRecurse( BalancedBTreeItem_t *node, int line )
+IRCChannel_t *FindChannelNum( IRCServer_t *server, int channum )
 {
-    Version_t          *vItem;
-    static char         buf[256];
-
-    if( !node ) {
-        return( line );
-    }
-
-    line = versionShowRecurse( node->left, line );
-
-    vItem = (Version_t *)node->item;
-    snprintf( buf, 256, "%-15s %s", vItem->what, vItem->version );
-    cursesTextAdd( WINDOW_DETAILS, ALIGN_LEFT, 0, line, buf );
-    line++;
-
-    line = versionShowRecurse( node->right, line );
-
-    return( line );
-}
-
-void mainReloadAll( void *arg )
-{
-    pthread_kill( mainThreadId, SIGHUP );
-    cursesMenuLeave();
+    return NULL;
 }
 
 /*
