@@ -203,11 +203,12 @@ QueryTable_t    QueryTable[] = {
       "`floodMaxTime`, `floodBuffer`, `floodMaxLine`, `enabled` ) "
       "VALUES ( ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ? )", NULL, NULL, FALSE },
     /* 28 */
-    { "SELECT COUNT(msgid) FROM `irclog`", NULL, NULL, FALSE }, 
+    { "SELECT COUNT(msgid) FROM `irclog` "
+      "WHERE `msgType` = 0 OR `msgType` = 1 ", NULL, NULL, FALSE }, 
     /* 29 */
     { "SELECT `chanid`, `nick`, `message`, `timestamp` FROM `irclog` "
       "WHERE `msgType` = 0 OR `msgType` = 1 "
-      "LIMIT ?, 10000" , NULL, NULL, FALSE }
+      "LIMIT ?, 1000000" , NULL, NULL, FALSE }
 };
 
 QueueObject_t   *QueryQ;
@@ -1206,7 +1207,7 @@ void db_rebuild_clucene( void )
 
     pthread_mutex_unlock( mutex );
 
-    for( i = 0; i < reccount; i += 10000 ) {
+    for( i = 0; i < reccount; i += 1000000 ) {
         LogPrint( LOG_INFO, "Batch starting at %d", i );
 
         data = (MYSQL_BIND *)malloc(1 * sizeof(MYSQL_BIND));
