@@ -118,9 +118,9 @@ extern "C" {
 
     SearchResults_t *clucene_search( int chanid, char *text, int *count )
     {
-        IndexReader            *reader = IndexReader::open(CLUCENE_INDEX_DIR);
+        IndexReader            *reader;
         WhitespaceAnalyzer      an;
-        IndexSearcher           s(reader);
+        IndexSearcher          *s;
         Query                  *q;
         Hits                   *h;
         Document               *d;
@@ -130,18 +130,23 @@ extern "C" {
         int                     i;
         char                   *ts;
 
+        reader = IndexReader::open(CLUCENE_INDEX_DIR);
+        s = _CLNEW IndexSearcher(reader);
+
         esctext = clucene_escape(text);
         _sntprintf( query, MAX_STRING_LEN, 
                     _T("chanid:%ld AND (text:\"%s\" OR nick:\"%s\")"), chanid, 
                     esctext, esctext );
         LogPrint(LOG_INFO, "Query: %ls", query);
         q = QueryParser::parse(query, _T("text"), &an);
-        h = s.search(q);
+        h = s->search(q);
         if( h->length() == 0 ) {
             *count = 0;
             reader->close();
             _CLDELETE(h);
             _CLDELETE(q);
+            _CLDELETE(s);
+            _CLDELETE(reader);
             return( NULL );
         }
         *count = (h->length() > 3 ? 3 : h->length());
@@ -157,6 +162,8 @@ extern "C" {
         reader->close();
         _CLDELETE(h);
         _CLDELETE(q);
+        _CLDELETE(s);
+        _CLDELETE(reader);
 
         return( results );
     }
@@ -225,9 +232,9 @@ void addLogentry( Document *doc, unsigned long *tb, IndexItem_t *item )
 
 int loadLogentry( Document *doc, unsigned long tb )
 {
-    IndexReader                *reader = IndexReader::open(CLUCENE_INDEX_DIR);
+    IndexReader                *reader;
     WhitespaceAnalyzer          an;
-    IndexSearcher               s(reader);
+    IndexSearcher              *s;
     Query                      *q;
     Hits                       *h;
     Document                   *d;
@@ -236,9 +243,12 @@ int loadLogentry( Document *doc, unsigned long tb )
     static TCHAR                query[80];
     int                         len;
 
+    reader = IndexReader::open(CLUCENE_INDEX_DIR);
+    s = _CLNEW IndexSearcher(reader);
+
     _sntprintf( query, 80, _T("%ld"), tb );
     q = QueryParser::parse(query, _T("timestamp"), &an);
-    h = s.search(q);
+    h = s->search(q);
     len = h->length();
 #if 0
     LogPrint( LOG_INFO, "Q: %ls  len: %d", q->toString(), len );
@@ -247,6 +257,8 @@ int loadLogentry( Document *doc, unsigned long tb )
         reader->close();
         _CLDELETE(h);
         _CLDELETE(q);
+        _CLDELETE(s);
+        _CLDELETE(reader);
         return( 0 );
     }
     d = &h->doc(0);
@@ -263,6 +275,8 @@ int loadLogentry( Document *doc, unsigned long tb )
 
     _CLDELETE(h);
     _CLDELETE(q);
+    _CLDELETE(s);
+    _CLDELETE(reader);
 
     return( 1 );
 }
@@ -388,9 +402,14 @@ void *clucene_thread( void *arg )
     for( i = 0; i < docmax; i++ ) {
         if( lasttb[i] != 0 ) {
             writer->addDocument( doc[i] );
+            _CLDELETE( doc[i] );
         }
     }
     closeWriter( writer );
+
+    free( lasttb );
+    free( doc );
+
     return(NULL);
 }
 
