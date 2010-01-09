@@ -70,6 +70,7 @@ void *clucene_thread( void *arg );
 void *kicker_thread( void *arg );
 char *clucene_escape( char *text );
 IndexWriter *getWriter( void );
+void closeWriter( IndexWriter *writer );
 
 /* The C interface portion */
 extern "C" {
@@ -131,6 +132,7 @@ extern "C" {
         h = s.search(q);
         if( h->length() == 0 ) {
             *count = 0;
+            reader->close();
             _CLDELETE(h);
             _CLDELETE(q);
             return( NULL );
@@ -145,6 +147,7 @@ extern "C" {
             free( ts );
         }
 
+        reader->close();
         _CLDELETE(h);
         _CLDELETE(q);
 
@@ -182,8 +185,7 @@ void addLogentry( Document *doc, unsigned long *tb, IndexItem_t *item )
         if( *tb != 0 ) {
             writer = getWriter();
             writer->addDocument( doc );
-            writer->close();
-            _CLDELETE(writer);
+            closeWriter( writer );
             doc->clear();
         }
 
@@ -216,25 +218,40 @@ void addLogentry( Document *doc, unsigned long *tb, IndexItem_t *item )
 
 int loadLogentry( Document *doc, unsigned long tb )
 {
-    IndexReader            *reader = IndexReader::open(CLUCENE_INDEX_DIR);
-    WhitespaceAnalyzer      an;
-    IndexSearcher           s(reader);
-    Query                  *q;
-    Hits                   *h;
-    Document               *d;
-    static TCHAR            query[80];
+    IndexReader                *reader = IndexReader::open(CLUCENE_INDEX_DIR);
+    WhitespaceAnalyzer          an;
+    IndexSearcher               s(reader);
+    Query                      *q;
+    Hits                       *h;
+    Document                   *d;
+    DocumentFieldEnumeration   *fields;
+    Field                      *field;
+    static TCHAR                query[80];
+    int                         len;
 
     _sntprintf( query, 80, _T("%ld"), tb );
     q = QueryParser::parse(query, _T("timestamp"), &an);
     h = s.search(q);
-    LogPrint( LOG_INFO, "Q: %ls  len: %ld", q->toString(), h->length() );
+    len = h->length();
+    LogPrint( LOG_INFO, "Q: %ls  len: %d", q->toString(), len );
     if( h->length() == 0 ) {
+        reader->close();
         _CLDELETE(h);
         _CLDELETE(q);
         return( 0 );
     }
     d = &h->doc(0);
-    memcpy(doc, d, sizeof(Document));
+    fields = d->fields();
+    doc->clear();
+    /* Recreate the current document */
+    while( (field = fields->nextElement()) ) {
+        doc->add( *_CLNEW Field( field->name(), field->stringValue(), 
+                                 Field::STORE_YES | Field::INDEX_TOKENIZED ) );
+    }
+    LogPrint( LOG_INFO, "Deleting document %lld", h->id(0) );
+    reader->deleteDocument( h->id(0) );
+    reader->close();
+
     _CLDELETE(h);
     _CLDELETE(q);
 
@@ -243,23 +260,36 @@ int loadLogentry( Document *doc, unsigned long tb )
 
 IndexWriter *getWriter( void ) 
 {
+    WhitespaceAnalyzer *an;
     IndexWriter        *writer = NULL;
-    static WhitespaceAnalyzer  an;
 
+    LogPrintNoArg(LOG_INFO, "Opening writer");
+    an = _CLNEW WhitespaceAnalyzer;
     if ( IndexReader::indexExists(CLUCENE_INDEX_DIR) ){
         if ( IndexReader::isLocked(CLUCENE_INDEX_DIR) ){
             LogPrintNoArg( LOG_INFO, "Index was locked... unlocking it.");
             IndexReader::unlock(CLUCENE_INDEX_DIR);
         }
 
-        writer = _CLNEW IndexWriter( CLUCENE_INDEX_DIR, &an, false);
+        writer = _CLNEW IndexWriter( CLUCENE_INDEX_DIR, an, false);
     } else {
-        writer = _CLNEW IndexWriter( CLUCENE_INDEX_DIR ,&an, true);
+        writer = _CLNEW IndexWriter( CLUCENE_INDEX_DIR, an, true);
     }
 
     writer->setMaxFieldLength(1000000);
 
     return( writer );
+}
+
+void closeWriter( IndexWriter *writer )
+{
+    WhitespaceAnalyzer *an;
+
+    LogPrintNoArg( LOG_INFO, "Closing Writer" );
+    an = (WhitespaceAnalyzer *)writer->getAnalyzer();
+    writer->close();
+    _CLDELETE(an);
+    _CLDELETE(writer);
 }
 
 void *kicker_thread( void *arg )
@@ -270,7 +300,7 @@ void *kicker_thread( void *arg )
     int             i;
 
     LogPrintNoArg( LOG_INFO, "Starting CLucene Kicker thread" );
-    while( !BotDone ) {
+    while( !GlobalAbort ) {
         gettimeofday( &tv, NULL );
         now = tv.tv_sec;
         target = ((now / SEARCH_WINDOW) + 1) * SEARCH_WINDOW;
@@ -299,14 +329,14 @@ void *clucene_thread( void *arg )
               CLUCENE_INDEX_DIR );
 
     writer = getWriter();
+    LogPrint( LOG_INFO, "%lld documents indexed", writer->docCount() );
     LogPrintNoArg( LOG_INFO, "Optimizing index" );
     writer->optimize();
     LogPrintNoArg( LOG_INFO, "Finished optimizing index" );
-    writer->close();
-    _CLDELETE(writer);
+    closeWriter( writer );
 
-    while( !BotDone ) {
-        item = (IndexItem_t *)QueueDequeueItem( IndexQ, -1 );
+    while( !GlobalAbort ) {
+        item = (IndexItem_t *)QueueDequeueItem( IndexQ, 1000 );
         if( !item ) {
             continue;
         }
@@ -340,11 +370,11 @@ void *clucene_thread( void *arg )
     writer = getWriter();
     for( i = 0; i < docmax; i++ ) {
         if( lasttb[i] != 0 ) {
+            LogPrint( LOG_INFO, "%ls", doc[i]->toString() );
             writer->addDocument( doc[i] );
         }
     }
-    writer->close();
-    _CLDELETE(writer);
+    closeWriter( writer );
     return(NULL);
 }
 
