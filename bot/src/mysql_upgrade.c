@@ -117,6 +117,11 @@ static SchemaUpgrade_t coreSchemaUpgrade[CURRENT_SCHEMA] = {
       { "ALTER TABLE `servers` ADD `enabled` INT DEFAULT '1' NOT NULL "
         "AFTER `serverid`", NULL, NULL, FALSE },
       { NULL, NULL, NULL, FALSE }
+    },
+    /* 10 -> 11 */
+    {
+      { "ALTER TABLE `irclog` DROP INDEX `searchtext`", NULL, NULL, FALSE },
+      { NULL, NULL, NULL, FALSE }
     }
 };
 

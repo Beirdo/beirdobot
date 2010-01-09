@@ -33,7 +33,7 @@
 static char db_schema_h_ident[] _UNUSED_ = 
     "$Id$";
 
-#define CURRENT_SCHEMA  10
+#define CURRENT_SCHEMA  11
 
 
 static QueryTable_t defCoreSchema[] = {
@@ -59,8 +59,7 @@ static QueryTable_t defCoreSchema[] = {
     "  `message` text NOT NULL,\n"
     "  PRIMARY KEY  (`msgid`),\n"
     "  KEY `timeChan` (`chanid`,`timestamp`),\n"
-    "  KEY `messageType` (`msgtype`,`chanid`,`timestamp`),\n"
-    "  FULLTEXT KEY `searchtext` (`nick`,`message`)\n"
+    "  KEY `messageType` (`msgtype`,`chanid`,`timestamp`)\n"
     ") TYPE=MyISAM\n", NULL, NULL, FALSE },
 
   { "CREATE TABLE `nicks` (\n"
