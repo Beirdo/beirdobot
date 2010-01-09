@@ -206,7 +206,7 @@ QueryTable_t    QueryTable[] = {
     { "SELECT COUNT(msgid) FROM `irclog`", NULL, NULL, FALSE }, 
     /* 29 */
     { "SELECT `chanid`, `nick`, `message`, `timestamp` FROM `irclog` "
-      "WHERE `msgType` = 0 OR `msgType` = 1 ORDER BY `timestamp` ASC "
+      "WHERE `msgType` = 0 OR `msgType` = 1 "
       "LIMIT ?, 10000" , NULL, NULL, FALSE }
 };
 
