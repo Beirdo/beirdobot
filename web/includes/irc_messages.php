@@ -150,7 +150,7 @@ class irc_message {
                             '/^\\\\(?=[*#;])/m'      => '',
                         // Insert htmlized versions of various dashes
                             '/ - /'                    => '&nbsp;&ndash; ', // N dash
-                            '/(?<=\d)-(?=\d)(?!\d+-)/' => '&ndash;',        // N dash between individual sequences of numbers
+                            '/(?<=\d)-(?=\d)(?!\d+-)(?![^<]*?(?:>|<\\/a>))/' => '&ndash;',        // N dash between individual sequences of numbers
                             '/ -- /'                   => '&nbsp;&mdash; ', // M dash
                         // Break up really long strings (that aren't inside of links)
                             '/(\S{80})(?![^<]*?(?:>|<\\/a>))/' => '$1 ',
