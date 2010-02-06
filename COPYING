@@ -1,8 +1,8 @@
-The beirdobot project is under GPL, except for the plugin API and the plugins,
-which are under LGPL.  This is so that individual plugins can interface with
-non-GPL-licensed libraries without making the entire project's licensing be
-nonsensical.
+The beirdobot project is under GPL v2 (or any later version), except for the i
+plugin API and the plugins, which are under LGPL v2.1 (or any later version).  
+This is so that individual plugins can interface with non-GPL-licensed 
+libraries without making the entire project's licensing be nonsensical.
 
-The GPL  license is in LICENSE.GPL
-The LGPL license is in LICENSE.LGPL
+The GPL v2    license is in LICENSE.GPL
+The LGPL v2.1 license is in LICENSE.LGPL
 
