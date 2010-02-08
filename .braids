@@ -1,0 +1,7 @@
+--- 
+webservice/mongoose: 
+  squashed: true
+  url: http://mongoose.googlecode.com/svn/trunk
+  type: svn
+  revision: 478
+  remote: braid/webservice/mongoose
