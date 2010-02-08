@@ -29,11 +29,16 @@
 #define clucene_h_
 
 #include "environment.h"
-#include "structs.h"
 
 /* CVS generated ID string (optional for h files) */
 static char clucene_h_ident[] _UNUSED_ = 
     "$Id$";
+
+typedef struct {
+    unsigned long   timestamp;
+    float           score;
+} SearchResults_t;
+
 
 #ifdef __cplusplus
 extern "C" {
@@ -42,10 +47,12 @@ extern "C" {
 #define SEARCH_WINDOW (15*60)
 
 /* C interface portion */
-void clucene_init(int clear);
 void clucene_shutdown(void);
+#ifndef WEBSERVICE
+void clucene_init(int clear);
 void clucene_add( int chanid, char *nick, char *text, 
                   unsigned long timestamp );
+#endif
 SearchResults_t *clucene_search( int chanid, char *text, int *count );
 
 #ifdef __cplusplus

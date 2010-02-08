@@ -1,0 +1,84 @@
+EMPTY_AUTOMAKE_TARGETS  = install-info installdirs check installcheck dvi pdf
+EMPTY_AUTOMAKE_TARGETS += ps info html tags ctags distdir
+
+CC	= @CC@
+CXX	= @CXX@
+
+CFLAGS	= -O6 -g -Wall -Werror -I../bot/include -I./mongoose -std=c99 -pedantic -Wno-long-long
+CFLAGS_mongoose  = -D_POSIX_SOURCE -D_BSD_SOURCE -D_FILE_OFFSET_BITS=64
+CFLAGS_mongoose += -D_LARGEFILE_SOURCE
+
+CXXFLAGS  = -O6 -g -Wall -Werror -I../bot/include -pedantic -Wno-long-long
+CXXFLAGS += -Wno-variadic-macros
+CXXFLAGS_clucene = -DCLUCENE_INDEX_DIR=\"${indexdir}\" -DWEBSERVICE
+
+LDFLAGS = -g -rdynamic
+
+SRCS  = webservice.c mongoose.c
+SRCCS = clucene.cc
+OBJS  = ${SRCS:.c=.o} ${SRCCS:.cc=.o}
+DEPS  = ${SRCS:.c=.d} ${SRCCS:.cc=.d}
+WEBSERVICE    = beirdobot-webserviced${EXEEXT}
+LIBS = -lclucene -ldl -lpthread
+
+DESTDIR		=
+prefix		= @prefix@
+exec_prefix	= @exec_prefix@
+bindir  	= @bindir@
+datarootdir	= @datarootdir@
+datadir		= @datadir@
+pkglibdir	= ${datadir}/beirdobot
+plugindir	= ${pkglibdir}/plugins
+indexdir	= ${pkglibdir}/clucene
+
+.PHONY:	clean cleanall ${EMPTY_AUTOMAKE_TARGETS}
+
+all:	${WEBSERVICE}
+
+${WEBSERVICE}:	${OBJS}
+	${CC} ${LDFLAGS} -o $@ $+ ${LIBS}
+
+depend:		${DEPS}
+${DEPS}:	Makefile
+
+%.o:	%.c
+	@echo "Compiling $@"
+	${CC} ${CFLAGS} ${CFLAGS_${<:%.c=%}} -c -o $@ $<
+
+%.o:	%.cc
+	@echo "Compiling $@"
+	${CXX} ${CXXFLAGS} ${CXXFLAGS_${<:%.cc=%}} -c -o $@ $<
+
+%.d:	%.c
+	@echo "Making $@ (dependencies for $<)"
+	@${CC} -MM ${CFLAGS} ${CFLAGS_${<:%.c=%}} $< | \
+	 sed 's,\($*\)\.o[ :]*,\1.o $@ : ,g'  > $@
+
+%.d:	%.cc
+	@echo "Making $@ (dependencies for $<)"
+	@${CXX} -MM ${CXXFLAGS} ${CXXFLAGS_${<:%.cc=%}} $< | \
+	 sed 's,\($*\)\.o[ :]*,\1.o $@ : ,g'  > $@
+
+distclean:	clean
+	${RM} ${DEPS}
+
+clean:
+	${RM} ${OBJS} ${EXE}
+
+cleanall:	clean
+	${RM} ${DEPS}
+
+install:	all install-data install-exec
+
+install-exec:	all
+	@INSTALL@ -D -m 775 ${WEBSERVICE} ${DESTDIR}${bindir}/${WEBSERVICE}
+
+install-data:	all
+
+uninstall:
+	${RM} ${DESTDIR}${bindir}/${WEBSERVICE}
+
+${EMPTY_AUTOMAKE_TARGETS}:
+
+-include ${DEPS}
+

@@ -43,7 +43,8 @@ DIST_COMMON = $(srcdir)/Makefile.local scripts/config.guess \
 	$(top_srcdir)/bot/include/config.h.in \
 	$(top_srcdir)/web/Makefile.in \
 	$(top_srcdir)/bot/src/Makefile.in \
-	$(top_srcdir)/bot/src/plugins/Makefile.in
+	$(top_srcdir)/bot/src/plugins/Makefile.in \
+	$(top_srcdir)/webservice/Makefile.in
 subdir = .
 ACLOCAL_M4 = $(top_srcdir)/aclocal.m4
 am__aclocal_m4_deps = $(top_srcdir)/configure.ac
@@ -54,7 +55,7 @@ am__CONFIG_DISTCLEAN_FILES = config.status config.cache config.log \
 mkinstalldirs = $(install_sh) -d
 CONFIG_HEADER = $(top_builddir)/bot/include/config.h
 CONFIG_CLEAN_FILES = web/Makefile bot/src/Makefile \
-	bot/src/plugins/Makefile
+	bot/src/plugins/Makefile webservice/Makefile
 SOURCES =
 RECURSIVE_TARGETS = all-recursive check-recursive dvi-recursive \
 	html-recursive info-recursive install-data-recursive \
@@ -172,7 +173,7 @@ target_cpu = @target_cpu@
 target_os = @target_os@
 target_vendor = @target_vendor@
 AUTOMAKE_OPTIONS = no-dist
-SUBDIRS = bot web
+SUBDIRS = bot web webservice
 all: all-recursive
 
 .SUFFIXES:
@@ -231,6 +232,8 @@ web/Makefile: $(top_builddir)/config.status $(top_srcdir)/web/Makefile.in
 bot/src/Makefile: $(top_builddir)/config.status $(top_srcdir)/bot/src/Makefile.in
 	cd $(top_builddir) && $(SHELL) ./config.status $@
 bot/src/plugins/Makefile: $(top_builddir)/config.status $(top_srcdir)/bot/src/plugins/Makefile.in
+	cd $(top_builddir) && $(SHELL) ./config.status $@
+webservice/Makefile: $(top_builddir)/config.status $(top_srcdir)/webservice/Makefile.in
 	cd $(top_builddir) && $(SHELL) ./config.status $@
 uninstall-info-am:
 

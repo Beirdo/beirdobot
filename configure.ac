@@ -216,5 +216,5 @@ ENABLE_SWITCH([plugin-url],[plugin_url],[PLUGIN_URL],[--disable-plugin-url],
 
 
 AC_CONFIG_FILES([Makefile web/Makefile bot/src/Makefile 
-                 bot/src/plugins/Makefile])
+                 bot/src/plugins/Makefile webservice/Makefile])
 AC_OUTPUT

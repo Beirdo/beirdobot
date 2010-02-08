@@ -33,9 +33,11 @@
 #include <stdlib.h>
 #include <sys/time.h>
 #include <time.h>
+#ifndef WEBSERVICE
 #include "protos.h"
 #include "logging.h"
 #include "queue.h"
+#endif
 
 using namespace std;
 using namespace lucene::index;
@@ -51,6 +53,7 @@ static char ident[] _UNUSED_=
 
 #define MAX_STRING_LEN 1024
 
+#ifndef WEBSERVICE
 typedef struct {
     unsigned long   id;
     int             chanid;
@@ -67,12 +70,14 @@ void addLogentry( Document *doc, unsigned long *tb, IndexItem_t *item );
 int loadLogentry( Document *doc, unsigned long tb );
 void *clucene_thread( void *arg );
 void *kicker_thread( void *arg );
-char *clucene_escape( char *text );
 IndexWriter *getWriter( int clear );
 void closeWriter( IndexWriter *writer );
+#endif
+char *clucene_escape( char *text );
 
 /* The C interface portion */
 extern "C" {
+#ifndef WEBSERVICE
     QueueObject_t  *IndexQ;
 
     void clucene_init(int clear)
@@ -94,12 +99,14 @@ extern "C" {
                            (char *)"thread_kicker", NULL );
         }
     }
+#endif
 
     void clucene_shutdown(void)
     {
         _lucene_shutdown();
     }
 
+#ifndef WEBSERVICE
     void clucene_add( int chanid, char *nick, char *text, 
                       unsigned long timestamp )
     {
@@ -115,6 +122,7 @@ extern "C" {
 
         QueueEnqueueItem( IndexQ, item );
     }
+#endif
 
     SearchResults_t *clucene_search( int chanid, char *text, int *count )
     {
@@ -137,7 +145,9 @@ extern "C" {
         _sntprintf( query, MAX_STRING_LEN, 
                     _T("chanid:%ld AND (text:\"%s\" OR nick:\"%s\")"), chanid, 
                     esctext, esctext );
+#ifndef WEBSERVICE
         LogPrint(LOG_INFO, "Query: %ls", query);
+#endif
         q = QueryParser::parse(query, _T("text"), &an);
         h = s->search(q);
         if( h->length() == 0 ) {
@@ -190,6 +200,7 @@ char *clucene_escape( char *text )
     return( buf );
 }
 
+#ifndef WEBSERVICE
 void addLogentry( Document *doc, unsigned long *tb, IndexItem_t *item )
 {
     static TCHAR            buf[MAX_STRING_LEN];
@@ -412,6 +423,7 @@ void *clucene_thread( void *arg )
 
     return(NULL);
 }
+#endif
 
 /*
  * vim:ts=4:sw=4:ai:et:si:sts=4
