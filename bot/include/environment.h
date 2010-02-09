@@ -68,7 +68,7 @@ static char environment_h_ident[] _UNUSED_ =
  */
 #ifndef __cplusplus
 #ifdef ___ARGH
-typedef int                    bool;
+typedef unsigned int           bool;
 #endif
 #endif
 typedef char                   int8;

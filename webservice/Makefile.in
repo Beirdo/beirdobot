@@ -63,7 +63,7 @@ distclean:	clean
 	${RM} ${DEPS}
 
 clean:
-	${RM} ${OBJS} ${EXE}
+	${RM} ${OBJS} ${WEBSERVICE}
 
 cleanall:	clean
 	${RM} ${DEPS}
