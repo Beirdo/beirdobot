@@ -14,7 +14,7 @@
 <hr >
 
 <p>IRC Logs collected by 
-<a href="http://trac.beirdo.ca/projects/beirdobot/">BeirdoBot</a>.<br />
+<a href="http://github.com/Beirdo/beirdobot/">BeirdoBot</a>.<br />
 Please use the above link to report any bugs.
 </p>
 
