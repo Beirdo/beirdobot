@@ -124,7 +124,8 @@ extern "C" {
     }
 #endif
 
-    SearchResults_t *clucene_search( int chanid, char *text, int *count )
+    SearchResults_t *clucene_search( int chanid, char *text, int *count, 
+                                     int max )
     {
         IndexReader            *reader;
         WhitespaceAnalyzer      an;
@@ -159,7 +160,7 @@ extern "C" {
             _CLDELETE(reader);
             return( NULL );
         }
-        *count = (h->length() > 3 ? 3 : h->length());
+        *count = (h->length() > max ? max : h->length());
         results = (SearchResults_t *)malloc(*count * sizeof(SearchResults_t));
         for( i = 0; i < *count; i++ ) {
             d = &h->doc(i);

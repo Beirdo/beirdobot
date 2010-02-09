@@ -53,7 +53,7 @@ void clucene_init(int clear);
 void clucene_add( int chanid, char *nick, char *text, 
                   unsigned long timestamp );
 #endif
-SearchResults_t *clucene_search( int chanid, char *text, int *count );
+SearchResults_t *clucene_search( int chanid, char *text, int *count, int max );
 
 #ifdef __cplusplus
 }

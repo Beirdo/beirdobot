@@ -325,11 +325,13 @@ void show_search(struct mg_connection *conn,
     time_t              time_start, time_end;
     struct timeval      tv_start, tv_end, tv_elapsed;
     float               score;
-    char               *string, *channum;
-    int                 chanid;
+    char               *string, *channum, *max;
+    int                 chanid; 
+    int                 maxcount = 20;
 
     string  = mg_get_var( conn, "s" );
     channum = mg_get_var( conn, "c" );
+    max = mg_get_var( conn, "max" );
 
     if( string == NULL || channum == NULL ) {
         if( string != NULL ) {
@@ -342,6 +344,19 @@ void show_search(struct mg_connection *conn,
         return;
     }
 
+    if( max != NULL ) {
+        maxcount = atoi(max);
+        mg_free(max);
+    }
+
+    if( maxcount < 0 ) {
+        maxcount = 1;
+    }
+
+    if( maxcount > 100 ) {
+        maxcount = 100;
+    }
+
     chanid = atoi(channum);
     mg_free( channum );
 
@@ -350,7 +365,7 @@ void show_search(struct mg_connection *conn,
                     "\"results\": [ ", string, chanid );
 
     gettimeofday(&tv_start, NULL);
-    results = clucene_search( chanid, string, &count );
+    results = clucene_search( chanid, string, &count, maxcount );
     gettimeofday(&tv_end, NULL);
     timersub(&tv_end, &tv_start, &tv_elapsed);
 

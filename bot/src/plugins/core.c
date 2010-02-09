@@ -338,7 +338,7 @@ void lucene_search_text( IRCServer_t *server, IRCChannel_t *channel, char *who,
     }
 
     LogPrintNoArg( LOG_INFO, "about to call clucene_search" );
-    results = clucene_search( channel->channelId, text, &count );
+    results = clucene_search( channel->channelId, text, &count, 3 );
     LogPrintNoArg( LOG_INFO, "returned from clucene_search" );
 
     if( !results ) {
