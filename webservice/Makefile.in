@@ -7,6 +7,7 @@ CXX	= @CXX@
 CFLAGS	= -O6 -g -Wall -Werror -I../bot/include -I./mongoose -std=c99 -pedantic -Wno-long-long
 CFLAGS_mongoose  = -D_POSIX_SOURCE -D_BSD_SOURCE -D_FILE_OFFSET_BITS=64
 CFLAGS_mongoose += -D_LARGEFILE_SOURCE
+CFLAGS_webservice = -DLOG_DIR=\"${logdir}\"
 
 CXXFLAGS  = -O6 -g -Wall -Werror -I../bot/include -pedantic -Wno-long-long
 CXXFLAGS += -Wno-variadic-macros
@@ -30,6 +31,7 @@ datadir		= @datadir@
 pkglibdir	= ${datadir}/beirdobot
 plugindir	= ${pkglibdir}/plugins
 indexdir	= ${pkglibdir}/clucene
+logdir		= ${pkglibdir}/weblogs
 
 .PHONY:	clean cleanall ${EMPTY_AUTOMAKE_TARGETS}
 
@@ -74,6 +76,7 @@ install-exec:	all
 	@INSTALL@ -D -m 775 ${WEBSERVICE} ${DESTDIR}${bindir}/${WEBSERVICE}
 
 install-data:	all
+	mkdir -p ${DESTDIR}/${logdir}
 
 uninstall:
 	${RM} ${DESTDIR}${bindir}/${WEBSERVICE}

@@ -73,6 +73,7 @@ int main ( int argc, char **argv )
 	struct mg_context	   *ctx;
     pid_t                   childPid;
     char                    port[16];
+    char                    buf[1024];
 
     /* Parse the command line options */
     MainParseArgs( argc, argv );
@@ -133,6 +134,12 @@ int main ( int argc, char **argv )
 	 */
 	ctx = mg_start();
 	mg_set_option(ctx, "ports", port);
+
+    sprintf( buf, "%s/access.log", LOG_DIR );
+    mg_set_option(ctx, "access_log", buf);
+
+    sprintf( buf, "%s/error.log", LOG_DIR );
+    mg_set_option(ctx, "error_log", buf);
 
 	/* Register an search URL */
 	mg_set_uri_callback(ctx, "/search", &show_search, NULL);
