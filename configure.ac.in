@@ -176,6 +176,18 @@ ENABLE_SWITCH([plugin-mailbox],[plugin_mailbox],[PLUGIN_MAILBOX],
                      mm_nocritical, mm_notify, mm_searched, mm_status, mm_login,
 	 	     mm_list, mm_critical, mm_exists, mm_log, mm_dlog;])])
 
+ENABLE_SWITCH([plugin-perl],[plugin_perl],[PLUGIN_PERL],
+	      [--disable-plugin-perl],[Disable the perl plugin],
+              [to enable the compilation of the perl plugin],
+              [To enable the compilation of the perl plugin],
+              [yes],[no],
+              [AX_WITH_PROG(PERL,perl)
+               AX_PERL_EXT_FLAGS([PERLXS_CFLAGS], [PERLXS_LDFLAGS])
+               AC_SUBST([PERLXS_CFLAGS])
+               AC_SUBST([PERLXS_LDFLAGS])
+	       AC_CHECK_LIB([perl], [perl_alloc],,
+	                    [AC_MSG_ERROR(libperl not installed)])])
+
 ENABLE_SWITCH([plugin-rssfeed],[plugin_rssfeed],[PLUGIN_RSSFEED],
               [--disable-plugin-rssfeed],[Disable the rssfeed plugin],
               [to enable the compilation of the rssfeed plugin],

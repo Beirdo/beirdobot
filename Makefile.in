@@ -47,7 +47,10 @@ DIST_COMMON = $(srcdir)/Makefile.local scripts/config.guess \
 	$(top_srcdir)/webservice/Makefile.in
 subdir = .
 ACLOCAL_M4 = $(top_srcdir)/aclocal.m4
-am__aclocal_m4_deps = $(top_srcdir)/configure.ac
+am__aclocal_m4_deps = $(top_srcdir)/acinclude.m4 \
+	$(top_srcdir)/scripts/ax_with_prog.m4 \
+	$(top_srcdir)/scripts/ax_perl_ext_flags.m4 \
+	$(top_srcdir)/configure.ac
 am__configure_deps = $(am__aclocal_m4_deps) $(CONFIGURE_DEPENDENCIES) \
 	$(ACLOCAL_M4)
 am__CONFIG_DISTCLEAN_FILES = config.status config.cache config.log \
@@ -110,10 +113,14 @@ PACKAGE_STRING = @PACKAGE_STRING@
 PACKAGE_TARNAME = @PACKAGE_TARNAME@
 PACKAGE_VERSION = @PACKAGE_VERSION@
 PATH_SEPARATOR = @PATH_SEPARATOR@
+PERL = @PERL@
+PERLXS_CFLAGS = @PERLXS_CFLAGS@
+PERLXS_LDFLAGS = @PERLXS_LDFLAGS@
 PLUGIN_DNS = @PLUGIN_DNS@
 PLUGIN_FART = @PLUGIN_FART@
 PLUGIN_LUASCRIPT = @PLUGIN_LUASCRIPT@
 PLUGIN_MAILBOX = @PLUGIN_MAILBOX@
+PLUGIN_PERL = @PLUGIN_PERL@
 PLUGIN_RSSFEED = @PLUGIN_RSSFEED@
 PLUGIN_TRAC = @PLUGIN_TRAC@
 PLUGIN_TROUT = @PLUGIN_TROUT@

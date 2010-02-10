@@ -53,6 +53,15 @@ ifeq (${PLUGIN_MAILBOX},yes)
  DLLIBS_mailbox	= -lc-client
 endif
 
+PLUGIN_PERL = @PLUGIN_PERL@
+ifeq (${PLUGIN_PERL},yes)
+ SRCS  += perl.c
+ CFLAGS_perl  = @PERLXS_CFLAGS@
+ CFLAGS_perl += -DPLUGIN_PATH=\"${plugindir}\"
+ DLLIBS_perl  = @PERLXS_LDFLAGS@
+ PERLSCRIPTS = test.pl
+endif
+
 PLUGIN_RSSFEED   = @PLUGIN_RSSFEED@
 ifeq (${PLUGIN_RSSFEED},yes)
  SRCS  += rssfeed.c
@@ -127,14 +136,14 @@ install-exec:
 	done
 
 install-data:
-	-[ "${LUASCRIPTS} ${EXTRAS}" != " " ] && \
-	for i in ${LUASCRIPTS} ${EXTRAS} ; do \
+	-[ "${LUASCRIPTS} ${PERLSCRIPTS} ${EXTRAS}" != " " ] && \
+	for i in ${LUASCRIPTS} ${PERLSCRIPTS} ${EXTRAS} ; do \
 		@INSTALL@ -D -m 644 $$i ${DESTDIR}${plugindir}/$$i ; \
 	done
 
 uninstall:
-	-[ "${OBJS} ${LUASCRIPTS} ${EXTRAS}" != "  " ] && \
-	for i in ${OBJS} ${LUASCRIPTS} ${EXTRAS} ; do \
+	-[ "${OBJS} ${LUASCRIPTS} ${PERLSCRIPTS} ${EXTRAS}" != "  " ] && \
+	for i in ${OBJS} ${LUASCRIPTS} ${PERLSCRIPTS} ${EXTRAS} ; do \
 		${RM} ${DESTDIR}${plugindir}/$$i ; \
 	done
 
