@@ -1,4 +1,10 @@
 --- 
+bot/src/cjson: 
+  squashed: true
+  url: https://cjson.svn.sourceforge.net/svnroot/cjson
+  type: svn
+  revision: 30
+  remote: braid/bot/src/cjson
 webservice/mongoose: 
   squashed: true
   url: http://mongoose.googlecode.com/svn/trunk
