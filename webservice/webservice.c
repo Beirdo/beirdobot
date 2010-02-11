@@ -46,6 +46,7 @@
 #include "release.h"
 #include "clucene.h"
 #include "mongoose.h"
+#include "cJSON.h"
 
 
 static char ident[] _UNUSED_= 
@@ -335,6 +336,8 @@ void show_search(struct mg_connection *conn,
     char               *string, *channum, *max;
     int                 chanid; 
     int                 maxcount = 20;
+    cJSON              *root, *array, *row;
+    double              elapsed;
 
     string  = mg_get_var( conn, "s" );
     channum = mg_get_var( conn, "c" );
@@ -368,36 +371,41 @@ void show_search(struct mg_connection *conn,
     mg_free( channum );
 
 	mg_printf(conn, "HTTP/1.0 200 OK\nContent-Type: application/json\n\n");
-    mg_printf(conn, "{ \"searchString\": \"%s\", \"searchChannel\": %d, "
-                    "\"results\": [ ", string, chanid );
+    root = cJSON_CreateObject();
+    cJSON_AddStringToObject(root, "searchString", string);
+    cJSON_AddNumberToObject(root, "searchChannel", chanid);
+    cJSON_AddItemToObject(root, "results", array = cJSON_CreateArray());
 
     gettimeofday(&tv_start, NULL);
     results = clucene_search( chanid, string, &count, maxcount );
     gettimeofday(&tv_end, NULL);
     timersub(&tv_end, &tv_start, &tv_elapsed);
-
     mg_free( string );
 
+    elapsed = (double)tv_elapsed.tv_sec + 
+              ((double)tv_elapsed.tv_usec / 100000.0);
+    cJSON_AddNumberToObject(root, "searchTime", elapsed);
+
     if( !results ) {
-        mg_printf( conn, "], \"resultCount\": 0, \"searchTime\": %d.%06d }\n\n",
-                   tv_elapsed.tv_sec, tv_elapsed.tv_usec );
-        return;
+        count = 0;
     }
+    cJSON_AddNumberToObject(root, "resultCount", count);
 
     for( i = 0; i < count; i++ ) {
         time_start = results[i].timestamp;
         time_end   = time_start + SEARCH_WINDOW;
         score = results[i].score;
 
-        mg_printf( conn, "{ \"startTime\": %d, \"endTime\": %d, "
-                         "\"score\": %.2f }", time_start, time_end, score );
-        if( i < count-1 ) {
-            mg_printf( conn, ", " );
-        }
+        cJSON_AddItemToArray(array, row = cJSON_CreateObject());
+        cJSON_AddNumberToObject(row, "startTime", time_start);
+        cJSON_AddNumberToObject(row, "endTime", time_end);
+        cJSON_AddNumberToObject(row, "score", score);
     }
 
-    mg_printf( conn, " ], \"resultCount\": %d, \"searchTime\": %d.%06d }\n\n", 
-               count, tv_elapsed.tv_sec, tv_elapsed.tv_usec );
+    string = cJSON_Print(root);
+    mg_printf( conn, string );
+    free( string );
+    cJSON_Delete( root );
 }
 
 

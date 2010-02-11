@@ -4,7 +4,8 @@ EMPTY_AUTOMAKE_TARGETS += ps info html tags ctags distdir
 CC	= @CC@
 CXX	= @CXX@
 
-CFLAGS	= -O6 -g -Wall -Werror -I../bot/include -I./mongoose -std=c99 -pedantic -Wno-long-long
+CFLAGS	= -O6 -g -Wall -Werror -I../bot/include -I./mongoose -I../bot/src/cjson
+CFLAGS += -std=c99 -pedantic -Wno-long-long
 CFLAGS_mongoose  = -D_POSIX_SOURCE -D_BSD_SOURCE -D_FILE_OFFSET_BITS=64
 CFLAGS_mongoose += -D_LARGEFILE_SOURCE
 CFLAGS_webservice = -DLOG_DIR=\"${logdir}\"
@@ -15,7 +16,7 @@ CXXFLAGS_clucene = -DCLUCENE_INDEX_DIR=\"${indexdir}\" -DWEBSERVICE
 
 LDFLAGS = -g -rdynamic
 
-SRCS  = webservice.c mongoose.c
+SRCS  = webservice.c mongoose.c cJSON.c
 SRCCS = clucene.cc
 OBJS  = ${SRCS:.c=.o} ${SRCCS:.cc=.o}
 DEPS  = ${SRCS:.c=.d} ${SRCCS:.cc=.d}
