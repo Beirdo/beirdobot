@@ -441,7 +441,7 @@ bool perlLoadItem( Perl_t *perl )
     LogPrint( LOG_NOTICE, "Installing as Perl module %s", perl->modName );
 
     args[0] = scriptfile;
-    perl_call_argv("Embed::Persistent::eval_file", G_DISCARD | G_EVAL, args);
+    call_argv("Embed::Persistent::eval_file", G_DISCARD | G_EVAL, args);
 
     /* check $@ */
     if(SvTRUE(ERRSV)) {
@@ -453,7 +453,10 @@ bool perlLoadItem( Perl_t *perl )
 
     initstring = (char *)malloc(strlen(perl->modName) + 13);
     sprintf( initstring, "%s::initialize", perl->modName );
-    perl_call_pv( initstring, G_DISCARD | G_EVAL );
+    dSP;
+    PUSHMARK(SP);
+    call_pv( initstring, G_DISCARD | G_EVAL | G_NOARGS );
+
     free( initstring );
 
     perl->loaded = true;
@@ -476,12 +479,14 @@ void perlUnloadItem( Perl_t *perl )
 
     string = (char *)malloc(strlen(perl->modName) + 11);
     sprintf( string, "%s::shutdown", perl->modName );
-    perl_call_pv( string, G_DISCARD | G_EVAL );
+    dSP;
+    PUSHMARK(SP);
+    call_pv( string, G_DISCARD | G_EVAL );
 
     LogPrint( LOG_NOTICE, "Unloading Perl script %s", perl->name );
 
     args[0] = perl->modName;
-    perl_call_argv("Embed::Persistent::unload_file", G_DISCARD | G_EVAL, args);
+    call_argv("Embed::Persistent::unload_file", G_DISCARD | G_EVAL, args);
 
     perl->loaded = false;
 

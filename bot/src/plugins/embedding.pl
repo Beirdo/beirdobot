@@ -5,6 +5,7 @@ package Embed::Persistent;
 use strict;
 our %Cache;
 use Symbol qw(delete_package);
+#use Devel::Symdump;
 
 sub valid_package_name {
     my($string) = @_;
@@ -20,41 +21,21 @@ sub valid_package_name {
 sub eval_file {
     my($filename) = @_;
     my $package = valid_package_name($filename);
-    my $mtime = -M $filename;
-    my $delete = 0;
-    if(defined $Cache{$package}{mtime}
-       &&
-       $Cache{$package}{mtime} <= $mtime)
+    local *FH;
+    open FH, $filename or die "open '$filename' $!";
+    local($/) = undef;
+    my $sub = <FH>;
+    close FH;
+
+    #wrap the code into a subroutine inside our unique package
+    my $eval = qq{package $package; $sub; };
     {
-       # we have compiled this subroutine already,
-       # it has not been updated on disk, nothing left to do
-       print STDERR "already compiled $package->handler\n";
+       # hide our variables within this block
+       my($filename,$package,$sub);
+       eval $eval;
     }
-    else {
-       local *FH;
-       open FH, $filename or die "open '$filename' $!";
-       local($/) = undef;
-       my $sub = <FH>;
-       close FH;
-
-       #wrap the code into a subroutine inside our unique package
-       my $eval = qq{package $package; sub handler { $sub; }};
-       {
-	   # hide our variables within this block
-	   my($filename,$mtime,$package,$sub);
-	   eval $eval;
-       }
-       die $@ if $@;
-
-       #cache it unless we're cleaning out each time
-       $Cache{$package}{mtime} = $mtime unless $delete;
-    }
-
-    eval {$package->handler;};
     die $@ if $@;
-
-    delete_package($package) if $delete;
-
+    
     #take a look if you want
     #print Devel::Symdump->rnew($package)->as_string, $/;
 }
