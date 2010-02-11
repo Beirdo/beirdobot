@@ -59,7 +59,7 @@ ifeq (${PLUGIN_PERL},yes)
  CFLAGS_perl  = @PERLXS_CFLAGS@
  CFLAGS_perl += -DPLUGIN_PATH=\"${plugindir}\"
  DLLIBS_perl  = @PERLXS_LDFLAGS@
- PERLSCRIPTS = test.pl
+ PERLSCRIPTS = embedding.pl test.pl
 endif
 
 PLUGIN_RSSFEED   = @PLUGIN_RSSFEED@

@@ -38,12 +38,15 @@
 #include "linked_list.h"
 #include "logging.h"
 #include <string.h>
+#define PERL_GCC_BRACE_GROUPS_FORBIDDEN
 #include <EXTERN.h>
 #include <perl.h>
 
 #ifndef PLUGIN_PATH
 #define PLUGIN_PATH "./plugins"
 #endif
+
+#define PERL_MODULE_PREFIX "BeirdoBot"
 
 /* INTERNAL FUNCTION PROTOTYPES */
 void botCmdPerl( IRCServer_t *server, IRCChannel_t *channel, char *who, 
@@ -96,6 +99,8 @@ static const struct luaL_reg mylib [] = {
     {NULL, NULL}
 };
 #endif
+
+static PerlInterpreter *my_perl = NULL;
 
 BalancedBTree_t *perlTree = NULL;
 int              perlMenuId;
@@ -159,6 +164,8 @@ void plugin_initialize( char *args )
 {
     static char            *command = "perl";
     char                    version[16];
+    int                     retval;
+    static char            *embedding[] = { "", PLUGIN_PATH "/embedding.pl" };
 
     LogPrintNoArg( LOG_NOTICE, "Initializing perl..." );
     snprintf( version, 16, "%d.%d.%d", PERL_REVISION, PERL_VERSION, 
@@ -185,6 +192,30 @@ void plugin_initialize( char *args )
         LogPrintNoArg( LOG_NOTICE, "No Perl scripts defined, unloading "
                                    "perl..." );
         BalancedBTreeUnlock( perlTree );
+        return;
+    }
+
+    if( (my_perl = perl_alloc()) == NULL ) {
+        LogPrintNoArg( LOG_CRIT, "No memory to start perl" );
+        return;
+    }
+    perl_construct(my_perl);
+
+    retval = perl_parse(my_perl, NULL, 2, embedding, NULL);
+    if( retval ) {
+        PL_perl_destruct_level = 0;
+        perl_destruct(my_perl);
+        perl_free(my_perl);
+        LogPrintNoArg( LOG_CRIT, "Perl parse failed" );
+        return;
+    }
+
+    retval = perl_run(my_perl);
+    if( retval ) {
+        PL_perl_destruct_level = 0;
+        perl_destruct(my_perl);
+        perl_free(my_perl);
+        LogPrintNoArg( LOG_CRIT, "Perl run failed" );
         return;
     }
 
@@ -231,6 +262,10 @@ void plugin_shutdown( void )
         free( item );
     }
     BalancedBTreeDestroy( perlTree );
+
+    PL_perl_destruct_level = 0;
+    perl_destruct(my_perl);
+    perl_free(my_perl);
 }
 
 BalancedBTree_t *db_get_perl( void )
@@ -379,60 +414,47 @@ bool perlUnload( char *name )
 bool perlLoadItem( Perl_t *perl )
 {
     char                   *scriptfile;
-    int                     retval;
-#if 0
-    lua_State              *L;
-#endif
-    (void)retval;
+    char                   *modname;
+    char                   *initstring;
+    int                     i;
+    static char            *args[] = { "", NULL };
 
     scriptfile = (char *)malloc(strlen(PLUGIN_PATH) + 
                          strlen(perl->fileName) + 3 );
     sprintf( scriptfile, "%s/%s", PLUGIN_PATH, perl->fileName );
 
+    modname = (char *)malloc(strlen(PERL_MODULE_PREFIX) + 
+                             strlen(perl->fileName) + 3);
+    sprintf( modname, "%s::%s", PERL_MODULE_PREFIX, perl->fileName );
+    for( i = strlen(PERL_MODULE_PREFIX)+2; modname[i]; i++ ) {
+        if( modname[i] == '.' && (modname[i+1] == 'P' || modname[i+1] == 'p') &&
+            (modname[i+2] == 'L' || modname[i+2] == 'l') ) {
+            modname[i] = '\0';
+            break;
+        }
+    }
+    perl->modName = strdup(modname);
+    free( modname );
+
     LogPrint( LOG_NOTICE, "Loading Perl script %s from %s", perl->name, 
                           scriptfile );
+    LogPrint( LOG_NOTICE, "Installing as Perl module %s", perl->modName );
 
-#if 0
-    L = lua_open();
-    luascript->L = L;
-    luaopen_base(L);
-    luaopen_table(L);
-    luaopen_io(L);
-    luaopen_string(L);
-    luaopen_math(L);
-    luaopen_mylib(L);
+    args[0] = scriptfile;
+    perl_call_argv("Embed::Persistent::eval_file", G_DISCARD | G_EVAL, args);
 
-    retval = luaL_loadfile(L, scriptfile);
-    if( retval ) {
-        LogPrint( LOG_CRIT, "Error loading LUA script %s: %s", luascript->name,
-                            lua_tostring(L, -1) );
-        return( FALSE );
+    /* check $@ */
+    if(SvTRUE(ERRSV)) {
+        LogPrint( LOG_CRIT, "Perl module %s error: %s", perl->modName,
+                  SvPV(ERRSV,PL_na) );
     }
-#endif
+
     free( scriptfile );
 
-#if 0
-    retval = lua_pcall(L, 0, 0, 0);
-    if( retval ) {
-        LogPrint( LOG_CRIT, "Error starting LUA script %s: %s", luascript->name,
-                            lua_tostring(L, -1) );
-        return( FALSE );
-    }
-
-    lua_pushlightuserdata(L, (void *)luascript);
-    lua_setglobal(L, "luascript");
-
-    lua_pushlightuserdata(L, NULL);
-    lua_setglobal(L, "null");
-
-    lua_getglobal(L, "initialize");
-    retval = lua_pcall(L, 0, 0, 0);
-    if( retval ) {
-        LogPrint( LOG_CRIT, "Error starting LUA script %s: %s", luascript->name,
-                            lua_tostring(L, -1) );
-        return( FALSE );
-    }
-#endif
+    initstring = (char *)malloc(strlen(perl->modName) + 13);
+    sprintf( initstring, "%s::initialize", perl->modName );
+    perl_call_pv( initstring, G_DISCARD | G_EVAL );
+    free( initstring );
 
     perl->loaded = true;
     return( TRUE );
@@ -440,26 +462,27 @@ bool perlLoadItem( Perl_t *perl )
 
 void perlUnloadItem( Perl_t *perl )
 {
-    LinkedListItem_t       *item;
 #if 0
+    LinkedListItem_t       *item;
     LuaRegexp_t            *regexp;
     LuaBotCmd_t            *cmd;
 #endif
-    (void)item;
+    char                   *args[] = { "", NULL };
+    char                   *string;
 
     if( !perl ) {
         return;
     }
 
-#if 0
-    lua_getglobal(luascript->L, "shutdown");
-    lua_pcall(luascript->L, 0, 0, 0);
-#endif
+    string = (char *)malloc(strlen(perl->modName) + 11);
+    sprintf( string, "%s::shutdown", perl->modName );
+    perl_call_pv( string, G_DISCARD | G_EVAL );
 
     LogPrint( LOG_NOTICE, "Unloading Perl script %s", perl->name );
-#if 0
-    lua_close(luascript->L);
-#endif
+
+    args[0] = perl->modName;
+    perl_call_argv("Embed::Persistent::unload_file", G_DISCARD | G_EVAL, args);
+
     perl->loaded = false;
 
 #if 0
