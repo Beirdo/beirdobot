@@ -170,7 +170,7 @@ void plugin_initialize( char *args )
     LogPrintNoArg( LOG_NOTICE, "Initializing perl..." );
     snprintf( version, 16, "%d.%d.%d", PERL_REVISION, PERL_VERSION, 
               PERL_SUBVERSION );
-    LogPrint( LOG_NOTICE, "Using %s", version );
+    LogPrint( LOG_NOTICE, "Using Perl %s", version );
     versionAdd( "Perl", version );
     LogPrint( LOG_NOTICE, "Script path: %s", PLUGIN_PATH );
 

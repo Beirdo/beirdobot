@@ -3,7 +3,6 @@
 package Embed::Persistent;
 
 use strict;
-our %Cache;
 use Symbol qw(delete_package);
 #use Devel::Symdump;
 
