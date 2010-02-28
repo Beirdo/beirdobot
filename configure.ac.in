@@ -16,7 +16,7 @@ AC_PATH_PROG(CUT, cut)
 
 AC_MSG_CHECKING(version of the package)
 
-VERSION=`cat bot/include/release.h | grep "GIT_Version =" | $CUT -d '"' -f 2`
+VERSION=`if [ -f bot/include/release.h ] ; then (cat bot/include/release.h | grep "GIT_Version =" | $CUT -d '"' -f 2) ; else echo GIT ; fi`
 AC_MSG_RESULT(${VERSION})
 
 AC_SUBST(VERSION)
@@ -110,7 +110,7 @@ AC_CHECK_LIB_PROG([clucene], [_lucene_shutdown();],,[AC_MSG_ERROR(libclucene not
 AC_LANG_C
 AC_CHECK_LIB([pcre], [pcre_config],,[AC_MSG_ERROR(libpcre not installed)])
 AC_CHECK_LIB([mysqlclient], [mysql_query],,
-             [AC_MSG_ERROR(libmysqlclient not intalled)])
+             [AC_MSG_ERROR(libmysqlclient not intalled)],[-lz -lcrypt -lm])
 
 # Check for mysql having --libs_r in mysql_config
 if mysql_config --libs_r > /dev/null ; then

@@ -2538,7 +2538,7 @@ fi
 { $as_echo "$as_me:$LINENO: checking version of the package" >&5
 $as_echo_n "checking version of the package... " >&6; }
 
-VERSION=`cat bot/include/release.h | grep "GIT_Version =" | $CUT -d '"' -f 2`
+VERSION=`if  -f bot/include/release.h  ; then (cat bot/include/release.h | grep "GIT_Version =" | $CUT -d '"' -f 2) ; else echo GIT ; fi`
 { $as_echo "$as_me:$LINENO: result: ${VERSION}" >&5
 $as_echo "${VERSION}" >&6; }
 
@@ -7383,7 +7383,7 @@ if test "${ac_cv_lib_mysqlclient_mysql_query+set}" = set; then
   $as_echo_n "(cached) " >&6
 else
   ac_check_lib_save_LIBS=$LIBS
-LIBS="-lmysqlclient  $LIBS"
+LIBS="-lmysqlclient -lz -lcrypt -lm $LIBS"
 cat >conftest.$ac_ext <<_ACEOF
 /* confdefs.h.  */
 _ACEOF
