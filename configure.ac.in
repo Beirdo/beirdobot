@@ -16,7 +16,7 @@ AC_PATH_PROG(CUT, cut)
 
 AC_MSG_CHECKING(version of the package)
 
-VERSION=`if [ -f bot/include/release.h ] ; then (cat bot/include/release.h | grep "GIT_Version =" | $CUT -d '"' -f 2) ; else echo GIT ; fi`
+VERSION=`if test -f bot/include/release.h ; then (cat bot/include/release.h | grep "GIT_Version =" | $CUT -d '"' -f 2) ; else echo GIT ; fi`
 AC_MSG_RESULT(${VERSION})
 
 AC_SUBST(VERSION)

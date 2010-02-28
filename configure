@@ -2538,7 +2538,7 @@ fi
 { $as_echo "$as_me:$LINENO: checking version of the package" >&5
 $as_echo_n "checking version of the package... " >&6; }
 
-VERSION=`if  -f bot/include/release.h  ; then (cat bot/include/release.h | grep "GIT_Version =" | $CUT -d '"' -f 2) ; else echo GIT ; fi`
+VERSION=`if test -f bot/include/release.h ; then (cat bot/include/release.h | grep "GIT_Version =" | $CUT -d '"' -f 2) ; else echo GIT ; fi`
 { $as_echo "$as_me:$LINENO: result: ${VERSION}" >&5
 $as_echo "${VERSION}" >&6; }
 
