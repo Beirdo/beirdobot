@@ -101,6 +101,29 @@ LIBS=$ac_check_lib_save_LIBS
 ])# AC_CHECK_LIB
 
 
+# Put the lib to check at the END of the line.  Needed for -lperl
+AC_DEFUN([AC_CHECK_LIB_POSTLIB],
+[m4_ifval([$3], , [AH_CHECK_LIB([$1])])dnl
+AS_LITERAL_IF([$1],
+	      [AS_VAR_PUSHDEF([ac_Lib], [ac_cv_lib_$1_$2])],
+	      [AS_VAR_PUSHDEF([ac_Lib], [ac_cv_lib_$1''_$2])])dnl
+AC_CACHE_CHECK([for $2 in -l$1], [ac_Lib],
+[ac_check_lib_save_LIBS=$LIBS
+LIBS="$5 $LIBS -l$1"
+AC_LINK_IFELSE([AC_LANG_CALL([], [$2])],
+	       [AS_VAR_SET([ac_Lib], [yes])],
+	       [AS_VAR_SET([ac_Lib], [no])])
+LIBS=$ac_check_lib_save_LIBS])
+AS_VAR_IF([ac_Lib], [yes],
+      [m4_default([$3], [AC_DEFINE_UNQUOTED(AS_TR_CPP(HAVE_LIB$1))
+  LIBS="-l$1 $LIBS"
+])],
+      [$4])dnl
+AS_VAR_POPDEF([ac_Lib])dnl
+])# AC_CHECK_LIB
+
+
+
 
 # Check for C++ libraries
 AC_LANG_CPLUSPLUS
@@ -185,9 +208,9 @@ ENABLE_SWITCH([plugin-perl],[plugin_perl],[PLUGIN_PERL],
                AX_PERL_EXT_FLAGS([PERLXS_CFLAGS], [PERLXS_LDFLAGS])
                AC_SUBST([PERLXS_CFLAGS])
                AC_SUBST([PERLXS_LDFLAGS])
-	       AC_CHECK_LIB([perl], [perl_alloc],,
-	                    [AC_MSG_ERROR(libperl not installed)],
-                            [$PERLXS_LDFLAGS])])
+	       AC_CHECK_LIB_POSTLIB([perl], [perl_alloc],,
+	                            [AC_MSG_ERROR(libperl not installed)],
+                                    [$PERLXS_LDFLAGS])])
 
 ENABLE_SWITCH([plugin-rssfeed],[plugin_rssfeed],[PLUGIN_RSSFEED],
               [--disable-plugin-rssfeed],[Disable the rssfeed plugin],
