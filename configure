@@ -8170,7 +8170,7 @@ if test "${ac_cv_lib_perl_perl_alloc+set}" = set; then
   $as_echo_n "(cached) " >&6
 else
   ac_check_lib_save_LIBS=$LIBS
-LIBS="-lperl  $LIBS"
+LIBS="-lperl $PERLXS_LDFLAGS $LIBS"
 cat >conftest.$ac_ext <<_ACEOF
 /* confdefs.h.  */
 _ACEOF

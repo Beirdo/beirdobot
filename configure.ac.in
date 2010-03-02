@@ -186,7 +186,8 @@ ENABLE_SWITCH([plugin-perl],[plugin_perl],[PLUGIN_PERL],
                AC_SUBST([PERLXS_CFLAGS])
                AC_SUBST([PERLXS_LDFLAGS])
 	       AC_CHECK_LIB([perl], [perl_alloc],,
-	                    [AC_MSG_ERROR(libperl not installed)])])
+	                    [AC_MSG_ERROR(libperl not installed)],
+                            [$PERLXS_LDFLAGS])])
 
 ENABLE_SWITCH([plugin-rssfeed],[plugin_rssfeed],[PLUGIN_RSSFEED],
               [--disable-plugin-rssfeed],[Disable the rssfeed plugin],
