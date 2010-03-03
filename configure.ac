@@ -120,7 +120,7 @@ AS_VAR_IF([ac_Lib], [yes],
 ])],
       [$4])dnl
 AS_VAR_POPDEF([ac_Lib])dnl
-])# AC_CHECK_LIB
+])# AC_CHECK_LIB_POSTLIB
 
 
 
@@ -208,9 +208,11 @@ ENABLE_SWITCH([plugin-perl],[plugin_perl],[PLUGIN_PERL],
                AX_PERL_EXT_FLAGS([PERLXS_CFLAGS], [PERLXS_LDFLAGS])
                AC_SUBST([PERLXS_CFLAGS])
                AC_SUBST([PERLXS_LDFLAGS])
+               ac_save_LIB=$LIBS
 	       AC_CHECK_LIB_POSTLIB([perl], [perl_alloc],,
 	                            [AC_MSG_ERROR(libperl not installed)],
-                                    [$PERLXS_LDFLAGS])])
+                                    [$PERLXS_LDFLAGS])
+               LIBS=$ac_save_LIB])
 
 ENABLE_SWITCH([plugin-rssfeed],[plugin_rssfeed],[PLUGIN_RSSFEED],
               [--disable-plugin-rssfeed],[Disable the rssfeed plugin],

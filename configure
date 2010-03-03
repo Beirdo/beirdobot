@@ -7208,7 +7208,7 @@ done
 
 
 # Put the lib to check at the END of the line.  Needed for -lperl
-# AC_CHECK_LIB
+# AC_CHECK_LIB_POSTLIB
 
 
 
@@ -8168,6 +8168,7 @@ $as_echo "$PERLXS_LDFLAGS" >&6; }
 
 
 
+               ac_save_LIB=$LIBS
 
 { $as_echo "$as_me:$LINENO: checking for perl_alloc in -lperl" >&5
 $as_echo_n "checking for perl_alloc in -lperl... " >&6; }
@@ -8247,6 +8248,7 @@ $as_echo "$as_me: error: libperl not installed" >&2;}
    { (exit 1); exit 1; }; }
 fi
 
+               LIBS=$ac_save_LIB
 fi
 
 PLUGIN_PERL=${ac_cv_option_plugin_perl}
