@@ -7202,9 +7202,9 @@ done
 #AC_CHECK_FUNCS([bzero gethostbyaddr gethostbyname gethostname getpagesize gettimeofday inet_ntoa isascii memset select socket strcasecmp strchr strdup strncasecmp strstr strsep])
 
 
-# AC_CHECK_LIB
+# AC_CHECK_LIB_PROLOG
 
-# AC_CHECK_LIB
+# AC_CHECK_LIB_PROG
 
 
 # Put the lib to check at the END of the line.  Needed for -lperl
@@ -7219,6 +7219,8 @@ ac_cpp='$CXXCPP $CPPFLAGS'
 ac_compile='$CXX -c $CXXFLAGS $CPPFLAGS conftest.$ac_ext >&5'
 ac_link='$CXX -o conftest$ac_exeext $CXXFLAGS $CPPFLAGS $LDFLAGS conftest.$ac_ext $LIBS >&5'
 ac_compiler_gnu=$ac_cv_cxx_compiler_gnu
+
+
 
 
 
@@ -7285,13 +7287,14 @@ if test $ac_cv_lib_clucene__lucene_shutdown___ = yes; then
 #define HAVE_LIBCLUCENE 1
 _ACEOF
 
-  LIBS="-lclucene $LIBS"
-
+       LIBS="-lclucene $LIBS"
 else
   { { $as_echo "$as_me:$LINENO: error: libclucene not installed" >&5
 $as_echo "$as_me: error: libclucene not installed" >&2;}
    { (exit 1); exit 1; }; }
 fi
+
+
 LIBS=$ac_check_lib_save_LIBS
 
 
@@ -7849,6 +7852,8 @@ cat >>confdefs.h <<\_ACEOF
 _ACEOF
 
 
+
+
 { $as_echo "$as_me:$LINENO: checking for mail_status in -lc-client" >&5
 $as_echo_n "checking for mail_status in -lc-client... " >&6; }
 if test "${ac_cv_lib_c_client_mail_status+set}" = set; then
@@ -7921,13 +7926,14 @@ if test $ac_cv_lib_c_client_mail_status = yes; then
 #define HAVE_LIBC_CLIENT 1
 _ACEOF
 
-  LIBS="-lc-client $LIBS"
-
+       LIBS="-lc-client $LIBS"
 else
   { { $as_echo "$as_me:$LINENO: error: libc-client not installed" >&5
 $as_echo "$as_me: error: libc-client not installed" >&2;}
    { (exit 1); exit 1; }; }
 fi
+
+
 LIBS=$ac_check_lib_save_LIBS
 
 fi
@@ -8170,6 +8176,8 @@ $as_echo "$PERLXS_LDFLAGS" >&6; }
 
                ac_save_LIB=$LIBS
 
+
+
 { $as_echo "$as_me:$LINENO: checking for perl_alloc in -lperl" >&5
 $as_echo_n "checking for perl_alloc in -lperl... " >&6; }
 if test "${ac_cv_lib_perl_perl_alloc+set}" = set; then
@@ -8240,13 +8248,14 @@ if test "x$ac_cv_lib_perl_perl_alloc" = x""yes; then
 #define HAVE_LIBPERL 1
 _ACEOF
 
-  LIBS="-lperl $LIBS"
-
+       LIBS="-lperl $LIBS"
 else
   { { $as_echo "$as_me:$LINENO: error: libperl not installed" >&5
 $as_echo "$as_me: error: libperl not installed" >&2;}
    { (exit 1); exit 1; }; }
 fi
+
+
 
                LIBS=$ac_save_LIB
 fi

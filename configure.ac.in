@@ -59,10 +59,10 @@ dnl (passing it in $6).  Note: also removing the library from LIBS to prevent
 dnl failure on all subsequent compile tries
 
 AC_DEFUN([AC_CHECK_LIB_PROLOG],
-[m4_ifval([$3], , [AH_CHECK_LIB([$1])])dnl
+[m4_ifval([$3], , [AH_CHECK_LIB([$1])])
 AS_LITERAL_IF([$1],
               [AS_VAR_PUSHDEF([ac_Lib], [ac_cv_lib_$1_$2])],
-              [AS_VAR_PUSHDEF([ac_Lib], [ac_cv_lib_$1''_$2])])dnl
+              [AS_VAR_PUSHDEF([ac_Lib], [ac_cv_lib_$1''_$2])])
 AC_CACHE_CHECK([for $2 in -l$1], ac_Lib,
 [ac_check_lib_save_LIBS=$LIBS
 LIBS="-l$1 $5 $LIBS"
@@ -71,19 +71,19 @@ AC_LINK_IFELSE([AC_LANG_CALL([$6], [$2])],
                [AS_VAR_SET(ac_Lib, no)])
 LIBS=$ac_check_lib_save_LIBS])
 AS_IF([test AS_VAR_GET(ac_Lib) = yes],
-      [m4_default([$3], [AC_DEFINE_UNQUOTED(AS_TR_CPP(HAVE_LIB$1))
-  LIBS="-l$1 $LIBS"
-])],
-      [$4])dnl
-AS_VAR_POPDEF([ac_Lib])dnl
+      [m4_default([$3], 
+      [AC_DEFINE_UNQUOTED(AS_TR_CPP(HAVE_LIB$1))
+       LIBS="-l$1 $LIBS"])],
+      [$4])
+AS_VAR_POPDEF([ac_Lib])
 LIBS=$ac_check_lib_save_LIBS
-])# AC_CHECK_LIB
+])# AC_CHECK_LIB_PROLOG
 
 AC_DEFUN([AC_CHECK_LIB_PROG],
-[m4_ifval([$3], , [AH_CHECK_LIB([$1])])dnl
+[m4_ifval([$3], , [AH_CHECK_LIB([$1])])
 AS_LITERAL_IF([$1],
               [AS_VAR_PUSHDEF([ac_Lib], [ac_cv_lib_$1_$2])],
-              [AS_VAR_PUSHDEF([ac_Lib], [ac_cv_lib_$1''_$2])])dnl
+              [AS_VAR_PUSHDEF([ac_Lib], [ac_cv_lib_$1''_$2])])
 AC_CACHE_CHECK([for $2 in -l$1], ac_Lib,
 [ac_check_lib_save_LIBS=$LIBS
 LIBS="-l$1 $5 $LIBS"
@@ -92,21 +92,21 @@ AC_LINK_IFELSE([AC_LANG_PROGRAM([$6], [$2])],
                [AS_VAR_SET(ac_Lib, no)])
 LIBS=$ac_check_lib_save_LIBS])
 AS_IF([test AS_VAR_GET(ac_Lib) = yes],
-      [m4_default([$3], [AC_DEFINE_UNQUOTED(AS_TR_CPP(HAVE_LIB$1))
-  LIBS="-l$1 $LIBS"
-])],
-      [$4])dnl
-AS_VAR_POPDEF([ac_Lib])dnl
+      [m4_default([$3], 
+      [AC_DEFINE_UNQUOTED(AS_TR_CPP(HAVE_LIB$1))
+       LIBS="-l$1 $LIBS"])],
+      [$4])
+AS_VAR_POPDEF([ac_Lib])
 LIBS=$ac_check_lib_save_LIBS
-])# AC_CHECK_LIB
+])# AC_CHECK_LIB_PROG
 
 
 # Put the lib to check at the END of the line.  Needed for -lperl
 AC_DEFUN([AC_CHECK_LIB_POSTLIB],
-[m4_ifval([$3], , [AH_CHECK_LIB([$1])])dnl
+[m4_ifval([$3], , [AH_CHECK_LIB([$1])])
 AS_LITERAL_IF([$1],
 	      [AS_VAR_PUSHDEF([ac_Lib], [ac_cv_lib_$1_$2])],
-	      [AS_VAR_PUSHDEF([ac_Lib], [ac_cv_lib_$1''_$2])])dnl
+	      [AS_VAR_PUSHDEF([ac_Lib], [ac_cv_lib_$1''_$2])])
 AC_CACHE_CHECK([for $2 in -l$1], [ac_Lib],
 [ac_check_lib_save_LIBS=$LIBS
 LIBS="$5 $LIBS -l$1"
@@ -115,11 +115,11 @@ AC_LINK_IFELSE([AC_LANG_CALL([], [$2])],
 	       [AS_VAR_SET([ac_Lib], [no])])
 LIBS=$ac_check_lib_save_LIBS])
 AS_VAR_IF([ac_Lib], [yes],
-      [m4_default([$3], [AC_DEFINE_UNQUOTED(AS_TR_CPP(HAVE_LIB$1))
-  LIBS="-l$1 $LIBS"
-])],
-      [$4])dnl
-AS_VAR_POPDEF([ac_Lib])dnl
+      [m4_default([$3], 
+      [AC_DEFINE_UNQUOTED(AS_TR_CPP(HAVE_LIB$1))
+       LIBS="-l$1 $LIBS"])],
+      [$4])
+AS_VAR_POPDEF([ac_Lib])
 ])# AC_CHECK_LIB_POSTLIB
 
 
