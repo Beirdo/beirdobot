@@ -7727,7 +7727,9 @@ if test "$ac_res" != no; then
   test "$ac_res" = "none required" || LIBS="$ac_res $LIBS"
 
 else
-  liblua not installed
+  { { $as_echo "$as_me:$LINENO: error: liblua not installed" >&5
+$as_echo "$as_me: error: liblua not installed" >&2;}
+   { (exit 1); exit 1; }; }
 fi
 
 	       { $as_echo "$as_me:$LINENO: checking for library containing luaL_loadfile" >&5
