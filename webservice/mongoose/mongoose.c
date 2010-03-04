@@ -3330,6 +3330,9 @@ send_cgi(struct mg_connection *conn, const char *prog)
 		goto done;
 	}
 
+	/* Seems old GCC is stupid and thinks this isn't being initialized */
+	ri.num_headers = 0;
+
 	/*
 	 * Now read CGI reply into a buffer. We need to set correct
 	 * status code, thus we need to see all HTTP headers first.
