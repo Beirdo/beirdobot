@@ -1853,11 +1853,11 @@ char *mailboxReportExpand( char *format, ENVELOPE *envelope, char *body,
                     message += strlen( message );
                 } else if( !strcasecmp( field, "date" ) ) {
                     offset = message - origmessage;
-                    len += strlen( envelope->date ) - 6;
+                    len += strlen( (char *)envelope->date ) - 6;
                     origmessage = realloc( origmessage, len );
                     message = origmessage + offset;
                     *message = '\0';
-                    strcat( message, envelope->date );
+                    strcat( message, (char *)envelope->date );
                     message += strlen(message);
                 } else if( !strcasecmp( field, "messageid" ) ) {
                     offset = message - origmessage;
