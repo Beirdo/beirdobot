@@ -20,8 +20,6 @@
  */
 
 /*HEADER---------------------------------------------------
-* $Id$
-*
 * Copyright 2010 Gavin Hurlbut
 * All rights reserved
 */
