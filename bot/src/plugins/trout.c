@@ -58,7 +58,7 @@ static FishCmd_t fishCmds[] = {
       "slaps %s with a %s trout on behalf of %s...",
       "slaps %s with a trout on behalf of %s..." },
     { "salmon", "throws several salmon at %s.  SPLAT!",
-      "connects with the head of %s with a %s salmon on behalf of %s..."
+      "connects with the head of %s with a %s salmon on behalf of %s...",
       "plants a salmon upside the head of %s on behalf of %s..." },
     { NULL, NULL, NULL, NULL }
 };
@@ -138,19 +138,20 @@ void botCmdFish( IRCServer_t *server, IRCChannel_t *channel, char *who,
 
     if( !msg ) {
         target = NULL;
-        message = (char *)malloc(strlen(cmd->fishSelf)+strlen(who)+2);
-        sprintf( message, cmd->fishSelf, who );
+        len = strlen(cmd->fishSelf) + strlen(who) + 2;
+        message = (char *)malloc(len);
+        snprintf( message, len-1, cmd->fishSelf, who );
     } else {
         target = CommandLineParse( line, &line );
         if( line ) {
             len = strlen(cmd->fishOtherAdj) + strlen(who) + strlen(target) + 
                   strlen(line) + 2;
             message = (char *)malloc(len);
-            sprintf( message, cmd->fishOtherAdj, target, line, who );
+            snprintf( message, len-1, cmd->fishOtherAdj, target, line, who );
         } else {
             len = strlen(cmd->fishOther) + strlen(who) + strlen(target) + 2;
             message = (char *)malloc(len);
-            sprintf( message, cmd->fishOther, target, who );
+            snprintf( message, len-1, cmd->fishOther, target, who );
         }
     }
     LoggedActionMessage( server, channel, message );
