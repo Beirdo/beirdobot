@@ -38,12 +38,9 @@
 #include "logging.h"
 
 /* INTERNAL FUNCTION PROTOTYPES */
-void botCmdTrout( IRCServer_t *server, IRCChannel_t *channel, char *who, 
-                  char *msg, void *tag );
-char *botHelpTrout( void *tag );
-void botCmdSalmon( IRCServer_t *server, IRCChannel_t *channel, char *who, 
-                   char *msg, void *tag );
-char *botHelpSalmon( void *tag );
+void botCmdFish( IRCServer_t *server, IRCChannel_t *channel, char *who, 
+                 char *msg, void *tag );
+char *botHelpFish( void *tag );
 
 /* CVS generated ID string */
 static char ident[] _UNUSED_ = 
@@ -51,14 +48,19 @@ static char ident[] _UNUSED_ =
 
 typedef struct {
     const char         *command;
-    BotCmdFunc_t        func;
-    BotCmdHelpFunc_t    helpFunc;
+    const char         *fishSelf;
+    const char         *fishOtherAdj;
+    const char         *fishOther;
 } FishCmd_t;
 
 static FishCmd_t fishCmds[] = {
-    { "trout", botCmdTrout, botHelpTrout },
-    { "salmon", botCmdSalmon, botHelpSalmon },
-    { NULL, NULL, NULL }
+    { "trout", "dumps a bucket of trout onto %s", 
+      "slaps %s with a %s trout on behalf of %s...",
+      "slaps %s with a trout on behalf of %s..." },
+    { "salmon", "throws several salmon at %s.  SPLAT!",
+      "connects with the head of %s with a %s salmon on behalf of %s..."
+      "plants a salmon upside the head of %s on behalf of %s..." },
+    { NULL, NULL, NULL, NULL }
 };
 
 void plugin_initialize( char *args )
@@ -67,8 +69,7 @@ void plugin_initialize( char *args )
 
     LogPrintNoArg( LOG_NOTICE, "Initializing trout..." );
     for( cmd = &fishCmds[0]; cmd && cmd->command; cmd++ ) {
-        botCmd_add( &cmd->command, cmd->func, cmd->helpFunc,
-                    (void *)cmd->command );
+        botCmd_add( &cmd->command, botCmdFish, botHelpFish, (void *)cmd );
     }
 }
 
@@ -83,9 +84,10 @@ void plugin_shutdown( void )
 }
 
 
-void botCmdTrout( IRCServer_t *server, IRCChannel_t *channel, char *who, 
-                  char *msg, void *tag )
+void botCmdFish( IRCServer_t *server, IRCChannel_t *channel, char *who, 
+                 char *msg, void *tag )
 {
+    FishCmd_t      *cmd;
     char           *message;
     char           *line;
     char           *target;
@@ -93,10 +95,20 @@ void botCmdTrout( IRCServer_t *server, IRCChannel_t *channel, char *who,
     int             len;
     bool            privmsg = false;
 
+    cmd = (FishCmd_t *)tag;
+    if( !cmd ) {
+        return;
+    }
+
     if( !channel ) {
         privmsg = true;
         if( !msg ) {
-            transmitMsg( server, TX_PRIVMSG, who, "Try \"help trout\"" );
+            message = (char *)malloc(12 + strlen(cmd->command));
+            sprintf(message, "Try \"help %s\"", cmd->command);
+            transmitMsg( server, TX_PRIVMSG, who, message );
+            if( message ) {
+                free( message );
+            }
             return;
         }
 
@@ -126,20 +138,19 @@ void botCmdTrout( IRCServer_t *server, IRCChannel_t *channel, char *who,
 
     if( !msg ) {
         target = NULL;
-        message = (char *)malloc(29+strlen(who)+2);
-        sprintf( message, "dumps a bucket of trout onto %s", who );
+        message = (char *)malloc(strlen(cmd->fishSelf)+strlen(who)+2);
+        sprintf( message, cmd->fishSelf, who );
     } else {
         target = CommandLineParse( line, &line );
         if( line ) {
-            len = 38 + strlen(who) + strlen(target) + strlen(line) + 2;
+            len = strlen(cmd->fishOtherAdj) + strlen(who) + strlen(target) + 
+                  strlen(line) + 2;
             message = (char *)malloc(len);
-            sprintf( message, "slaps %s with a %s trout on behalf of %s...", 
-                     target, line, who );
+            sprintf( message, cmd->fishOtherAdj, target, line, who );
         } else {
-            len = 36 + strlen(who) + strlen(target) + 2;
+            len = strlen(cmd->fishOther) + strlen(who) + strlen(target) + 2;
             message = (char *)malloc(len);
-            sprintf( message, "slaps %s with a trout on behalf of %s...", 
-                     target, who );
+            sprintf( message, cmd->fishOther, target, who );
         }
     }
     LoggedActionMessage( server, channel, message );
@@ -147,84 +158,25 @@ void botCmdTrout( IRCServer_t *server, IRCChannel_t *channel, char *who,
     free(message);
 }
 
-char *botHelpTrout( void *tag )
+char *botHelpFish( void *tag )
 {
-    static char *help = "Slaps someone with a trout on your behalf.  "
-                        "Syntax: (in channel) trout nick [adjective] "
-                        "(in privmsg) trout #channel nick [adjective]";
-    
-    return( help );
-}
-
-void botCmdSalmon( IRCServer_t *server, IRCChannel_t *channel, char *who, 
-                   char *msg, void *tag )
-{
-    char           *message;
-    char           *line;
-    char           *target;
-    char           *chan;
+    FishCmd_t      *cmd;
+    static char    *helpFmt = "Abuses someone with a %s on your behalf.  "
+                           "Syntax: (in channel) %s nick [adjective] "
+                           "(in privmsg) %s #channel nick [adjective]";
+    static char    *badFish = "Unknown help for unknown abuse fish!";
+    static char    *help = NULL;
     int             len;
-    bool            privmsg = false;
 
-    if( !channel ) {
-        privmsg = true;
-        if( !msg ) {
-            transmitMsg( server, TX_PRIVMSG, who, "Try \"help salmon\"" );
-            return;
-        }
-
-        chan = CommandLineParse( msg, &line );
-
-        channel = FindChannel(server, chan);
-        if( !channel ) {
-            message = (char *)malloc(22 + strlen(chan));
-            sprintf( message, "Can't find channel %s", chan );
-            transmitMsg( server, TX_PRIVMSG, who, message);
-            if( message ) {
-                free( message );
-            }
-
-            if( chan ) {
-                free( chan );
-            }
-            return;
-        }
-
-        if( chan ) {
-            free( chan );
-        }
-    } else {
-        line = msg;
+    cmd = (FishCmd_t *)tag;
+    if( !cmd ) {
+        return( badFish );
     }
 
-    if( !msg ) {
-        target = NULL;
-        message = (char *)malloc(34+strlen(who)+2);
-        sprintf( message, "throws several salmon at %s.  SPLAT!", who );
-    } else {
-        target = CommandLineParse( line, &line );
-        if( line ) {
-            len = 49 + strlen(who) + strlen(target) + strlen(line) + 2;
-            message = (char *)malloc(len);
-            sprintf( message, "swings a %s salmon at the head of %s on behalf of %s...", 
-                     line, target, who );
-        } else {
-            len = 52 + strlen(who) + strlen(target) + 2;
-            message = (char *)malloc(len);
-            sprintf( message, "plants a salmon upside the head of %s on behalf of %s...", 
-                     target, who );
-        }
-    }
-    LoggedActionMessage( server, channel, message );
-    free(target);
-    free(message);
-}
+    len = strlen( helpFmt ) + (3 * strlen( cmd->command )) + 2;
 
-char *botHelpSalmon( void *tag )
-{
-    static char *help = "Abuses someone with a salmon on your behalf.  "
-                        "Syntax: (in channel) salmon nick [adjective] "
-                        "(in privmsg) salmon #channel nick [adjective]";
+    help = (char *)realloc(help, len);
+    sprintf( help, helpFmt, cmd->command, cmd->command, cmd->command );
     
     return( help );
 }
