@@ -155,8 +155,14 @@ void botCmdFish( IRCServer_t *server, IRCChannel_t *channel, char *who,
         }
     }
     LoggedActionMessage( server, channel, message );
-    free(target);
-    free(message);
+
+    if( target ) {
+        free(target);
+    }
+
+    if( message ) {
+        free(message);
+    }
 }
 
 char *botHelpFish( void *tag )
