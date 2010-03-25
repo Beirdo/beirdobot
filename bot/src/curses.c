@@ -1,6 +1,6 @@
 /*
  *  This file is part of the beirdobot package
- *  Copyright (C) 2007 Gavin Hurlbut
+ *  Copyright (C) 2007, 2010 Gavin Hurlbut
  *
  *  beirdobot is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -20,7 +20,7 @@
 /*HEADER---------------------------------------------------
 * $Id$
 *
-* Copyright 2007 Gavin Hurlbut
+* Copyright 2007, 2010 Gavin Hurlbut
 * All rights reserved
 *
 */
@@ -384,6 +384,8 @@ void curses_start( void )
     for( i = 0; i < WINDOW_COUNT; i++ ) {
         textEntries[i] = LinkedListCreate();
     }
+
+    versionAdd( "ncurses", NCURSES_VERSION );
 
     cursesWindowSet();
     cursesMenuInitialize();
