@@ -36,8 +36,10 @@
 #include <errno.h>
 #include <getopt.h>
 #include <sys/types.h>
+#ifndef ___CYGWIN___
 #include <execinfo.h>
 #include <ucontext.h>
+#endif
 #include <curl/curl.h>
 #include "botnet.h"
 #include "protos.h"
@@ -397,6 +399,7 @@ void signal_death( int signum, siginfo_t *info, void *secret )
 
 void do_symbol( void *ptr )
 {
+#ifndef ___CYGWIN___
     void               *array[1];
     char              **strings;
 
@@ -406,10 +409,12 @@ void do_symbol( void *ptr )
     LogPrint( LOG_DEBUG, "%s", strings[0] );
 
     free( strings );
+#endif
 }
 
 void do_backtrace( int signum, void *ip )
 {
+#ifndef ___CYGWIN___
     void               *array[100];
     size_t              size;
     char              **strings;
@@ -448,6 +453,7 @@ void do_backtrace( int signum, void *ip )
     }
 
     free( strings );
+#endif
 }
 
 void MainDelayExit( void )

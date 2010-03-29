@@ -9,8 +9,6 @@ AC_CANONICAL_SYSTEM
 
 AM_INIT_AUTOMAKE(beirdobot, "GIT")
 
-
-
 AC_ARG_VAR(CUT, [location of the cut command])
 AC_PATH_PROG(CUT, cut)
 
@@ -20,6 +18,13 @@ VERSION=`if test -f bot/include/release.h ; then (cat bot/include/release.h | gr
 AC_MSG_RESULT(${VERSION})
 
 AC_SUBST(VERSION)
+
+# Check for Cygwin
+AC_MSG_CHECKING([for cygwin])
+_using_cygwin=no
+test "x$target_os" = "xcygwin" && _using_cygwin=yes
+AC_MSG_RESULT($_using_cygwin)
+AM_CONDITIONAL([USING_CYGWIN], [test "x$_using_cygwin" = "xyes"])
 
 AC_GNU_SOURCE
 

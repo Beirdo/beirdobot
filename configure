@@ -677,6 +677,8 @@ CPPFLAGS
 LDFLAGS
 CFLAGS
 CC
+USING_CYGWIN_FALSE
+USING_CYGWIN_TRUE
 CUT
 am__untar
 am__tar
@@ -2492,8 +2494,6 @@ am__tar='${AMTAR} chof - "$$tardir"'; am__untar='${AMTAR} xf -'
 
 
 
-
-
 # Extract the first word of "cut", so it can be a program name with args.
 set dummy cut; ac_word=$2
 { $as_echo "$as_me:$LINENO: checking for $ac_word" >&5
@@ -2542,6 +2542,24 @@ VERSION=`if test -f bot/include/release.h ; then (cat bot/include/release.h | gr
 { $as_echo "$as_me:$LINENO: result: ${VERSION}" >&5
 $as_echo "${VERSION}" >&6; }
 
+
+
+# Check for Cygwin
+{ $as_echo "$as_me:$LINENO: checking for cygwin" >&5
+$as_echo_n "checking for cygwin... " >&6; }
+_using_cygwin=no
+test "x$target_os" = "xcygwin" && _using_cygwin=yes
+{ $as_echo "$as_me:$LINENO: result: $_using_cygwin" >&5
+$as_echo "$_using_cygwin" >&6; }
+
+
+if test "x$_using_cygwin" = "xyes"; then
+  USING_CYGWIN_TRUE=
+  USING_CYGWIN_FALSE='#'
+else
+  USING_CYGWIN_TRUE='#'
+  USING_CYGWIN_FALSE=
+fi
 
 
 DEPDIR="${am__leading_dot}deps"
@@ -8963,6 +8981,13 @@ LIBOBJS=$ac_libobjs
 LTLIBOBJS=$ac_ltlibobjs
 
 
+if test -z "${USING_CYGWIN_TRUE}" && test -z "${USING_CYGWIN_FALSE}"; then
+  { { $as_echo "$as_me:$LINENO: error: conditional \"USING_CYGWIN\" was never defined.
+Usually this means the macro was only invoked conditionally." >&5
+$as_echo "$as_me: error: conditional \"USING_CYGWIN\" was never defined.
+Usually this means the macro was only invoked conditionally." >&2;}
+   { (exit 1); exit 1; }; }
+fi
 if test -z "${AMDEP_TRUE}" && test -z "${AMDEP_FALSE}"; then
   { { $as_echo "$as_me:$LINENO: error: conditional \"AMDEP\" was never defined.
 Usually this means the macro was only invoked conditionally." >&5
