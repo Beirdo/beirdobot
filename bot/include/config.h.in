@@ -12,6 +12,9 @@
 /* Define to 1 if you have the `apr-1' library (-lapr-1). */
 #undef HAVE_LIBAPR_1
 
+/* Define to 1 if you have the `clucene' library (-lclucene). */
+#undef HAVE_LIBCLUCENE
+
 /* Define to 1 if you have the `curl' library (-lcurl). */
 #undef HAVE_LIBCURL
 
@@ -23,6 +26,9 @@
 
 /* Define to 1 if you have the `pcre' library (-lpcre). */
 #undef HAVE_LIBPCRE
+
+/* Define to 1 if you have the `perl' library (-lperl). */
+#undef HAVE_LIBPERL
 
 /* Define to 1 if you have the `resolv' library (-lresolv). */
 #undef HAVE_LIBRESOLV
@@ -46,6 +52,9 @@
 
 /* Define to 1 if you have the <stdlib.h> header file. */
 #undef HAVE_STDLIB_H
+
+/* Define to 1 if you have the `strdup' function. */
+#undef HAVE_STRDUP
 
 /* Define to 1 if you have the <strings.h> header file. */
 #undef HAVE_STRINGS_H
@@ -100,6 +109,9 @@
 
 /* To enable the compilation of the mailbox plugin */
 #undef PLUGIN_MAILBOX
+
+/* To enable the compilation of the perl plugin */
+#undef PLUGIN_PERL
 
 /* To enable the compilation of the rssfeed plugin */
 #undef PLUGIN_RSSFEED

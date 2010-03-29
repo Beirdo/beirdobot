@@ -56,6 +56,7 @@ AC_TYPE_SIGNAL
 AC_FUNC_STRNLEN
 #AC_FUNC_STRTOD
 AC_FUNC_VPRINTF
+AC_CHECK_FUNCS([strdup])
 #AC_CHECK_FUNCS([bzero gethostbyaddr gethostbyname gethostname getpagesize gettimeofday inet_ntoa isascii memset select socket strcasecmp strchr strdup strncasecmp strstr strsep])
 
 dnl Since the stupid libc-client requires the callbacks to be defined, I need
