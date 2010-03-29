@@ -83,6 +83,10 @@ void mainVersions( void *arg );
 void mainReloadAll( void *arg );
 int versionShowRecurse( BalancedBTreeItem_t *node, int line );
 
+#ifdef __CYGWIN__
+char *strdup(const char *);
+#endif
+
 typedef void (*sigAction_t)(int, siginfo_t *, void *);
 
 typedef struct {
@@ -119,6 +123,8 @@ int main ( int argc, char **argv )
                          "broken to use.\n\n" );
         exit( 1 );
     }
+#else
+    len = 0;
 #endif
 
     /* Do we need to detach? */
@@ -280,8 +286,10 @@ void LogBanner( void )
 
 void MainParseArgs( int argc, char **argv )
 {
+#ifndef __CYGWIN__
     extern char *optarg;
     extern int optind, opterr, optopt;
+#endif
     int opt;
     int optIndex = 0;
     static struct option longOpts[] = {
