@@ -36,7 +36,7 @@
 #include <errno.h>
 #include <getopt.h>
 #include <sys/types.h>
-#ifndef ___CYGWIN___
+#ifndef __CYGWIN__
 #include <execinfo.h>
 #include <ucontext.h>
 #endif
@@ -399,7 +399,7 @@ void signal_death( int signum, siginfo_t *info, void *secret )
 
 void do_symbol( void *ptr )
 {
-#ifndef ___CYGWIN___
+#ifndef __CYGWIN__
     void               *array[1];
     char              **strings;
 
@@ -414,7 +414,7 @@ void do_symbol( void *ptr )
 
 void do_backtrace( int signum, void *ip )
 {
-#ifndef ___CYGWIN___
+#ifndef __CYGWIN__
     void               *array[100];
     size_t              size;
     char              **strings;

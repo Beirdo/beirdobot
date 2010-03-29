@@ -36,8 +36,10 @@
 #include <errno.h>
 #include <getopt.h>
 #include <sys/types.h>
+#ifndef __CYGWIN__
 #include <execinfo.h>
 #include <ucontext.h>
+#endif
 #include <curl/curl.h>
 #include "botnet.h"
 #include "protos.h"
@@ -104,6 +106,7 @@ int main ( int argc, char **argv )
     /* Parse the command line options */
     MainParseArgs( argc, argv );
 
+#ifndef __CYGWIN__
     len = confstr( _CS_GNU_LIBPTHREAD_VERSION, NULL, 0 );
     if( len ) {
         pthreadsVersion = (char *)malloc(len);
@@ -116,6 +119,7 @@ int main ( int argc, char **argv )
                          "broken to use.\n\n" );
         exit( 1 );
     }
+#endif
 
     /* Do we need to detach? */
     if( Daemon ) {
@@ -200,7 +204,9 @@ int main ( int argc, char **argv )
 
     versionTree = BalancedBTreeCreate( BTREE_KEY_STRING );
 
+#ifndef __CYGWIN__
     versionAdd( "pthreads", pthreadsVersion );
+#endif
 
     curses_start();
     cursesMenuItemAdd( 2, MENU_SYSTEM, "About", mainAbout, NULL );
@@ -454,10 +460,14 @@ void signal_everyone( int signum, siginfo_t *info, void *secret )
     extern const char *const    sys_siglist[];
     SigFunc_t                   sigFunc;
     pthread_t                   myThreadId;
+#ifndef __CYGWIN__
     ucontext_t                 *uc;
+#endif
     void                       *arg;
 
+#ifndef __CYGWIN__
     uc = (ucontext_t *)secret;
+#endif
     myThreadId = pthread_self();
 
 #if 0
@@ -469,8 +479,12 @@ void signal_everyone( int signum, siginfo_t *info, void *secret )
     sigFunc = ThreadGetHandler( myThreadId, signum, &arg );
     if( sigFunc ) {
         if( signum == SIGUSR2 ) {
+#ifndef __CYGWIN__
 #ifdef OLD_IP
             arg = (void *)uc->uc_mcontext.gregs[OLD_IP];
+#else
+            arg = NULL;
+#endif
 #else
             arg = NULL;
 #endif
@@ -486,10 +500,12 @@ void signal_everyone( int signum, siginfo_t *info, void *secret )
 void signal_death( int signum, siginfo_t *info, void *secret )
 {
     extern const char *const    sys_siglist[];
-    ucontext_t                 *uc;
     struct sigaction            sa;
+#ifndef __CYGWIN__
+    ucontext_t                 *uc;
 
     uc = (ucontext_t *)secret;
+#endif
 
     /* Make it so another bad signal will just KILL it */
     sa.sa_handler = SIG_DFL;
@@ -500,6 +516,7 @@ void signal_death( int signum, siginfo_t *info, void *secret )
     sigaction( SIGFPE, &sa, NULL );
 
     LogPrint( LOG_CRIT, "Received signal: %s", sys_siglist[signum] );
+#ifndef __CYGWIN__
 #ifdef OLD_IP
     LogPrint( LOG_CRIT, "Faulty Address: %p, from %p", info->si_addr,
                         uc->uc_mcontext.gregs[OLD_IP] );
@@ -507,11 +524,17 @@ void signal_death( int signum, siginfo_t *info, void *secret )
     LogPrint( LOG_CRIT, "Faulty Address %p, no discernable context",
                         info->si_addr );
 #endif
+#else
+    LogPrint( LOG_CRIT, "Faulty Address %p, no discernable context",
+                        info->si_addr );
+#endif
 
+#ifndef __CYGWIN__
 #ifdef OLD_IP
     do_backtrace( signum, (void *)uc->uc_mcontext.gregs[OLD_IP] );
 #else
     do_backtrace( signum, NULL );
+#endif
 #endif
 
     /* Spew all remaining messages */
@@ -525,6 +548,7 @@ void signal_death( int signum, siginfo_t *info, void *secret )
 
 void do_symbol( void *ptr )
 {
+#ifndef __CYGWIN__
     void               *array[1];
     char              **strings;
 
@@ -534,10 +558,12 @@ void do_symbol( void *ptr )
     LogPrint( LOG_DEBUG, "%s", strings[0] );
 
     free( strings );
+#endif
 }
 
 void do_backtrace( int signum, void *ip )
 {
+#ifndef __CYGWIN__
     void               *array[100];
     size_t              size;
     char              **strings;
@@ -576,6 +602,7 @@ void do_backtrace( int signum, void *ip )
     }
 
     free( strings );
+#endif
 }
 
 void MainDelayExit( void )
