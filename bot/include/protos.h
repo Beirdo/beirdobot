@@ -237,6 +237,10 @@ void ThreadAllNotifyChannel( IRCChannel_t *channel );
 void ThreadAllNotifyServer( IRCServer_t *server );
 int FindServerWithChannel( int channelId );
 
+#ifdef __CYGWIN__
+char *strdup(const char *);
+#endif
+
 #ifdef __cplusplus
 }
 #endif

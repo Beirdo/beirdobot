@@ -83,10 +83,6 @@ void mainVersions( void *arg );
 void mainReloadAll( void *arg );
 int versionShowRecurse( BalancedBTreeItem_t *node, int line );
 
-#ifdef __CYGWIN__
-char *strdup(const char *);
-#endif
-
 typedef void (*sigAction_t)(int, siginfo_t *, void *);
 
 typedef struct {
