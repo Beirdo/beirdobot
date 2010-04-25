@@ -39,6 +39,7 @@
 #define PERL_GCC_BRACE_GROUPS_FORBIDDEN
 #include <EXTERN.h>
 #include <perl.h>
+#include "embedding.pl.h"
 
 #ifndef PLUGIN_PATH
 #define PLUGIN_PATH "./plugins"
@@ -163,7 +164,8 @@ void plugin_initialize( char *args )
     static char            *command = "perl";
     char                    version[16];
     int                     retval;
-    static char            *embedding[] = { "", PLUGIN_PATH "/embedding.pl" };
+    static char            *dummy_args[] = { "", "-e", "0" };
+    SV                     *sv;
 
     LogPrintNoArg( LOG_NOTICE, "Initializing perl..." );
     snprintf( version, 16, "%d.%d.%d", PERL_REVISION, PERL_VERSION, 
@@ -199,12 +201,19 @@ void plugin_initialize( char *args )
     }
     perl_construct(my_perl);
 
-    retval = perl_parse(my_perl, NULL, 2, embedding, NULL);
+    retval = perl_parse(my_perl, NULL, 3, dummy_args, NULL);
     if( retval ) {
         PL_perl_destruct_level = 0;
         perl_destruct(my_perl);
         perl_free(my_perl);
         LogPrintNoArg( LOG_CRIT, "Perl parse failed" );
+        return;
+    }
+
+    sv = perl_eval_pv( EMBEDDING_PL, FALSE );
+    if( !sv ) {
+        /* This may not be the correct error checking! */
+        LogPrintNoArg( LOG_CRIT, "Error bootstrapping embedded.pl" );
         return;
     }
 

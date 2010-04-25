@@ -1,6 +1,5 @@
-EMPTY_AUTOMAKE_TARGETS  = install-info installdirs check installcheck dvi pdf
-EMPTY_AUTOMAKE_TARGETS += ps info html tags ctags distdir
-
+EMPTY_AUTOMAKE_TARGETS  = install-info installdirs check installcheck dvi pdf 
+EMPTY_AUTOMAKE_TARGETS += ps info html tags ctags distdir 
 BOTNETCFG	= ../../bin/botnet-config
 MYSQLCFG	= mysql_config
 PKGCONFIGPATH	= ../../lib/pkgconfig
@@ -26,6 +25,10 @@ LIBS	= $(shell ${MYSQLCFG} --libs_r)
 LIBS	+= $(shell ${BOTNETCFG} --libs-static)
 
 SRCS    = core.c
+
+.PHONY:	clean cleanall ${EMPTY_AUTOMAKE_TARGETS}
+
+default:	all
 
 PLUGIN_DNS       = @PLUGIN_DNS@
 ifeq (${PLUGIN_DNS},yes)
@@ -60,9 +63,16 @@ ifeq (${PLUGIN_PERL},yes)
  CFLAGS_perl += -DPLUGIN_PATH=\"${plugindir}\"
  # Since libperl 5.8.8 under ubuntu 8.04.4 gives stupid warnings for unused
  # functions generated in reentr.inc
- CFLAGS_perl += -Wno-unused-functions
+# CFLAGS_perl += -Wno-unused-functions
  DLLIBS_perl  = @PERLXS_LDFLAGS@
- PERLSCRIPTS = embedding.pl test.pl
+ PERLSCRIPTS   = test.pl
+# CFLAGS_perl += -Wno-unused-functions
+ PERLHEAD      = embedding.pl.h
+
+perl.c::	embedding.pl.h
+
+embedding.pl.h:	embedding.pl
+	../../bin/pltoh.pl $<
 endif
 
 PLUGIN_RSSFEED   = @PLUGIN_RSSFEED@
@@ -106,9 +116,7 @@ DEPS	= ${SRCS:.c=.d}
 
 EXTRAS	= 
 
-.PHONY:	clean cleanall ${EMPTY_AUTOMAKE_TARGETS}
-
-all:	${OBJS}
+all:	${OBJS} 
 
 plugin_%.so:	%.c
 	${CC} ${CFLAGS} ${CFLAGS_${<:%.c=%}} -fPIC -shared -o $@ $< ${DLLIBS_${<:%.c=%}}
@@ -125,7 +133,8 @@ distclean:	clean
 	${RM} ${DEPS}
 
 clean:
-	[ "${OBJS}" != "" ] && ${RM} ${OBJS}
+	[ "${OBJS}" != "" ]     && ${RM} ${OBJS}
+	[ "${PERLHEAD}" != "" ] && ${RM} ${PERLHEAD}
 
 cleanall:	clean
 	${RM} ${DEPS}
