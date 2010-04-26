@@ -53,6 +53,9 @@ void botCmdLuascript( IRCServer_t *server, IRCChannel_t *channel, char *who,
 char *botHelpLuascript( void *tag );
 
 BalancedBTree_t *db_get_luascripts( void );
+void db_check_luascripts( LinkedList_t *list );
+void result_check_luascripts( MYSQL_RES *res, MYSQL_BIND *input, void *arg,
+                              long insertid );
 void result_get_luascripts( MYSQL_RES *res, MYSQL_BIND *input, void *arg,
                             long insertid );
 void cursesLuascriptDisplay( void *arg );
@@ -121,7 +124,13 @@ static SchemaUpgrade_t schemaUpgrade[CURRENT_SCHEMA_LUASCRIPT] = {
 static QueryTable_t luascriptQueryTable[] = {
     /* 0 */
     { "SELECT scriptName, fileName, preload, arguments FROM plugin_luascript",
-      NULL, NULL, FALSE }
+      NULL, NULL, FALSE },
+    /* 1 */
+    { "SELECT `scriptName` FROM `plugin_luascript` WHERE `scriptName` = ?", 
+      NULL, NULL, FALSE },
+    /* 2 */
+    { "INSERT INTO `plugin_luascript` ( `scriptName`, `fileName`, `preload`, "
+      "`arguments`) VALUES ( ?, ?, ?, ? )", NULL, NULL, FALSE }
 };
 
 typedef struct {
@@ -156,6 +165,7 @@ static char ident[] _UNUSED_ =
 void plugin_initialize( char *args )
 {
     static char            *command = "luascript";
+    LinkedList_t           *list;
 
     LogPrintNoArg( LOG_NOTICE, "Initializing luascript..." );
     LogPrint( LOG_NOTICE, "Using %s", LUA_VERSION );
@@ -168,6 +178,10 @@ void plugin_initialize( char *args )
                      schemaUpgrade );
 
     luascriptMenuId = cursesMenuItemAdd( 1, -1, "LUAScript", NULL, NULL );
+
+    list = pluginFindPlugins( NULL, ".lua" );
+    db_check_luascripts( list );
+    LinkedListDestroy( list );
 
     luascriptTree = db_get_luascripts();
     if( !luascriptTree ) {
@@ -228,6 +242,73 @@ void plugin_shutdown( void )
     }
     BalancedBTreeDestroy( luascriptTree );
 }
+
+void db_check_luascripts( LinkedList_t *list )
+{
+    MYSQL_BIND         *data;
+    pthread_mutex_t    *mutex;
+    int                 found;
+    LinkedListItem_t   *item, *next;
+    PluginItem_t       *plugItem;
+
+    mutex = (pthread_mutex_t *)malloc(sizeof(pthread_mutex_t));
+    pthread_mutex_init( mutex, NULL );
+
+    LinkedListLock( list );
+    for( item = list->head; item; item = next ) {
+        next = item->next;
+        plugItem = (PluginItem_t *)item;
+
+        data = (MYSQL_BIND *)malloc( 1 * sizeof(MYSQL_BIND));
+        memset( data, 0, 1 * sizeof(MYSQL_BIND) );
+
+        bind_string( &data[0], plugItem->plugin, MYSQL_TYPE_VAR_STRING );
+
+        db_queue_query( 1, luascriptQueryTable, data, 1, 
+                        result_check_luascripts, &found, mutex );
+        pthread_mutex_unlock( mutex );
+
+        if( !found ) {
+            LogPrint( LOG_NOTICE, "Adding new LUA script to database: %s (%s)",
+                                  plugItem->plugin, "disabled" );
+
+            data = (MYSQL_BIND *)malloc( 4 * sizeof(MYSQL_BIND));
+            memset( data, 0, 4 * sizeof(MYSQL_BIND) );
+
+            bind_string( &data[0], plugItem->plugin, MYSQL_TYPE_VAR_STRING );
+            bind_string( &data[1], plugItem->script, MYSQL_TYPE_VAR_STRING );
+            bind_numeric( &data[2], 0, MYSQL_TYPE_LONG );
+            bind_string( &data[3], "", MYSQL_TYPE_VAR_STRING );
+
+            db_queue_query( 2, luascriptQueryTable, data, 4, NULL, NULL, mutex);
+            pthread_mutex_unlock( mutex );
+        }
+
+        free( plugItem->plugin );
+        free( plugItem->script );
+        LinkedListRemove( list, item, LOCKED );
+        free( item );
+    }
+    LinkedListUnlock( list );
+
+    pthread_mutex_destroy( mutex );
+    free( mutex );
+}
+
+void result_check_luascripts( MYSQL_RES *res, MYSQL_BIND *input, void *arg,
+                              long insertid )
+{
+    int         *found;
+
+    found = (int *)arg;
+
+    if( !res || !(mysql_num_rows(res)) ) {
+        *found = FALSE;
+    } else {
+        *found = TRUE;
+    }
+}
+
 
 BalancedBTree_t *db_get_luascripts( void )
 {
