@@ -372,7 +372,7 @@ void *clucene_thread( void *arg )
               CLUCENE_INDEX_DIR );
 
     writer = getWriter(clear);
-    LogPrint( LOG_INFO, "%lld documents indexed", writer->docCount() );
+    LogPrint( LOG_INFO, "%ld documents indexed", (long int)writer->docCount() );
     LogPrintNoArg( LOG_INFO, "Optimizing index" );
     writer->optimize();
     LogPrintNoArg( LOG_INFO, "Finished optimizing index" );
