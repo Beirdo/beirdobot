@@ -1147,24 +1147,26 @@ void db_set_auth( char *nick, AuthData_t *auth )
     db_queue_query( 18, QueryTable, data, 2, NULL, NULL, NULL);
 }
 
-void db_check_plugins( PluginDef_t *plugins, int count )
+void db_check_plugins( LinkedList_t *list )
 {
-    PluginDef_t        *plugin;
-    int                 i;
     MYSQL_BIND         *data;
     pthread_mutex_t    *mutex;
     int                 found;
+    LinkedListItem_t   *item, *next;
+    PluginItem_t       *plugItem;
 
     mutex = (pthread_mutex_t *)malloc(sizeof(pthread_mutex_t));
     pthread_mutex_init( mutex, NULL );
 
-    for( i = 0; i < count; i++ ) {
-        plugin = &plugins[i];
+    LinkedListLock( list );
+    for( item = list->head; item; item = next ) {
+        next = item->next;
+        plugItem = (PluginItem_t *)item;
 
         data = (MYSQL_BIND *)malloc( 1 * sizeof(MYSQL_BIND));
         memset( data, 0, 1 * sizeof(MYSQL_BIND) );
 
-        bind_string( &data[0], plugin->pluginName, MYSQL_TYPE_VAR_STRING );
+        bind_string( &data[0], plugItem->plugin, MYSQL_TYPE_VAR_STRING );
 
         db_queue_query( 21, QueryTable, data, 1, result_check_plugins, &found,
                         mutex );
@@ -1172,21 +1174,26 @@ void db_check_plugins( PluginDef_t *plugins, int count )
 
         if( !found ) {
             LogPrint( LOG_NOTICE, "Adding new plugin to database: %s (%s)",
-                                  plugin->pluginName, 
-                                  (plugin->preload ? "enabled" : "disabled") );
+                                  plugItem->plugin, "disabled" );
 
             data = (MYSQL_BIND *)malloc( 4 * sizeof(MYSQL_BIND));
             memset( data, 0, 4 * sizeof(MYSQL_BIND) );
 
-            bind_string( &data[0], plugin->pluginName, MYSQL_TYPE_VAR_STRING );
-            bind_string( &data[1], plugin->libName, MYSQL_TYPE_VAR_STRING );
-            bind_numeric( &data[2], plugin->preload, MYSQL_TYPE_LONG );
-            bind_string( &data[3], plugin->arguments, MYSQL_TYPE_VAR_STRING );
+            bind_string( &data[0], plugItem->plugin, MYSQL_TYPE_VAR_STRING );
+            bind_string( &data[1], plugItem->script, MYSQL_TYPE_VAR_STRING );
+            bind_numeric( &data[2], 0, MYSQL_TYPE_LONG );
+            bind_string( &data[3], "", MYSQL_TYPE_VAR_STRING );
 
             db_queue_query( 22, QueryTable, data, 4, NULL, NULL, mutex);
             pthread_mutex_unlock( mutex );
         }
+
+        free( plugItem->plugin );
+        free( plugItem->script );
+        LinkedListRemove( list, item, LOCKED );
+        free( item );
     }
+    LinkedListUnlock( list );
 
     pthread_mutex_destroy( mutex );
     free( mutex );

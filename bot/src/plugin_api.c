@@ -1,6 +1,6 @@
 /*
  *  This file is part of the beirdobot package
- *  Copyright (C) 2007 Gavin Hurlbut
+ *  Copyright (C) 2007, 2010 Gavin Hurlbut
  *
  *  The plugin portion of beirdobot is free software; you can redistribute it 
  *  and/or modify it under the terms of the GNU Lesser General Public
@@ -20,9 +20,7 @@
  */
 
 /*HEADER---------------------------------------------------
-* $Id$
-*
-* Copyright 2006 Gavin Hurlbut
+* Copyright 2007, 2010 Gavin Hurlbut
 * All rights reserved
 */
 
@@ -33,12 +31,13 @@
 #include <stdlib.h>
 #include <string.h>
 #include <dlfcn.h>
+#include <dirent.h>
+#include <ctype.h>
 #include "structs.h"
 #include "protos.h"
 #include "balanced_btree.h"
+#include "protected_data.h"
 #include "logging.h"
-#define _DEFINE_PLUGINS
-#include "plugins/plugin_list.h"
 
 
 #ifndef PLUGIN_PATH
@@ -57,6 +56,7 @@ bool pluginFlushUnvisited( BalancedBTreeItem_t *node );
 void pluginSaveFunc( void *arg, int index, char *string );
 
 BalancedBTree_t *pluginTree;
+static ProtectedData_t *extBlock;
 
 /* CVS generated ID string */
 static char ident[] _UNUSED_ = 
@@ -65,13 +65,25 @@ static char ident[] _UNUSED_ =
 void plugins_initialize( void )
 {
     static char        *command = "plugin";
+    LinkedList_t       *list;
+
+    extBlock = ProtectedDataCreate();
+    if( !extBlock ) {
+        LogPrintNoArg( LOG_CRIT, "No memory to create plugin extension "
+                                 "protected structure!!");
+        exit(1);
+    }
+
+    extBlock->data = NULL;
 
     pluginTree = BalancedBTreeCreate( BTREE_KEY_STRING );
     if( !pluginTree ) {
         return;
     }
 
-    db_check_plugins( DefaultPlugins, DefaultPluginCount );
+    list = pluginFindPlugins( "plugin_", ".so" );
+    db_check_plugins( list );
+    LinkedListDestroy( list );
 
     LogPrint( LOG_NOTICE, "Plugin path: %s", PLUGIN_PATH );
 
@@ -434,6 +446,112 @@ void pluginSaveFunc( void *arg, int index, char *string )
                       string );
 }
 
+int filterFile( const struct dirent *de )
+{
+    char           *name;
+    int             namelen;
+    int             i;
+    int             j;
+    PluginSpec_t   *spec;
+
+    spec = (PluginSpec_t *)extBlock->data;
+
+    name = (char *)de->d_name;
+
+    if( !spec || !spec->extension || !name ) {
+        return( 0 );
+    }
+
+    namelen = strlen( name );
+
+    if( spec->prefix ) {
+        if( namelen <= spec->prefLen ) {
+            return( 0 );
+        }
+
+        for( i = 0; i < spec->prefLen; i++ ) {
+            if( tolower(name[i]) != tolower(spec->prefix[i]) ) { 
+                return( 0 );
+            }
+        }
+    }
+
+    if( namelen <= spec->extLen ) {
+        return( 0 );
+    }
+
+    for( i = namelen - spec->extLen, j = 0; i < namelen; i++, j++ ) {
+        if( tolower(name[i]) != tolower(spec->extension[j]) ) { 
+            return( 0 );
+        }
+    }
+
+    /* I guess all the characters match, return non-zero */
+    return( 1 );
+}
+
+LinkedList_t *pluginFindPlugins( char *prefix, char *extension )
+{
+    LinkedList_t   *list;
+    PluginItem_t   *item;
+    struct dirent **namelist;
+    int             n;
+    int             i;
+    int             len;
+    PluginSpec_t   *spec;
+    char           *name;
+
+    list = LinkedListCreate();
+    LinkedListLock( list );
+
+    ProtectedDataLock( extBlock );
+
+    if( extBlock->data ) {
+        spec = (PluginSpec_t *)extBlock->data;
+        if( spec->prefix ) {
+            free( spec->prefix );
+        }
+        if( spec->extension ) {
+            free( spec->extension );
+        }
+        free( extBlock->data );
+    }
+
+    spec = (PluginSpec_t *)malloc(sizeof(PluginSpec_t));
+    memset( spec, 0, sizeof(PluginSpec_t) );
+    extBlock->data = (void *)spec;
+
+    if( prefix ) {
+        spec->prefix    = strdup( prefix );
+        spec->prefLen   = strlen( prefix );
+    }
+
+    spec->extension = strdup( extension );
+    spec->extLen    = strlen( extension );
+
+    n = scandir( PLUGIN_PATH, &namelist, filterFile, alphasort );
+
+    for( i = 0; i < n; i++ ) {
+        item = (PluginItem_t *)malloc(sizeof(PluginItem_t));
+        name = namelist[i]->d_name;
+        len = strlen(name);
+        item->plugin = strndup( &name[spec->prefLen],
+                                len - spec->prefLen - spec->extLen );
+        item->script = strdup( name );
+        LinkedListAdd( list, (LinkedListItem_t*)item, LOCKED, AT_TAIL );
+        free( namelist[i] );
+    }
+
+    ProtectedDataUnlock( extBlock );
+
+    if( n >= 0 ) {
+        free( namelist );
+    }
+
+    LinkedListUnlock( list );
+
+    return( list );
+}
 
 /*
  * vim:ts=4:sw=4:ai:et:si:sts=4

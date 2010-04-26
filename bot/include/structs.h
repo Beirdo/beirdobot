@@ -435,6 +435,19 @@ typedef struct {
 
 typedef void (*CursesSaveFunc_t)(void *, int, char *);
 
+typedef struct {
+    char       *prefix;
+    int         prefLen;
+    char       *extension;
+    int         extLen;
+} PluginSpec_t;
+
+typedef struct {
+    LinkedListItem_t    linkage;
+    char               *plugin;
+    char               *script;
+} PluginItem_t;
+
 #endif
 
 /*

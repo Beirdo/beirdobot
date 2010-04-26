@@ -1,6 +1,6 @@
 /*
  *  This file is part of the beirdonet package
- *  Copyright (C) 2006 Gavin Hurlbut
+ *  Copyright (C) 2006, 2010 Gavin Hurlbut
  *
  *  beirdobot is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -18,9 +18,7 @@
  */
 
 /*HEADER---------------------------------------------------
-* $Id$
-*
-* Copyright 2006 Gavin Hurlbut
+* Copyright 2006, 2010 Gavin Hurlbut
 * All rights reserved
 *
 */
@@ -84,7 +82,7 @@ void db_nick_history( IRCChannel_t *channel, char *nick, NickHistory_t type );
 AuthData_t *db_get_auth( char *nick );
 void db_set_auth( char *nick, AuthData_t *auth );
 void db_free_auth( AuthData_t *auth );
-void db_check_plugins( PluginDef_t *plugins, int count );
+void db_check_plugins( LinkedList_t *list );
 void db_rebuild_clucene( void );
 
 IRCChannel_t *FindChannelNum( IRCServer_t *server, int channum );
@@ -111,6 +109,7 @@ void plugins_sighup( void );
 bool pluginLoad( char *name );
 bool pluginUnload( char *name );
 void pluginUnloadAll( void );
+LinkedList_t *pluginFindPlugins( char *prefix, char *extension );
 
 void regexp_initialize( void );
 void regexp_add( const char *channelRegexp, const char *contentRegexp, 
