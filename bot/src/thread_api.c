@@ -86,7 +86,8 @@ void thread_register( pthread_t *pthreadId, char *name,
     item->key  = (void *)thread->threadId;
 
     BalancedBTreeAdd( ThreadTree, item, UNLOCKED, true );
-    LogPrint( LOG_INFO, "Added Thread %ld as \"%s\"", *pthreadId, name );
+    LogPrint( LOG_INFO, "Added Thread %lld as \"%s\"", 
+              (long long int)*pthreadId, name );
 }
 
 char *thread_name( pthread_t pthreadId )
@@ -117,8 +118,8 @@ void thread_deregister( pthread_t pthreadId )
     BalancedBTreeRemove( ThreadTree, item, UNLOCKED, true );
     thread = (Thread_t *)item->item;
 
-    LogPrint( LOG_INFO, "Removed Thread %ld as \"%s\"", pthreadId, 
-                        (char *)thread->name );
+    LogPrint( LOG_INFO, "Removed Thread %lld as \"%s\"", 
+                        (long long int)pthreadId, (char *)thread->name );
 
     free( thread );
     free( item );
