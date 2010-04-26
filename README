@@ -4,6 +4,29 @@ The bot/ dir contains the source of the IRC bot (C)
 The web/ dir contains the source of the web frontend (PHP)
 The scripts/ dir contains script files used for packaging
 
-NOTE: in Ubuntu, you will need to (as root) do 
-"ln -s /usr/lib/CLucene/clucene-config.h /usr/include/CLucene"
-or ./configure will fail.  This will be true until the packaging bug is fixed.
+
+
+To get the prerequisites in Ubuntu:
+apt-get install libclucene-dev libpcre3-dev libc-client-dev libperl-dev 
+apt-get install libcurl4-openssl-dev libapr1-dev libaprutil1-dev libsvn-dev 
+apt-get install autoconf automake libncurses5-dev
+ln -s /usr/lib/CLucene/clucene-config.h /usr/include/CLucene
+
+After install (use appropriate user/group info):
+chown -R botuser.botgroup /usr/share/beirdobot/clucene
+
+
+
+Flood settings for IRC networks (tested):
+
+Freenode:
+Flood Interval: 2                   
+Flood Max Time: 8                   
+Flood Buffer:   1500                
+Flood Max Line: 160 
+
+OFTC:
+Flood Interval: 2                   
+Flood Max Time: 8                   
+Flood Buffer:   2000                
+Flood Max Line: 256 
