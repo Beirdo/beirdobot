@@ -52,6 +52,9 @@ void botCmdPerl( IRCServer_t *server, IRCChannel_t *channel, char *who,
                  char *msg, void *tag );
 char *botHelpPerl( void *tag );
 
+void db_check_perlscripts( LinkedList_t *list );
+void result_check_perlscripts( MYSQL_RES *res, MYSQL_BIND *input, void *arg,
+                               long insertid );
 BalancedBTree_t *db_get_perl( void );
 void result_get_perl( MYSQL_RES *res, MYSQL_BIND *input, void *arg,
                       long insertid );
@@ -125,7 +128,13 @@ static SchemaUpgrade_t schemaUpgrade[CURRENT_SCHEMA_PERL] = {
 static QueryTable_t perlQueryTable[] = {
     /* 0 */
     { "SELECT scriptName, fileName, preload, arguments FROM plugin_perl",
-      NULL, NULL, FALSE }
+      NULL, NULL, FALSE },
+    /* 1 */
+    { "SELECT `scriptName` FROM `plugin_perl` WHERE `scriptName` = ?", 
+      NULL, NULL, FALSE },
+    /* 2 */
+    { "INSERT INTO `plugin_perl` ( `scriptName`, `fileName`, `preload`, "
+      "`arguments`) VALUES ( ?, ?, ?, ? )", NULL, NULL, FALSE }
 };
 
 #if 0
@@ -166,6 +175,7 @@ void plugin_initialize( char *args )
     int                     retval;
     static char            *dummy_args[] = { "", "-e", "0" };
     SV                     *sv;
+    LinkedList_t           *list;
 
     LogPrintNoArg( LOG_NOTICE, "Initializing perl..." );
     snprintf( version, 16, "%d.%d.%d", PERL_REVISION, PERL_VERSION, 
@@ -179,6 +189,10 @@ void plugin_initialize( char *args )
                      schemaUpgrade );
 
     perlMenuId = cursesMenuItemAdd( 1, -1, "Perl", NULL, NULL );
+
+    list = pluginFindPlugins( NULL, ".pl" );
+    db_check_perlscripts( list );
+    LinkedListDestroy( list );
 
     perlTree = db_get_perl();
     if( !perlTree ) {
@@ -274,6 +288,73 @@ void plugin_shutdown( void )
     perl_destruct(my_perl);
     perl_free(my_perl);
 }
+
+void db_check_perlscripts( LinkedList_t *list )
+{
+    MYSQL_BIND         *data;
+    pthread_mutex_t    *mutex;
+    int                 found;
+    LinkedListItem_t   *item, *next;
+    PluginItem_t       *plugItem;
+
+    mutex = (pthread_mutex_t *)malloc(sizeof(pthread_mutex_t));
+    pthread_mutex_init( mutex, NULL );
+
+    LinkedListLock( list );
+    for( item = list->head; item; item = next ) {
+        next = item->next;
+        plugItem = (PluginItem_t *)item;
+
+        data = (MYSQL_BIND *)malloc( 1 * sizeof(MYSQL_BIND));
+        memset( data, 0, 1 * sizeof(MYSQL_BIND) );
+
+        bind_string( &data[0], plugItem->plugin, MYSQL_TYPE_VAR_STRING );
+
+        db_queue_query( 1, perlQueryTable, data, 1, result_check_perlscripts, 
+                        &found, mutex );
+        pthread_mutex_unlock( mutex );
+
+        if( !found ) {
+            LogPrint( LOG_NOTICE, "Adding new perl script to database: %s (%s)",
+                                  plugItem->plugin, "disabled" );
+
+            data = (MYSQL_BIND *)malloc( 4 * sizeof(MYSQL_BIND));
+            memset( data, 0, 4 * sizeof(MYSQL_BIND) );
+
+            bind_string( &data[0], plugItem->plugin, MYSQL_TYPE_VAR_STRING );
+            bind_string( &data[1], plugItem->script, MYSQL_TYPE_VAR_STRING );
+            bind_numeric( &data[2], 0, MYSQL_TYPE_LONG );
+            bind_string( &data[3], "", MYSQL_TYPE_VAR_STRING );
+
+            db_queue_query( 2, perlQueryTable, data, 4, NULL, NULL, mutex);
+            pthread_mutex_unlock( mutex );
+        }
+
+        free( plugItem->plugin );
+        free( plugItem->script );
+        LinkedListRemove( list, item, LOCKED );
+        free( item );
+    }
+    LinkedListUnlock( list );
+
+    pthread_mutex_destroy( mutex );
+    free( mutex );
+}
+
+void result_check_perlscripts( MYSQL_RES *res, MYSQL_BIND *input, void *arg,
+                               long insertid )
+{
+    int         *found;
+
+    found = (int *)arg;
+
+    if( !res || !(mysql_num_rows(res)) ) {
+        *found = FALSE;
+    } else {
+        *found = TRUE;
+    }
+}
+
 
 BalancedBTree_t *db_get_perl( void )
 {
