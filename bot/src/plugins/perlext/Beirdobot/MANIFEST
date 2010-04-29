@@ -1,0 +1,8 @@
+Beirdobot.xs
+Changes
+Makefile.PL
+MANIFEST
+ppport.h
+README
+t/Beirdobot.t
+lib/Beirdobot.pm
