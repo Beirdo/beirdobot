@@ -373,9 +373,11 @@ void *clucene_thread( void *arg )
 
     writer = getWriter(clear);
     LogPrint( LOG_INFO, "%ld documents indexed", (long int)writer->docCount() );
-    LogPrintNoArg( LOG_INFO, "Optimizing index" );
-    writer->optimize();
-    LogPrintNoArg( LOG_INFO, "Finished optimizing index" );
+    if( optimize ) {
+        LogPrintNoArg( LOG_INFO, "Optimizing index" );
+        writer->optimize();
+        LogPrintNoArg( LOG_INFO, "Finished optimizing index" );
+    }
     closeWriter( writer );
 
     while( !GlobalAbort ) {

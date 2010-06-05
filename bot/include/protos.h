@@ -51,6 +51,7 @@ extern bool Daemon;
 extern bool GlobalAbort;
 extern bool BotDone;
 extern bool ChannelsLoaded;
+extern bool optimize;
 
 
 /* Prototypes */

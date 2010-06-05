@@ -63,6 +63,7 @@ bool                Daemon;
 bool                Debug;
 bool                GlobalAbort = FALSE;
 bool                BotDone = FALSE;
+bool                optimize = FALSE;
 pthread_t           mainThreadId;
 BalancedBTree_t    *versionTree;
 char               *pthreadsVersion = NULL;
@@ -310,8 +311,9 @@ void MainParseArgs( int argc, char **argv )
     verbose = false;
     Debug = false;
     Daemon = false;
+    optimize = false;
 
-    while( (opt = getopt_long( argc, argv, "hVH:P:u:p:d:Dgv", longOpts, 
+    while( (opt = getopt_long( argc, argv, "hVH:P:u:p:d:Dgov", longOpts, 
                                &optIndex )) != -1 )
     {
         switch( opt )
@@ -325,6 +327,9 @@ void MainParseArgs( int argc, char **argv )
                 break;
             case 'g':
                 Debug = true;
+                break;
+            case 'o':
+                optimize = true;
                 break;
             case 'v':
                 verbose = true;
