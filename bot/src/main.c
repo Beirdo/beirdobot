@@ -299,6 +299,7 @@ void MainParseArgs( int argc, char **argv )
         {"database", 1, 0, 'd'},
         {"daemon", 0, 0, 'D'},
         {"verbose", 0, 0, 'v'},
+        {"optimize", 0, 0, 'o'},
         {"debug", 0, 0, 'g'},
         {0, 0, 0, 0}
     };

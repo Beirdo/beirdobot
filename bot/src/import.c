@@ -62,6 +62,7 @@ bool                Daemon = FALSE;
 bool                Debug = FALSE;
 bool                GlobalAbort = FALSE;
 bool                BotDone = FALSE;
+bool                optimize = FALSE;
 pthread_t           mainThreadId;
 BalancedBTree_t    *versionTree;
 char               *pthreadsVersion = NULL;
@@ -184,6 +185,7 @@ void MainParseArgs( int argc, char **argv )
         {"password", 1, 0, 'p'},
         {"port", 1, 0, 'P'},
         {"database", 1, 0, 'd'},
+        {"optimize", 0, 0, 'o'},
         {0, 0, 0, 0}
     };
 
@@ -192,8 +194,9 @@ void MainParseArgs( int argc, char **argv )
     mysql_user = NULL;
     mysql_password = NULL;
     mysql_db = NULL;
+    optimize = false;
 
-    while( (opt = getopt_long( argc, argv, "hVH:P:u:p:d:", longOpts, 
+    while( (opt = getopt_long( argc, argv, "hVH:P:u:p:d:o", longOpts, 
                                &optIndex )) != -1 )
     {
         switch( opt )
@@ -211,6 +214,9 @@ void MainParseArgs( int argc, char **argv )
                 break;
             case 'P':
                 mysql_portnum = atoi(optarg);
+                break;
+            case 'o':
+                optimize = true;
                 break;
             case 'u':
                 if( mysql_user != NULL )
