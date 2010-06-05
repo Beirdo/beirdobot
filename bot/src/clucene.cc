@@ -281,7 +281,7 @@ int loadLogentry( Document *doc, unsigned long tb )
         doc->add( *_CLNEW Field( field->name(), field->stringValue(), 
                                  Field::STORE_YES | Field::INDEX_TOKENIZED ) );
     }
-    LogPrint( LOG_INFO, "Deleting document %lld", h->id(0) );
+    LogPrint( LOG_INFO, "Deleting document %lld", (uint64)(h->id(0)) );
     reader->deleteDocument( h->id(0) );
     reader->close();
 
