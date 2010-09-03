@@ -26,11 +26,18 @@
                         FROM channels
                     ORDER BY chanid');
     while ($row = $sh->fetch_assoc()) {
-        $sh2 = $db->query('SELECT MAX(timestamp) AS last_entry,
-                                  MIN(timestamp) AS first_entry
-                             FROM irclog 
-                            WHERE chanid = ?', $row['chanid']);
-        $row2 = $sh2->fetch_assoc();
+        $sh2 = $db->query_col('SELECT timestamp
+                                 FROM irclog 
+                                WHERE chanid = ?
+                             ORDER BY timestamp ASC
+                                LIMIT 1', $row['chanid']);
+        $row2['first_entry'] = $sh2;
+        $sh2 = $db->query_col('SELECT timestamp
+                                 FROM irclog 
+                                WHERE chanid = ?
+                             ORDER BY timestamp DESC
+                                LIMIT 1', $row['chanid']);
+        $row2['last_entry'] = $sh2;
         $Channels[$row['chanid']] = new irc_channel($row,$row2);
     }
     $sh->finish();

@@ -139,7 +139,7 @@ QueryTable_t    QueryTable[] = {
       NULL, FALSE },
     /* 8 */
     { "SELECT `lastnotice` FROM `nicks` WHERE `chanid` = ? AND `nick` = ? AND "
-      "`lastnotice` <= ?", NULL, NULL, FALSE },
+      "`lastnotice` <= ? AND `present` = 1", NULL, NULL, FALSE },
     /* 9 */
     { "INSERT INTO `nickhistory` ( `chanid`, `nick`, `histType`, `timestamp` )"
       " VALUES ( ?, ?, ?, ? )", NULL, NULL, FALSE },

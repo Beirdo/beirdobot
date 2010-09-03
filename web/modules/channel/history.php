@@ -12,11 +12,18 @@
 /**/
 
 // Pull up the earliest and latest log entries
-    list($min, $max) = $db->query_row('SELECT MIN(timestamp), MAX(timestamp)
-                                         FROM irclog
-                                        WHERE chanid=?
-                                     GROUP BY chanid',
-                                      $Channel->chanid);
+    $min = $db->query_col('SELECT timestamp
+                             FROM irclog
+                            WHERE chanid=?
+                         ORDER BY timestamp ASC
+                            LIMIT 1',
+                         $Channel->chanid);
+    $max = $db->query_col('SELECT timestamp
+                             FROM irclog
+                            WHERE chanid=?
+                         ORDER BY timestamp DESC
+                            LIMIT 1',
+                         $Channel->chanid);
 
     $min = day_in_seconds * intVal(($min + date('Z')) / day_in_seconds) - date('Z');
     $max = day_in_seconds * intVal(($max + date('Z')) / day_in_seconds) - date('Z');
