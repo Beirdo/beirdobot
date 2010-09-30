@@ -60,6 +60,10 @@ static FishCmd_t fishCmds[] = {
     { "salmon", "throws several salmon at %s.  SPLAT!",
       "connects with the head of %s with a %s salmon on behalf of %s...",
       "plants a salmon upside the head of %s on behalf of %s..." },
+    { "parrot", "looks around the channel for parrots for %s to smack.",
+      "points at %s and says \"Nice %s parrot you got there!\" on behalf "
+      "of %s...",
+      "dislodges the parrot from the shoulder of %s on behalf of %s..." },
     { NULL, NULL, NULL, NULL }
 };
 
