@@ -169,7 +169,7 @@ class irc_message {
 /**/
     function _parse_link($link) {
     // parse_message() runs htmlentities first, so undo a bit of that
-        $str = '<a href="'.str_replace('&amp;', '&', $link).'">';
+        $str = '<a href="'.str_replace('&amp;', '&', $link).'" rel="nofollow">';
     // Long links mess up the page wrapping, since browsers don't know to wrap
     // on characters like & or +
         if (strlen($link) > 64) {
