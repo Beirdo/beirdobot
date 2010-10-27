@@ -11,3 +11,10 @@ webservice/mongoose:
   type: svn
   revision: 478
   remote: braid/webservice/mongoose
+bot/src/clucene: 
+  squashed: true
+  url: git://clucene.git.sourceforge.net/gitroot/clucene/clucene
+  branch: master
+  type: git
+  revision: da67d76eed7b09a0e0e7670b0c7546de71c563cf
+  remote: braid/bot/src/clucene
