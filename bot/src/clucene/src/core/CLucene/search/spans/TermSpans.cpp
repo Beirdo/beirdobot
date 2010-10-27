@@ -10,6 +10,7 @@
 #include "CLucene/util/StringBuffer.h"
 
 #include "_TermSpans.h"
+#include <limits.h>
 
 CL_NS_DEF2(search, spans)
 
