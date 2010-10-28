@@ -1793,9 +1793,14 @@ void cursesFormRegenerate( void )
             free_field( detailsFields[i] );
             detailsFields[i] = NULL;
         }
+        detailsForm = NULL;
     }
 
-    pageCount = (maxy + y - 1) / (y - 1);
+    if( maxy <= y - 1 ) {
+        pageCount = 1;
+    } else {
+        pageCount = (maxy + y - 1) / (y - 1);
+    }
     newPage = FALSE;
     
     detailsFieldCount = count + pageCount + 1;
@@ -1811,7 +1816,8 @@ void cursesFormRegenerate( void )
 
             starty = fieldItem->starty - pageStart;
 
-            if( starty < 0 || starty > pageStart + y - 2 )
+            if( starty < 0 || ( pageCount > 1 && starty > y - 2 ) ||
+                ( pageCount == 1 && starty > y - 1 ) )
             {
                 continue;
             }
