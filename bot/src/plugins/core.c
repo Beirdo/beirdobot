@@ -323,7 +323,7 @@ void lucene_search_text( IRCServer_t *server, IRCChannel_t *channel, char *who,
                          char *text )
 {
     SearchResults_t    *results;
-    int                 count;
+    uint32              count;
     int                 i;
     int                 len;
     char               *value = NULL;

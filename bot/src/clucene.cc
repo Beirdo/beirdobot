@@ -29,6 +29,7 @@
 #include "clucene.h"
 #include <CLucene.h>
 #include <CLucene/config/repl_tchar.h>
+#include <CLucene/util/Misc.h>
 #include <string.h>
 #include <stdlib.h>
 #include <sys/time.h>
@@ -124,8 +125,8 @@ extern "C" {
     }
 #endif
 
-    SearchResults_t *clucene_search( int chanid, char *text, int *count, 
-                                     int max )
+    SearchResults_t *clucene_search( int chanid, char *text, uint32 *count, 
+                                     uint32 max )
     {
         IndexReader            *reader;
         WhitespaceAnalyzer      an;
@@ -136,7 +137,7 @@ extern "C" {
         static TCHAR            query[MAX_STRING_LEN];
         char                   *esctext;
         SearchResults_t        *results;
-        int                     i;
+        uint32                  i;
         char                   *ts;
 
         reader = IndexReader::open(CLUCENE_INDEX_DIR);
@@ -250,10 +251,11 @@ int loadLogentry( Document *doc, unsigned long tb )
     Query                      *q;
     Hits                       *h;
     Document                   *d;
-    DocumentFieldEnumeration   *fields;
+    Document::FieldsType       *fields;
     Field                      *field;
     static TCHAR                query[80];
     int                         len;
+    Document::FieldsType::iterator itr;
 
     reader = IndexReader::open(CLUCENE_INDEX_DIR);
     s = _CLNEW IndexSearcher(reader);
@@ -274,12 +276,15 @@ int loadLogentry( Document *doc, unsigned long tb )
         return( 0 );
     }
     d = &h->doc(0);
-    fields = d->fields();
+    fields = (Document::FieldsType *)d->getFields();
     doc->clear();
     /* Recreate the current document */
-    while( (field = fields->nextElement()) ) {
+    itr = fields->begin();
+    while( itr != fields->end() ) {
+        field = *itr;
         doc->add( *_CLNEW Field( field->name(), field->stringValue(), 
                                  Field::STORE_YES | Field::INDEX_TOKENIZED ) );
+        itr++;
     }
     LogPrint( LOG_INFO, "Deleting document %lld", (uint64)(h->id(0)) );
     reader->deleteDocument( h->id(0) );

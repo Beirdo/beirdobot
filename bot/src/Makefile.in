@@ -23,7 +23,8 @@ CFLAGS_main += -DLDFLAGS="\"${LDFLAGS}\""
 CXXFLAGS  = -O6 -g -Wall -Werror -I../include -pedantic -Wno-long-long
 CXXFLAGS += -Wno-variadic-macros
 CXXFLAGS += $(shell ${MYSQLCFG} --cflags)
-CXXFLAGS_clucene = -DCLUCENE_INDEX_DIR=\"${indexdir}\"
+CXXFLAGS_clucene  = -DCLUCENE_INDEX_DIR=\"${indexdir}\" -I./clucene/src/core
+CXXFLAGS_clucene += -I./clucene/src/shared
 
 LDFLAGS = -g -rdynamic
 
@@ -31,7 +32,9 @@ LIBS	= $(shell ${MYSQLCFG} @MYSQL_LIBS@)
 LIBS   += $(shell ${BOTNETCFG} --libs-static)
 LIBS   += $(shell ${PCRECFG} --libs)
 LIBS   += $(shell ${CURLCFG} --libs)
-LIBS   += -ldl -L../lib -lopie -lmenu -lform -lncurses -lclucene
+LIBS   += -ldl -L../lib -lopie -lmenu -lform -lncurses -lstdc++ -lz
+LIBS   += -lclucene-core-static -lclucene-shared-static
+LIBS   += -lclucene-contribs-lib-static
 
 SRCS	= main.c plugin_api.c bot.c bot_cmds.c mysql.c linked_list.c regexp.c
 SRCS   += balanced_btree.c protected_data.c mysql_upgrade.c queue.c notice.c
@@ -48,7 +51,9 @@ IMPORTEROBJS  = ${IMPORTERSRCS:.c=.o} ${IMPORTERSRCCS:.cc=.o}
 DEPS         += import.d
 IMPORTER      = importdb${EXEEXT}
 IMPORTERLIBS  = $(shell ${MYSQLCFG} @MYSQL_LIBS@)
-IMPORTERLIBS += -lclucene
+IMPORTERLIBS += -lstdc++ -lz -L../lib 
+IMPORTERLIBS += -lclucene-core-static -lclucene-shared-static
+IMPORTERLIBS += -lclucene-contribs-lib-static
 
 DESTDIR		=
 prefix		= @prefix@
