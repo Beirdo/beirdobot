@@ -7,4 +7,4 @@ CMAKE_DEFINES += "-DCMAKE_CXX_FLAGS:STRING=-finput-charset=iso-8859-1"
 all:
 	-mkdir build
 	cd build ; cmake -G "Unix Makefiles" ${CMAKE_DEFINES} ..
-	${MAKE} -C build all clucene-contribs-lib
+	${MAKE} -C build all #clucene-contribs-lib

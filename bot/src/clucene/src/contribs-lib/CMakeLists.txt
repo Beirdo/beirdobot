@@ -112,3 +112,27 @@ SET_TARGET_PROPERTIES(clucene-contribs-lib PROPERTIES
     SOVERSION ${CLUCENE_SOVERSION}
     COMPILE_DEFINITIONS_DEBUG _DEBUG
 )
+
+IF ( BUILD_STATIC_LIBRARIES )
+	add_library(clucene-contribs-lib-static STATIC
+		${clucene_contribs_Files} ${clucene_shared_Files} ${HEADERS}
+	)
+	
+	SET_TARGET_PROPERTIES(clucene-core-static PROPERTIES
+	    VERSION ${CLUCENE_VERSION}
+	    SOVERSION ${CLUCENE_SOVERSION}
+	    COMPILE_DEFINITIONS_DEBUG _DEBUG
+	)
+	
+	#and install library
+	install(TARGETS clucene-contribs-lib-static 
+	        DESTINATION ${LIB_DESTINATION} 
+	        COMPONENT runtime )
+ENDIF ( BUILD_STATIC_LIBRARIES )
+
+
+
+#and install library
+install(TARGETS clucene-contribs-lib 
+        DESTINATION ${LIB_DESTINATION}  
+        COMPONENT runtime )
