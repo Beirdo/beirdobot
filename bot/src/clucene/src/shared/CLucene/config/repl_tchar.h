@@ -130,7 +130,7 @@ namespace std
     typedef string tstring;
   #endif
 #endif
-};
+}
 
 #define STRCPY_AtoA(target,src,len) strncpy(target,src,len)
 #define STRDUP_AtoA(x) strdup(x)
