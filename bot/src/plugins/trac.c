@@ -74,9 +74,7 @@ static svn_error_t *user_prompt_callback( svn_auth_cred_username_t **cred,
                                           void *baton, const char *realm,
                                           svn_boolean_t may_save,
                                           apr_pool_t *pool );
-static svn_error_t *tracSvnReceiver( void *baton, apr_hash_t *changed_paths, 
-                                     svn_revnum_t revision, const char *author, 
-                                     const char *date, const char *message, 
+static svn_error_t *tracSvnReceiver( void *baton, svn_log_entry_t *log_entry,
                                      apr_pool_t *pool );
 static size_t tracMemorizeFile(void *ptr, size_t size, size_t nmemb, 
                                void *data);
@@ -995,20 +993,29 @@ char *botHelpTrac( void *tag )
     return( help );
 }
 
-static svn_error_t *tracSvnReceiver( void *baton, apr_hash_t *changed_paths, 
-                                     svn_revnum_t revision, const char *author, 
-                                     const char *date, const char *message, 
+static svn_error_t *tracSvnReceiver( void *baton, svn_log_entry_t *log_entry,
                                      apr_pool_t *pool )
 {
     TracSVNLog_t       *args;
     char               *ch;
+    apr_hash_t         *revprops;
+                           
+    char               *author; 
+    char               *date;
+    char               *message; 
+
+    revprops = log_entry->revprops;
+    author   = (char *)apr_hash_get( revprops, "author",  APR_HASH_KEY_STRING );
+    date     = (char *)apr_hash_get( revprops, "date",    APR_HASH_KEY_STRING );
+    message  = (char *)apr_hash_get( revprops, "message", APR_HASH_KEY_STRING );
 
     args = (TracSVNLog_t *)baton;
 
     args->message = (char *)malloc( 42 + strlen(author) + strlen(date) +
                                     strlen(message) );
     sprintf( args->message, "[%ld] Author: %s  Date: %s  Message: %s",
-                            (long int)revision, author, date, message );
+                            (long int)log_entry->revision, author, date, 
+                            message );
 
     for( ch = args->message; *ch; ch++ ) {
         if( *ch == '\n' || *ch == '\r' ) {
@@ -1147,6 +1154,7 @@ char *tracDetailsChangeset( TracURL_t *tracItem, int number )
     apr_pool_t             *pool;
     svn_opt_revision_t      revision;
     apr_array_header_t     *target;
+    apr_array_header_t     *revision_range;
     char                   *url;
     TracSVNLog_t            args;
     char                   *message;
@@ -1159,14 +1167,19 @@ char *tracDetailsChangeset( TracURL_t *tracItem, int number )
     url = apr_pstrdup( pool, tracItem->svnUrl );
     APR_ARRAY_PUSH( target, const char *) = url;
 
+    revision_range = apr_array_make( pool, 2, sizeof(svn_opt_revision_t *) );
+    APR_ARRAY_PUSH( revision_range, svn_opt_revision_t * ) = &revision;
+    APR_ARRAY_PUSH( revision_range, svn_opt_revision_t * ) = &revision;
+
     args.item    = tracItem;
     args.pool    = pool;
     args.message = NULL;
 
-    if( (error = svn_client_log( target, &revision, &revision, 
-                                 FALSE, FALSE, tracSvnReceiver, 
-                                 (void *)&args, 
-                                 tracItem->svnContext, pool ) ) ) {
+    if( (error = svn_client_log5( target, svn_opt_revision_unspecified, 
+                                  revision_range, 0,
+                                  FALSE, FALSE, FALSE, NULL,
+                                  tracSvnReceiver, (void *)&args, 
+                                  tracItem->svnContext, pool ) ) ) {
         log_svn_error( error );
         message = (char *)malloc(60);
         sprintf(message, "No data for changeset [%d]", number);
