@@ -12,9 +12,6 @@
 /* Define to 1 if you have the `apr-1' library (-lapr-1). */
 #undef HAVE_LIBAPR_1
 
-/* Define to 1 if you have the `clucene' library (-lclucene). */
-#undef HAVE_LIBCLUCENE
-
 /* Define to 1 if you have the `curl' library (-lcurl). */
 #undef HAVE_LIBCURL
 
@@ -94,6 +91,9 @@
 
 /* Define to the one symbol short name of this package. */
 #undef PACKAGE_TARNAME
+
+/* Define to the home page for this package. */
+#undef PACKAGE_URL
 
 /* Define to the version of this package. */
 #undef PACKAGE_VERSION
