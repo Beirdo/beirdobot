@@ -87,7 +87,8 @@ static DNSType_t        dnsTypes[] = {
     { "SOA",    ns_t_soa },
     { "PTR",    ns_t_ptr },
     { "MX",     ns_t_mx },
-    { "TXT",    ns_t_txt }
+    { "TXT",    ns_t_txt },
+    { "AAAA",   ns_t_aaaa }
 };
 static int dnsTypeCount = NELEMENTS(dnsTypes);
 
@@ -478,6 +479,8 @@ char           *findRR(char *domain, int requested_type)
 
     int             count;
     int             i;
+    int             tempNum;
+    int             wasZero;
 
     struct in_addr          addr;
     BalancedBTreeItem_t    *item;
@@ -623,6 +626,31 @@ char           *findRR(char *domain, int requested_type)
                     strcat(result, message);
                 }
 
+                found = 1;
+                break;
+            case (T_AAAA):
+                wasZero = 0;
+                for( i = 0; i < dlen; i += 2 ) {
+                    tempNum = ((int)cp[i] << 8) + cp[i+1];
+                    if( i != 0 ) {
+                        if( !wasZero ) {
+                            if( tempNum == 0 ) {
+                                strcat(result, "::");
+                                wasZero = 1;
+                                continue;
+                            }
+                        } else if( tempNum == 0 && i != dlen-2 ) {
+                            continue;
+                        }
+
+                        if( !wasZero ) {
+                            strcat(result, ":");
+                        }
+                    }
+                    sprintf(message, "%X", tempNum);
+                    strcat(result, message);
+                }
+                strcat(result, " ");
                 found = 1;
                 break;
             default:
