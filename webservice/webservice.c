@@ -328,14 +328,14 @@ void show_search(struct mg_connection *conn,
 {
 
     SearchResults_t    *results;
-    int                 count;
+    uint32              count;
     int                 i;
     time_t              time_start, time_end;
     struct timeval      tv_start, tv_end, tv_elapsed;
     float               score;
     char               *string, *channum, *max;
     int                 chanid; 
-    int                 maxcount = 20;
+    uint32              maxcount = 20;
     cJSON              *root, *array, *row;
     double              elapsed;
 
@@ -359,7 +359,7 @@ void show_search(struct mg_connection *conn,
         mg_free(max);
     }
 
-    if( maxcount < 0 ) {
+    if( maxcount <= 0 ) {
         maxcount = 1;
     }
 

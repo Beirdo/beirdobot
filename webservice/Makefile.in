@@ -12,7 +12,9 @@ CFLAGS_webservice = -DLOG_DIR=\"${logdir}\"
 
 CXXFLAGS  = -O6 -g -Wall -Werror -I../bot/include -pedantic -Wno-long-long
 CXXFLAGS += -Wno-variadic-macros
-CXXFLAGS_clucene = -DCLUCENE_INDEX_DIR=\"${indexdir}\" -DWEBSERVICE
+CXXFLAGS_clucene  = -DCLUCENE_INDEX_DIR=\"${indexdir}\" -DWEBSERVICE
+CXXFLAGS_clucene += -I../bot/src/clucene/src/core 
+CXXFLAGS_clucene += -I../bot/src/clucene/src/shared
 
 LDFLAGS = -g -rdynamic
 
@@ -21,7 +23,9 @@ SRCCS = clucene.cc
 OBJS  = ${SRCS:.c=.o} ${SRCCS:.cc=.o}
 DEPS  = ${SRCS:.c=.d} ${SRCCS:.cc=.d}
 WEBSERVICE    = beirdobot-webserviced${EXEEXT}
-LIBS = -lclucene -ldl -lpthread
+LIBS  = -lstdc++ -lz -ldl -lpthread
+LIBS += -L ../bot/lib -lclucene-core-static -lclucene-shared-static
+LIBS += -lclucene-contribs-lib-static
 
 DESTDIR		=
 prefix		= @prefix@
