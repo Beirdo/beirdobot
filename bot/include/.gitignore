@@ -6,3 +6,5 @@ opie.h
 release.h
 stamp-h1
 cJSON.h
+CLucene.h
+CLucene
