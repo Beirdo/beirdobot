@@ -327,7 +327,7 @@ void *trac_thread(void *arg)
             LogPrintNoArg( LOG_INFO, "No Channels defined for Trac, "
                                      "disabling" );
             BalancedBTreeUnlock( urlTree );
-            continue;
+            break;
         }
 
         len = 7;
