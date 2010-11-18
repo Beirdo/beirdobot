@@ -1042,7 +1042,7 @@ char *db_get_setting( char *name )
 {
     MYSQL_BIND         *data;
     pthread_mutex_t    *mutex;
-    char               *value;
+    char               *value = NULL;
 
     if( !name ) {
         return( NULL );
