@@ -7,10 +7,15 @@ The scripts/ dir contains script files used for packaging
 
 
 To get the prerequisites in Ubuntu:
-apt-get install libclucene-dev libpcre3-dev libc-client-dev libperl-dev 
+apt-get install libpcre3-dev libc-client-dev libperl-dev 
 apt-get install libcurl4-openssl-dev libapr1-dev libaprutil1-dev libsvn-dev 
-apt-get install autoconf automake libncurses5-dev
-ln -s /usr/lib/CLucene/clucene-config.h /usr/include/CLucene
+apt-get install autoconf automake libncurses5-dev cmake
+
+To get the prerequisites in RedHat & derivatives (tested on CentOS 5.5):
+yum install pcre-devel zlib-devel curl-devel ncurses-devel
+yum install cmake autoconf automake
+(NOTE: this build had several plugins disabled -- luascript, mailbox, perl,
+rssfeed, trac)
 
 After install (use appropriate user/group info):
 chown -R botuser.botgroup /usr/share/beirdobot/clucene
