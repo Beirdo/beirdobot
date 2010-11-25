@@ -135,7 +135,8 @@ QueryTable_t    QueryTable[] = {
     /* 7 */
     { "SELECT DISTINCT `nicks`.`chanid` FROM `nicks`, `channels` "
       "WHERE `nicks`.`chanid` = `channels`.`chanid` AND "
-      "`channels`.`serverid` = ? AND `nicks`.`nick` = ?", chain_flush_nick,
+      "`channels`.`serverid` = ? AND `nicks`.`nick` = ? AND "
+      "`nicks`.`present` = 1", chain_flush_nick,
       NULL, FALSE },
     /* 8 */
     { "SELECT `lastnotice` FROM `nicks` WHERE `chanid` = ? AND `nick` = ? AND "
