@@ -111,6 +111,12 @@ ifeq (${PLUGIN_URL},yes)
  DLLIBS_url     = $(shell ${CURLCFG} --libs)
 endif
 
+PLUGIN_SVNGIT    = @PLUGIN_SVNGIT@
+ifeq (${PLUGIN_SVNGIT},yes)
+ SRCS  += svngit.c 
+endif
+
+
 OBJS	= ${SRCS:%.c=plugin_%.so}
 DEPS	= ${SRCS:.c=.d}
 

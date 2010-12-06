@@ -1,13 +1,13 @@
 # Process this file with autoconf to produce a configure script.
 AC_PREREQ(2.59)
 
-AC_INIT(beirdobot, [git], [gjhurlbu@gmail.com])
+AC_INIT(beirdobot, [GIT], [gjhurlbu@gmail.com])
 AC_CONFIG_AUX_DIR(scripts)
 AC_CONFIG_SRCDIR(bot/src/main.c)
 AM_CONFIG_HEADER(bot/include/config.h)
 AC_CANONICAL_SYSTEM
 
-AM_INIT_AUTOMAKE(beirdobot, "git")
+AM_INIT_AUTOMAKE(beirdobot, "GIT")
 
 AC_ARG_VAR(CUT, [location of the cut command])
 AC_PATH_PROG(CUT, cut)
@@ -257,6 +257,12 @@ ENABLE_SWITCH([plugin-url],[plugin_url],[PLUGIN_URL],[--disable-plugin-url],
               [yes],[no],
 	      [AC_CHECK_LIB([curl], [curl_escape],,
                             [AC_MSG_ERROR(libcurl not installed)])])
+
+ENABLE_SWITCH([plugin-svngit],[plugin_svngit],[PLUGIN_SVNGIT],
+              [--disable-plugin-svngit],[Disable the SVNGIT plugin],
+              [to enable the compilation of the SVNGIT plugin],
+              [To enable the compilation of the SVNGIT plugin],
+              [yes],[no])
 
 
 

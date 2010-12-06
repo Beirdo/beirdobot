@@ -258,6 +258,12 @@ ENABLE_SWITCH([plugin-url],[plugin_url],[PLUGIN_URL],[--disable-plugin-url],
 	      [AC_CHECK_LIB([curl], [curl_escape],,
                             [AC_MSG_ERROR(libcurl not installed)])])
 
+ENABLE_SWITCH([plugin-svngit],[plugin_svngit],[PLUGIN_SVNGIT],
+              [--disable-plugin-svngit],[Disable the SVNGIT plugin],
+              [to enable the compilation of the SVNGIT plugin],
+              [To enable the compilation of the SVNGIT plugin],
+              [yes],[no])
+
 
 
 AC_CONFIG_FILES([Makefile web/Makefile bot/src/Makefile 
