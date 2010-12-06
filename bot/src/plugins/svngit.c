@@ -142,6 +142,7 @@ char *get_svn_git( char *svnid )
     GitSha_t   *sha;
     int         len;
     char       *message;
+    char       *temp;
 
     gitsha = db_get_svn_git( svnid );
     if( !gitsha ) {
@@ -152,11 +153,16 @@ char *get_svn_git( char *svnid )
         sprintf( message, "SVN %s:", svnid );
         len = strlen(message);
         for( sha = gitsha; sha->repo; sha++ ) {
-            len += strlen(sha->repo) + strlen(sha->branch) + 11;
+            len += strlen(sha->repo) + strlen(sha->branch) + 8 + 45;
             message = (char *)realloc( message, len + 1 );
+            temp = (char *)malloc( len + 1 );
             sha->hash[8] = '\0';
-            sprintf( message, "%s %s:%s/%s", message, sha->repo, 
-                                             sha->branch, sha->hash );
+            sprintf( temp, 
+                     "%s (branch %s) https://github.com/MythTV/%s/commit/%s",
+                     message, sha->branch, sha->repo, sha->hash );
+            free( message );
+            message = temp;
+
             free( sha->repo );
             free( sha->branch );
             free( sha->hash );
