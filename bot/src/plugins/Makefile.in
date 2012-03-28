@@ -89,7 +89,7 @@ endif
 PLUGIN_TRAC      = @PLUGIN_TRAC@
 ifeq (${PLUGIN_TRAC},yes)
  SRCS  += trac.c
- CFLAGS_trac  = -I/usr/include/subversion-1 -I/usr/include/apr-1.0
+ CFLAGS_trac  = -I/usr/include/subversion-1 -I/usr/include/apr-1
  CFLAGS_trac += $(shell PKG_CONFIG_PATH=${PKGCONFIGPATH} pkg-config --cflags nxml)
  CFLAGS_trac += $(shell PKG_CONFIG_PATH=${PKGCONFIGPATH} pkg-config --cflags mrss)
  CFLAGS_trac += $(shell ${CURLCFG} --cflags)
@@ -97,6 +97,11 @@ ifeq (${PLUGIN_TRAC},yes)
  DLLIBS_trac += $(shell PKG_CONFIG_PATH=${PKGCONFIGPATH} pkg-config --libs nxml)
  DLLIBS_trac += $(shell PKG_CONFIG_PATH=${PKGCONFIGPATH} pkg-config --libs mrss)
  DLLIBS_trac += $(shell ${CURLCFG} --libs)
+endif
+
+PLUGIN_TRACREDIR     = @PLUGIN_TRACREDIR@
+ifeq (${PLUGIN_TRACREDIR},yes)
+ SRCS  += tracredir.c 
 endif
 
 PLUGIN_TROUT     = @PLUGIN_TROUT@

@@ -244,6 +244,12 @@ ENABLE_SWITCH([plugin-trac],[plugin_trac],[PLUGIN_TRAC],[--disable-plugin-trac],
 			    [AC_MSG_ERROR(libsvn_client-1 not installed)])
               ])
 
+ENABLE_SWITCH([plugin-tracredir],[plugin_tracredir],[PLUGIN_TRACREDIR],
+              [--disable-plugin-trout],[Disable the trout plugin],
+              [to enable the compilation of the trac redirection plugin],
+              [To enable the compilation of the trac redirection plugin],
+              [yes],[no])
+
 ENABLE_SWITCH([plugin-trout],[plugin_trout],[PLUGIN_TROUT],
               [--disable-plugin-trout],[Disable the trout plugin],
               [to enable the compilation of the trout plugin],
