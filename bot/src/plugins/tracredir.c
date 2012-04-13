@@ -33,7 +33,7 @@ void regexpFuncTrac( IRCServer_t *server, IRCChannel_t *channel, char *who,
 static char ident[] _UNUSED_ =
     "$Id$";
 
-static char *contentRegexp = "(?i)(?:\\B|\\s*|^)(?<!build\\s)#(\\d+)(?:\\s|\\.|,|$)";
+static char *contentRegexp = "(?i)(?:\\B|\\s+|^)(?<!build\\s)#(\\d+)(?:\\s|\\.|,|$)";
 
 void plugin_initialize( char *args )
 {
