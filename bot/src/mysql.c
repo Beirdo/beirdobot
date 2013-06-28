@@ -375,7 +375,7 @@ bool db_server_connect( MYSQL *mysql )
               mysql_portnum);
 
     if( !mysql_real_connect(mysql, mysql_host, mysql_user, mysql_password, 
-                            mysql_db, mysql_port, NULL, 0) ) {
+                            mysql_db, mysql_portnum, NULL, 0) ) {
         LogPrint(LOG_CRIT, "Unable to connect to the database - %s",
                            mysql_error(mysql) );
         return( FALSE );
